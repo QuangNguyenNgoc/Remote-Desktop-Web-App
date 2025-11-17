@@ -59,8 +59,4 @@ logs/
 .DS_Store
 Thumbs.db
 ehthumbs.db
-
-# If you prefer to ignore the generated CSS output from Tailwind (currently
-# `wwwroot/css/app.css`), uncomment the next line. By default it is NOT ignored
-# because many projects keep the compiled CSS tracked.
 wwwroot/css/app.css
