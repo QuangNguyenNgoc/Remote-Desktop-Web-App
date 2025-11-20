@@ -14,7 +14,11 @@ Hướng dẫn nhanh cách clone dự án về máy, cài đặt phụ thuộc v
 dotnet --list-sdks
 ```
 
-- Node.js (kèm npm) để chạy Tailwind CSS build/watch.
+- Node.js (kèm npm) để chạy Tailwind CSS build/watch. (node.js: v22.20.0 | npm: 11.6.2)
+```
+node --version
+npm --version
+```
 - Git để clone repository.
 
 ## Clone repository
