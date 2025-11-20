@@ -58,7 +58,7 @@ Lệnh này sẽ biên dịch `Styles/app.css` thành `wwwroot/css/app.css` và 
 2. Chạy ứng dụng Blazor:
 
 ```powershell
-dotnet run
+dotnet watch
 ```
 
 Hoặc, nếu bạn muốn chỉ định project file:
