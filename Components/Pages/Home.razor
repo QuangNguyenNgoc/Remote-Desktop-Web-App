@@ -1,14 +1,121 @@
 ﻿@page "/"
+@using Components.Layout
+@code {
+    protected override void OnInitialized() => MainLayout.PageTitle = "Dashboard Overview";
+}
 
-<PageTitle>Home</PageTitle>
+<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+    <div class="bg-gray-800 rounded-xl p-6 border border-gray-700 shadow-sm">
+        <div class="flex justify-between items-start">
+            <div>
+                <p class="text-sm text-gray-400 font-medium">Active Agents</p>
+                <h3 class="text-3xl font-bold text-white mt-2">12</h3>
+                <p class="text-xs text-green-400 mt-2 flex items-center">
+                    <span class="mr-1">↑</span> +2 connected just now
+                </p>
+            </div>
+            <div class="p-3 bg-blue-500/10 rounded-lg text-blue-500">
+                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                        d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z">
+                    </path>
+                </svg>
+            </div>
+        </div>
+    </div>
 
-<h1>Hello, world!</h1>
+    <div class="bg-gray-800 rounded-xl p-6 border border-gray-700 shadow-sm">
+        <div class="flex justify-between items-start">
+            <div>
+                <p class="text-sm text-gray-400 font-medium">Total Keylogs</p>
+                <h3 class="text-3xl font-bold text-white mt-2">8.4k</h3>
+                <p class="text-xs text-gray-500 mt-2">Captured in last 24h</p>
+            </div>
+            <div class="p-3 bg-purple-500/10 rounded-lg text-purple-500">
+                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                        d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z">
+                    </path>
+                </svg>
+            </div>
+        </div>
+    </div>
 
-Welcome to your new app.
-<article
-    class="rounded-xl shadow-lg shadow-black/20 hover:shadow-2xl hover:shadow-black/30 transition-all duration-300 max-w-[18rem] mx-auto overflow-hidden">
-    <h1 class="text-3xl text-red-700 font-bold underline border border-amber-200">
-        HCMUS - CTT5
-    </h1>
-</article>
-<Button />
+    <div class="bg-gray-800 rounded-xl p-6 border border-gray-700 shadow-sm">
+        <div class="flex justify-between items-start">
+            <div>
+                <p class="text-sm text-gray-400 font-medium">Screenshots</p>
+                <h3 class="text-3xl font-bold text-white mt-2">142</h3>
+                <p class="text-xs text-gray-500 mt-2">Stored in /temp</p>
+            </div>
+            <div class="p-3 bg-indigo-500/10 rounded-lg text-indigo-500">
+                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                        d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z">
+                    </path>
+                </svg>
+            </div>
+        </div>
+    </div>
+
+    <div class="bg-gray-800 rounded-xl p-6 border border-gray-700 shadow-sm">
+        <div class="flex justify-between items-start">
+            <div>
+                <p class="text-sm text-gray-400 font-medium">System Load</p>
+                <h3 class="text-3xl font-bold text-white mt-2">14%</h3>
+                <div class="w-24 h-1 bg-gray-700 mt-3 rounded-full overflow-hidden">
+                    <div class="bg-green-500 h-full w-[14%]"></div>
+                </div>
+            </div>
+            <div class="p-3 bg-green-500/10 rounded-lg text-green-500">
+                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                        d="M9 3v2m6-2v2M9 19v2m6-2v2M5 9H3m2 6H3m18-6h-2m2 6h-2M7 19h10a2 2 0 002-2V7a2 2 0 00-2-2H7a2 2 0 00-2 2v10a2 2 0 002 2zM9 9h6v6H9V9z">
+                    </path>
+                </svg>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="bg-gray-800 rounded-xl border border-gray-700 overflow-hidden">
+    <div class="px-6 py-4 border-b border-gray-700 flex justify-between items-center">
+        <h3 class="font-semibold text-lg">Recent Agent Activity</h3>
+        <button class="text-sm text-blue-400 hover:text-blue-300">View All Logs</button>
+    </div>
+    <div class="overflow-x-auto">
+        <table class="w-full text-left text-sm text-gray-400">
+            <thead class="bg-gray-900/50 uppercase text-xs font-semibold text-gray-500">
+                <tr>
+                    <th class="px-6 py-3">Agent ID</th>
+                    <th class="px-6 py-3">Event Type</th>
+                    <th class="px-6 py-3">Details</th>
+                    <th class="px-6 py-3">Time</th>
+                </tr>
+            </thead>
+            <tbody class="divide-y divide-gray-700">
+                <tr class="hover:bg-gray-750">
+                    <td class="px-6 py-4 text-white font-medium">DESKTOP-A41</td>
+                    <td class="px-6 py-4"><span
+                            class="px-2 py-1 rounded bg-yellow-500/10 text-yellow-500 text-xs">Process</span></td>
+                    <td class="px-6 py-4">Started 'chrome.exe'</td>
+                    <td class="px-6 py-4">2 mins ago</td>
+                </tr>
+                <tr class="hover:bg-gray-750">
+                    <td class="px-6 py-4 text-white font-medium">LAPTOP-WRK</td>
+                    <td class="px-6 py-4"><span
+                            class="px-2 py-1 rounded bg-blue-500/10 text-blue-500 text-xs">Network</span></td>
+                    <td class="px-6 py-4">Connected to Hub</td>
+                    <td class="px-6 py-4">5 mins ago</td>
+                </tr>
+                <tr class="hover:bg-gray-750">
+                    <td class="px-6 py-4 text-white font-medium">SERVER-09</td>
+                    <td class="px-6 py-4"><span
+                            class="px-2 py-1 rounded bg-green-500/10 text-green-500 text-xs">System</span></td>
+                    <td class="px-6 py-4">Webcam activated</td>
+                    <td class="px-6 py-4">12 mins ago</td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+</div>
