@@ -1,4 +1,5 @@
 @page "/devices/{Id}"
+@inject NavigationManager Nav
 
 @code {
     // Fix CS8618: Thêm "= default!" để báo với C# rằng: "Yên tâm, cái này Blazor tự điền, không null đâu"
@@ -8,6 +9,12 @@
     protected override void OnInitialized()
     {
         // Logic khởi tạo nếu cần
+    }
+
+    // Hàm quay lại danh sách thiết bị
+    void GoBack()
+    {
+        Nav.NavigateTo("/devices");
     }
 }
 
@@ -60,6 +67,16 @@
                     d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
             </svg>
             Shutdown
+        </button>
+
+        <!-- Nút Close (X) MỚI -->
+        <div class="h-8 w-px bg-gray-700 mx-1"></div> <!-- Đường kẻ dọc ngăn cách -->
+        <button @onclick="GoBack"
+            class="p-2 text-gray-400 hover:text-white hover:bg-gray-700 rounded-lg transition-colors"
+            title="Back to Device List">
+            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+            </svg>
         </button>
     </div>
 </div>
