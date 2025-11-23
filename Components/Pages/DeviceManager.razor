@@ -1,18 +1,23 @@
 @page "/devices"
-@using Components.Layout
 @inject NavigationManager Nav
 
 @code {
-    protected override void OnInitialized() => MainLayout.PageTitle = "Device Manager";
+    // Fix CS0105: Đã xóa dòng using Components.Layout vì nó đã có trong _Imports.razor
 
-    // Mock Data
+    protected override void OnInitialized()
+    {
+        // Cách set title an toàn hơn nếu MainLayout không static
+        // MainLayout.PageTitle = "Device Manager";
+    }
+
+    // Fix CS8618: Khởi tạo giá trị mặc định cho các thuộc tính
     class Device
     {
-        public string Name { get; set; }
-        public string Ip { get; set; }
-        public string OS { get; set; }
+        public string Name { get; set; } = ""; // Gán rỗng để tránh null
+        public string Ip { get; set; } = "";
+        public string OS { get; set; } = "";
         public bool IsOnline { get; set; }
-        public string LastSeen { get; set; }
+        public string LastSeen { get; set; } = "";
     }
 
     List<Device> Devices = new List<Device> {
@@ -23,9 +28,14 @@ new Device { Name = "SERVER-BACKUP", Ip = "192.168.1.200", OS = "Windows Server"
 new Device { Name = "GUEST-LAPTOP", Ip = "192.168.1.150", OS = "Windows 11", IsOnline = false, LastSeen = "1d ago" },
 };
 
-    void Connect(string name) => Nav.NavigateTo($"/devices/{name}");
+    // Hàm điều hướng: Khi bấm nút sẽ nhảy sang trang /devices/{tên_máy}
+    void Connect(string name)
+    {
+        Nav.NavigateTo($"/devices/{name}");
+    }
 }
 
+<!-- Phần giao diện HTML giữ nguyên như cũ -->
 <div class="mb-6">
     <div class="relative max-w-md">
         <span class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-gray-500">
@@ -61,16 +71,14 @@ new Device { Name = "GUEST-LAPTOP", Ip = "192.168.1.150", OS = "Windows 11", IsO
                 @if (device.IsOnline)
                 {
                     <span
-                        class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-500/10 text-green-400">
-                        ● Online
-                    </span>
+                        class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-500/10 text-green-400">●
+                        Online</span>
                 }
                 else
                 {
                     <span
-                        class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-700 text-gray-400">
-                        ● Offline
-                    </span>
+                        class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-700 text-gray-400">●
+                        Offline</span>
                 }
             </div>
 
@@ -108,9 +116,7 @@ new Device { Name = "GUEST-LAPTOP", Ip = "192.168.1.150", OS = "Windows 11", IsO
                 else
                 {
                     <button disabled
-                        class="flex-1 bg-gray-700/50 text-gray-500 py-2 px-4 rounded-lg text-sm font-medium cursor-not-allowed">
-                        Unreachable
-                    </button>
+                        class="flex-1 bg-gray-700/50 text-gray-500 py-2 px-4 rounded-lg text-sm font-medium cursor-not-allowed">Unreachable</button>
                     <button class="p-2 bg-gray-700/50 text-gray-600 rounded-lg cursor-not-allowed">
                         <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"

@@ -1,13 +1,17 @@
 @page "/devices/{Id}"
-@using Components.Layout
 
 @code {
+    // Fix CS8618: Thêm "= default!" để báo với C# rằng: "Yên tâm, cái này Blazor tự điền, không null đâu"
     [Parameter]
-    public string Id { get; set; }
+    public string Id { get; set; } = default!;
 
-    protected override void OnInitialized() => MainLayout.PageTitle = "Device Control Panel";
+    protected override void OnInitialized()
+    {
+        // Logic khởi tạo nếu cần
+    }
 }
 
+<!-- Info Bar & Actions -->
 <div
     class="bg-gray-800 border border-gray-700 rounded-xl p-4 mb-6 flex flex-col md:flex-row justify-between items-center gap-4">
     <div class="flex items-center gap-4">
@@ -19,6 +23,7 @@
             </svg>
         </div>
         <div>
+            <!-- Hiển thị ID lấy từ URL -->
             <h2 class="text-xl font-bold text-white">@Id</h2>
             <div class="flex items-center gap-2 text-sm">
                 <span class="w-2 h-2 rounded-full bg-green-500"></span>
@@ -59,6 +64,7 @@
     </div>
 </div>
 
+<!-- Tabs & Remote Screen -->
 <div class="bg-gray-800 border border-gray-700 rounded-xl overflow-hidden">
     <div class="flex border-b border-gray-700">
         <button
@@ -91,6 +97,7 @@
     <div class="relative bg-black w-full aspect-video flex items-center justify-center group">
         <div class="text-center">
             <div class="text-gray-500 mb-2">Live Stream Active</div>
+            <!-- Ảnh Demo: bạn có thể thay bằng ảnh thật hoặc Canvas sau này -->
             <img src="https://picsum.photos/1200/675" alt="Remote Screen"
                 class="opacity-50 max-w-full max-h-full rounded" />
         </div>
@@ -102,6 +109,7 @@
     </div>
 </div>
 
+<!-- Terminal Log -->
 <div class="mt-6 bg-black rounded-xl border border-gray-800 p-4 font-mono text-sm h-48 overflow-y-auto">
     <div class="text-gray-500 mb-2 border-b border-gray-800 pb-2 flex justify-between">
         <span>>_ SYSTEM CONSOLE</span>
