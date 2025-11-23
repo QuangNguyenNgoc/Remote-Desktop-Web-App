@@ -5,19 +5,22 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <base href="/" />
-    <ResourcePreloader />
+    <!-- Fix: Thêm InteractiveServer cho HeadOutlet để có thể thay đổi Title động -->
+    <HeadOutlet @rendermode="RenderMode.InteractiveServer" />
     <link rel="stylesheet" href="css/app.css" />
-    <link rel="stylesheet" href="@Assets["Blazor_Web_App_Learning.styles.css"]" />
-    <ImportMap />
+    <link rel="stylesheet" href="Blazor_Web_App_Learning.styles.css" />
     <link rel="icon" type="image/png" href="favicon.png" />
-    <HeadOutlet />
+    <ImportMap />
 </head>
 
 <body>
-    <Routes />
-    <ReconnectModal />
-    <script src="@Assets["_framework/blazor.web.js"]"></script>
+    <!-- Fix: QUAN TRỌNG NHẤT - Kích hoạt chế độ tương tác (InteractiveServer) cho toàn bộ Routes -->
+    <!-- Nếu không có dòng này, các nút bấm @onclick sẽ không hoạt động -->
+    <Routes @rendermode="RenderMode.InteractiveServer" />
 
+    <script src="_framework/blazor.web.js"></script>
 </body>
 
 </html>
+
+@using Microsoft.AspNetCore.Components.Web
