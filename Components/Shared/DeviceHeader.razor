@@ -1,0 +1,66 @@
+<div class="bg-gray-800 border border-gray-700 rounded-xl p-4 mb-6 flex flex-col md:flex-row justify-between items-center gap-4">
+    <div class="flex items-center gap-4">
+        <div class="w-12 h-12 bg-gray-700 rounded-lg flex items-center justify-center text-gray-300">
+            <svg class="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                      d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z">
+                </path>
+            </svg>
+        </div>
+        <div>
+            <h2 class="text-xl font-bold text-white">@DeviceId</h2>
+            <div class="flex items-center gap-2 text-sm">
+                <span class="w-2 h-2 rounded-full bg-green-500"></span>
+                <span class="text-green-400">Online</span>
+                <span class="text-gray-500">•</span>
+                <span class="text-gray-400">@IpAddress</span>
+            </div>
+        </div>
+    </div>
+
+    <div class="flex items-center gap-3">
+        <button class="px-4 py-2 bg-gray-700 hover:bg-gray-600 text-gray-200 rounded-lg text-sm font-medium flex items-center gap-2">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                      d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z">
+                </path>
+            </svg>
+            Webcam
+        </button>
+        <button class="px-4 py-2 bg-orange-500/10 hover:bg-orange-500/20 text-orange-500 rounded-lg text-sm font-medium flex items-center gap-2 border border-orange-500/20">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                      d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15">
+                </path>
+            </svg>
+            Restart
+        </button>
+        <button class="px-4 py-2 bg-red-500/10 hover:bg-red-500/20 text-red-500 rounded-lg text-sm font-medium flex items-center gap-2 border border-red-500/20">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                      d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+            </svg>
+            Shutdown
+        </button>
+
+        <div class="h-8 w-px bg-gray-700 mx-1"></div>
+        <button @onclick="GoBack"
+                class="p-2 text-gray-400 hover:text-white hover:bg-gray-700 rounded-lg transition-colors"
+                title="Back to Device List">
+            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+            </svg>
+        </button>
+    </div>
+</div>
+
+@code {
+    [Parameter] public string DeviceId { get; set; } = "Unknown";
+    [Parameter] public string IpAddress { get; set; } = "192.168.1.104";
+    [Inject] NavigationManager Nav { get; set; } = default!;
+
+    void GoBack()
+    {
+        Nav.NavigateTo("/devices");
+    }
+}
