@@ -1,0 +1,23 @@
+<NavLink href="@Href" Match="@Match"
+         class="flex items-center px-4 py-3 text-gray-400 hover:bg-gray-800 hover:text-white rounded-lg transition-colors"
+         ActiveClass="bg-blue-600 text-white shadow-lg shadow-blue-900/50">
+    @if (Icon != null)
+    {
+        @Icon
+    }
+    @Text
+</NavLink>
+
+@code {
+    [Parameter]
+    public string Href { get; set; } = "";
+
+    [Parameter]
+    public NavLinkMatch Match { get; set; } = NavLinkMatch.Prefix;
+
+    [Parameter]
+    public RenderFragment? Icon { get; set; }
+
+    [Parameter]
+    public string Text { get; set; } = "";
+}

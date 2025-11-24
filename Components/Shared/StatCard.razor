@@ -1,0 +1,39 @@
+<div class="bg-gray-800 rounded-xl p-6 border border-gray-700 shadow-sm">
+    <div class="flex justify-between items-start">
+        <div>
+            <p class="text-sm text-gray-400 font-medium">@Title</p>
+            <h3 class="text-3xl font-bold text-white mt-2">@Value</h3>
+            @if (!string.IsNullOrEmpty(SubText))
+            {
+                <p class="text-xs text-gray-500 mt-2">@SubText</p>
+            }
+            @if (SubContent != null)
+            {
+                @SubContent
+            }
+        </div>
+        <div class="p-3 @ColorClass rounded-lg">
+            @Icon
+        </div>
+    </div>
+</div>
+
+@code {
+    [Parameter]
+    public string Title { get; set; } = "";
+
+    [Parameter]
+    public string Value { get; set; } = "";
+
+    [Parameter]
+    public string SubText { get; set; } = "";
+
+    [Parameter]
+    public RenderFragment? SubContent { get; set; }
+
+    [Parameter]
+    public RenderFragment? Icon { get; set; }
+
+    [Parameter]
+    public string ColorClass { get; set; } = "bg-blue-500/10 text-blue-500";
+}

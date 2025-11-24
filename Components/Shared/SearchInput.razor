@@ -1,0 +1,31 @@
+<div class="mb-6">
+    <div class="relative max-w-md">
+        <span class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-gray-500">
+            <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                      d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+            </svg>
+        </span>
+        <input type="text"
+               class="block w-full pl-10 pr-3 py-2 bg-gray-800 border border-gray-700 rounded-lg leading-5 text-gray-300 placeholder-gray-500 focus:outline-none focus:bg-gray-700 focus:border-blue-500 sm:text-sm transition duration-150 ease-in-out"
+               placeholder="@Placeholder"
+               @bind="Value"
+               @bind:event="oninput"
+               @onkeyup="HandleKeyUp">
+    </div>
+</div>
+
+@code {
+    [Parameter] public string Placeholder { get; set; } = "Search hostname or IP...";
+    [Parameter] public string Value { get; set; } = "";
+    [Parameter] public EventCallback<string> ValueChanged { get; set; }
+    [Parameter] public EventCallback<KeyboardEventArgs> OnKeyUp { get; set; }
+
+    private async Task HandleKeyUp(KeyboardEventArgs e)
+    {
+        if (OnKeyUp.HasDelegate)
+        {
+            await OnKeyUp.InvokeAsync(e);
+        }
+    }
+}
