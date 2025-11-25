@@ -1,22 +1,224 @@
 @import "tailwindcss";
 
+:root {
+  color-scheme: light dark;
+  /* Body & Base */
+  --body-bg: #f9fafb;
+  --body-text: #111827;
+  --scrollbar-track: #e5e7eb;
+  --scrollbar-thumb: #9ca3af;
+
+  /* Sidebar & Header */
+  --sidebar-bg: #ffffff;
+  --sidebar-border: #e5e7eb;
+  --header-bg: #ffffff;
+  --header-border: #e5e7eb;
+  --header-text: #111827;
+
+  /* Cards */
+  --card-bg: #ffffff;
+  --card-border: #e5e7eb;
+  --card-hover-border: #d1d5db;
+
+  /* Text Colors */
+  --text-primary: #111827;
+  --text-secondary: #374151;
+  --text-tertiary: #6b7280;
+  --text-quaternary: #9ca3af;
+  --text-white: #ffffff;
+
+  /* Buttons */
+  --btn-primary-bg: #2563eb;
+  --btn-primary-hover: #1d4ed8;
+  --btn-primary-text: #ffffff;
+  --btn-secondary-bg: #f3f4f6;
+  --btn-secondary-hover: #e5e7eb;
+  --btn-secondary-text: #374151;
+  --btn-disabled-bg: #f3f4f6;
+  --btn-disabled-text: #9ca3af;
+
+  /* Tables */
+  --table-bg: #ffffff;
+  --table-header-bg: #f9fafb;
+  --table-header-text: #6b7280;
+  --table-row-hover: #f9fafb;
+  --table-border: #e5e7eb;
+  --table-text: #6b7280;
+  --table-text-primary: #111827;
+
+  /* Terminal/Console */
+  --terminal-bg: #1f2937;
+  --terminal-border: #374151;
+  --terminal-text: #d1d5db;
+  --terminal-text-secondary: #9ca3af;
+
+  /* Status Colors */
+  --status-online: #10b981;
+  --status-offline: #6b7280;
+  --status-badge-online-bg: rgba(16, 185, 129, 0.1);
+  --status-badge-online-text: #10b981;
+  --status-badge-offline-bg: #f3f4f6;
+  --status-badge-offline-text: #6b7280;
+
+  /* Input Fields */
+  --input-bg: #ffffff;
+  --input-border: #d1d5db;
+  --input-text: #111827;
+  --input-placeholder: #9ca3af;
+  --input-focus-bg: #ffffff;
+  --input-focus-border: #2563eb;
+
+  /* Icons & Accents */
+  --icon-bg: #f3f4f6;
+  --icon-text: #374151;
+  --nav-active-bg: #2563eb;
+  --nav-active-text: #ffffff;
+  --nav-hover-bg: #f3f4f6;
+  --nav-hover-text: #111827;
+  --nav-text: #6b7280;
+
+  /* Dividers */
+  --divider: #e5e7eb;
+
+  /* Progress Bars */
+  --progress-bg: #e5e7eb;
+  --progress-fill: #10b981;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    /* Body & Base */
+    --body-bg: #111827;
+    --body-text: #f3f4f6;
+    --scrollbar-track: #111827;
+    --scrollbar-thumb: #374151;
+
+    /* Sidebar & Header */
+    --sidebar-bg: #111827;
+    --sidebar-border: #1f2937;
+    --header-bg: #111827;
+    --header-border: #1f2937;
+    --header-text: #f3f4f6;
+
+    /* Cards */
+    --card-bg: #1f2937;
+    --card-border: #374151;
+    --card-hover-border: #4b5563;
+
+    /* Text Colors */
+    --text-primary: #f3f4f6;
+    --text-secondary: #e5e7eb;
+    --text-tertiary: #d1d5db;
+    --text-quaternary: #9ca3af;
+    --text-white: #ffffff;
+
+    /* Buttons */
+    --btn-primary-bg: #2563eb;
+    --btn-primary-hover: #1d4ed8;
+    --btn-primary-text: #ffffff;
+    --btn-secondary-bg: #374151;
+    --btn-secondary-hover: #4b5563;
+    --btn-secondary-text: #e5e7eb;
+    --btn-disabled-bg: rgba(55, 65, 81, 0.5);
+    --btn-disabled-text: #6b7280;
+
+    /* Tables */
+    --table-bg: #1f2937;
+    --table-header-bg: rgba(17, 24, 39, 0.5);
+    --table-header-text: #9ca3af;
+    --table-row-hover: rgba(31, 41, 55, 0.8);
+    --table-border: #374151;
+    --table-text: #9ca3af;
+    --table-text-primary: #ffffff;
+
+    /* Terminal/Console */
+    --terminal-bg: #000000;
+    --terminal-border: #1f2937;
+    --terminal-text: #d1d5db;
+    --terminal-text-secondary: #6b7280;
+
+    /* Status Colors */
+    --status-online: #10b981;
+    --status-offline: #6b7280;
+    --status-badge-online-bg: rgba(16, 185, 129, 0.1);
+    --status-badge-online-text: #34d399;
+    --status-badge-offline-bg: #374151;
+    --status-badge-offline-text: #9ca3af;
+
+    /* Input Fields */
+    --input-bg: #1f2937;
+    --input-border: #374151;
+    --input-text: #e5e7eb;
+    --input-placeholder: #9ca3af;
+    --input-focus-bg: #374151;
+    --input-focus-border: #2563eb;
+
+    /* Icons & Accents */
+    --icon-bg: #374151;
+    --icon-text: #d1d5db;
+    --nav-active-bg: #2563eb;
+    --nav-active-text: #ffffff;
+    --nav-hover-bg: #1f2937;
+    --nav-hover-text: #ffffff;
+    --nav-text: #9ca3af;
+
+    /* Dividers */
+    --divider: #374151;
+
+    /* Progress Bars */
+    --progress-bg: #374151;
+    --progress-fill: #10b981;
+  }
+}
+
 /* Custom Scrollbar cho giao diện dark mode */
 ::-webkit-scrollbar {
   width: 8px;
   height: 8px;
 }
 ::-webkit-scrollbar-track {
-  background: #111827;
+  background: var(--scrollbar-track);
 }
 ::-webkit-scrollbar-thumb {
-  background: #374151;
+  background: var(--scrollbar-thumb);
   border-radius: 4px;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: #4b5563;
+  background: color-mix(in srgb, var(--scrollbar-thumb) 80%, #000);
 }
 
 body {
-  background-color: #111827; /* bg-gray-900 */
-  color: #f3f4f6; /* text-gray-100 */
+  background-color: var(--body-bg);
+  color: var(--body-text);
+}
+
+/* Utility classes for theme-aware components */
+.hover-theme:hover {
+  background-color: var(--nav-hover-bg);
+  color: var(--nav-hover-text);
+}
+
+.btn-primary {
+  background-color: var(--btn-primary-bg);
+  color: var(--btn-primary-text);
+}
+
+.btn-primary:hover {
+  background-color: var(--btn-primary-hover);
+}
+
+.btn-secondary {
+  background-color: var(--btn-secondary-bg);
+  color: var(--btn-secondary-text);
+}
+
+.btn-secondary:hover {
+  background-color: var(--btn-secondary-hover);
+}
+
+.nav-active {
+  background-color: var(--nav-active-bg) !important;
+  color: var(--nav-active-text) !important;
+  box-shadow: 0 10px 15px -3px rgba(37, 99, 235, 0.3),
+    0 4px 6px -2px rgba(37, 99, 235, 0.2);
 }
