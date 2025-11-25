@@ -1,6 +1,42 @@
 ﻿@page "/"
 @code {
-    protected override void OnInitialized() => MainLayout.PageTitle = "Dashboard Overview";
+    private List<AgentActivityModel> RecentActivities { get; set; } = new();
+
+    protected override void OnInitialized()
+    {
+        MainLayout.PageTitle = "Dashboard Overview";
+
+        RecentActivities = new()
+        {
+            new AgentActivityModel
+            {
+                AgentId = "DESKTOP-A41",
+                EventType = "Process",
+                BadgeTextColor = "#eab308",
+                BadgeBgColor = "rgba(234, 179, 8, 0.1)",
+                Details = "Started 'chrome.exe'",
+                TimeAgo = "2 mins ago"
+            },
+            new AgentActivityModel
+            {
+                AgentId = "LAPTOP-WRK",
+                EventType = "Network",
+                BadgeTextColor = "#2563eb",
+                BadgeBgColor = "rgba(37, 99, 235, 0.1)",
+                Details = "Connected to Hub",
+                TimeAgo = "5 mins ago"
+            },
+            new AgentActivityModel
+            {
+                AgentId = "SERVER-09",
+                EventType = "System",
+                BadgeTextColor = "#10b981",
+                BadgeBgColor = "rgba(16, 185, 129, 0.1)",
+                Details = "Webcam activated",
+                TimeAgo = "12 mins ago"
+            }
+        };
+    }
 
     /// <summary>
     /// Represents a single agent log entry; aligns with the future AgentLogs table schema.
