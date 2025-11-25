@@ -1,6 +1,30 @@
 ﻿@page "/"
 @code {
     protected override void OnInitialized() => MainLayout.PageTitle = "Dashboard Overview";
+
+    /// <summary>
+    /// Represents a single agent log entry; aligns with the future AgentLogs table schema.
+    /// </summary>
+    public record AgentActivityModel
+    {
+        /// <summary>Maps to table AgentLogs column agent_id.</summary>
+        public string AgentId { get; init; } = string.Empty;
+
+        /// <summary>Maps to table AgentLogs column event_type.</summary>
+        public string EventType { get; init; } = string.Empty;
+
+        /// <summary>Maps to table AgentLogs column badge_text_color.</summary>
+        public string BadgeTextColor { get; init; } = string.Empty;
+
+        /// <summary>Maps to table AgentLogs column badge_bg_color.</summary>
+        public string BadgeBgColor { get; init; } = string.Empty;
+
+        /// <summary>Maps to table AgentLogs column details.</summary>
+        public string Details { get; init; } = string.Empty;
+
+        /// <summary>Maps to table AgentLogs column time_ago.</summary>
+        public string TimeAgo { get; init; } = string.Empty;
+    }
 }
 
 <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
