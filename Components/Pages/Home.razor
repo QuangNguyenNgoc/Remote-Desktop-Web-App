@@ -1,15 +1,15 @@
 ﻿@page "/"
-@using Components.Layout
 @code {
     protected override void OnInitialized() => MainLayout.PageTitle = "Dashboard Overview";
 }
 
 <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-    <StatCard Title="Active Agents" Value="12" SubText="+2 connected just now" ColorClass="bg-blue-500/10 text-blue-500">
+    <StatCard Title="Active Agents" Value="12" SubText="+2 connected just now"
+        ColorClass="bg-blue-500/10 text-blue-500">
         <Icon>
             <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                      d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z">
+                    d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z">
                 </path>
             </svg>
         </Icon>
@@ -20,11 +20,12 @@
         </SubContent>
     </StatCard>
 
-    <StatCard Title="Total Keylogs" Value="8.4k" SubText="Captured in last 24h" ColorClass="bg-purple-500/10 text-purple-500">
+    <StatCard Title="Total Keylogs" Value="8.4k" SubText="Captured in last 24h"
+        ColorClass="bg-purple-500/10 text-purple-500">
         <Icon>
             <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                      d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z">
+                    d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z">
                 </path>
             </svg>
         </Icon>
@@ -34,7 +35,7 @@
         <Icon>
             <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                      d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z">
+                    d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z">
                 </path>
             </svg>
         </Icon>
@@ -44,26 +45,30 @@
         <Icon>
             <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                      d="M9 3v2m6-2v2M9 19v2m6-2v2M5 9H3m2 6H3m18-6h-2m2 6h-2M7 19h10a2 2 0 002-2V7a2 2 0 00-2-2H7a2 2 0 00-2 2v10a2 2 0 002 2zM9 9h6v6H9V9z">
+                    d="M9 3v2m6-2v2M9 19v2m6-2v2M5 9H3m2 6H3m18-6h-2m2 6h-2M7 19h10a2 2 0 002-2V7a2 2 0 00-2-2H7a2 2 0 00-2 2v10a2 2 0 002 2zM9 9h6v6H9V9z">
                 </path>
             </svg>
         </Icon>
         <SubContent>
-            <div class="w-24 h-1 bg-gray-700 mt-3 rounded-full overflow-hidden">
-                <div class="bg-green-500 h-full w-[14%]"></div>
+            <div class="w-24 h-1 mt-3 rounded-full overflow-hidden" style="background-color: var(--progress-bg);">
+                <div class="h-full w-[14%]" style="background-color: var(--progress-fill);"></div>
             </div>
         </SubContent>
     </StatCard>
 </div>
 
-<div class="bg-gray-800 rounded-xl border border-gray-700 overflow-hidden">
-    <div class="px-6 py-4 border-b border-gray-700 flex justify-between items-center">
-        <h3 class="font-semibold text-lg">Recent Agent Activity</h3>
-        <button class="text-sm text-blue-400 hover:text-blue-300">View All Logs</button>
+@* Recent agent acivity dashboard using <table></table> *@
+@* TODO: task: Break down the ingredients next time *@
+<div class="rounded-xl overflow-hidden" style="background-color: var(--card-bg); border: 1px solid var(--card-border);">
+    <div class="px-6 py-4 flex justify-between items-center" style="border-bottom: 1px solid var(--card-border);">
+        <h3 class="font-semibold text-lg" style="color: var(--text-primary);">Recent Agent Activity</h3>
+        <button class="text-sm transition-colors" style="color: var(--btn-primary-bg);" onmouseover="this.style.color='var(--btn-primary-hover)';" onmouseout="this.style.color='var(--btn-primary-bg)';">
+            View All Logs
+        </button>
     </div>
     <div class="overflow-x-auto">
-        <table class="w-full text-left text-sm text-gray-400">
-            <thead class="bg-gray-900/50 uppercase text-xs font-semibold text-gray-500">
+        <table class="w-full text-left text-sm" style="color: var(--table-text);">
+            <thead class="uppercase text-xs font-semibold" style="background-color: var(--table-header-bg); color: var(--table-header-text);">
                 <tr>
                     <th class="px-6 py-3">Agent ID</th>
                     <th class="px-6 py-3">Event Type</th>
@@ -71,25 +76,25 @@
                     <th class="px-6 py-3">Time</th>
                 </tr>
             </thead>
-            <tbody class="divide-y divide-gray-700">
-                <tr class="hover:bg-gray-750">
-                    <td class="px-6 py-4 text-white font-medium">DESKTOP-A41</td>
+            <tbody style="border-top: 1px solid var(--table-border);">
+                <tr class="transition-colors" style="border-bottom: 1px solid var(--table-border);" onmouseover="this.style.backgroundColor='var(--table-row-hover)';" onmouseout="this.style.backgroundColor='transparent';">
+                    <td class="px-6 py-4 font-medium" style="color: var(--table-text-primary);">DESKTOP-A41</td>
                     <td class="px-6 py-4"><span
-                            class="px-2 py-1 rounded bg-yellow-500/10 text-yellow-500 text-xs">Process</span></td>
+                            class="px-2 py-1 rounded text-xs" style="background-color: rgba(234, 179, 8, 0.1); color: #eab308;">Process</span></td>
                     <td class="px-6 py-4">Started 'chrome.exe'</td>
                     <td class="px-6 py-4">2 mins ago</td>
                 </tr>
-                <tr class="hover:bg-gray-750">
-                    <td class="px-6 py-4 text-white font-medium">LAPTOP-WRK</td>
+                <tr class="transition-colors" style="border-bottom: 1px solid var(--table-border);" onmouseover="this.style.backgroundColor='var(--table-row-hover)';" onmouseout="this.style.backgroundColor='transparent';">
+                    <td class="px-6 py-4 font-medium" style="color: var(--table-text-primary);">LAPTOP-WRK</td>
                     <td class="px-6 py-4"><span
-                            class="px-2 py-1 rounded bg-blue-500/10 text-blue-500 text-xs">Network</span></td>
+                            class="px-2 py-1 rounded text-xs" style="background-color: rgba(37, 99, 235, 0.1); color: #2563eb;">Network</span></td>
                     <td class="px-6 py-4">Connected to Hub</td>
                     <td class="px-6 py-4">5 mins ago</td>
                 </tr>
-                <tr class="hover:bg-gray-750">
-                    <td class="px-6 py-4 text-white font-medium">SERVER-09</td>
+                <tr class="transition-colors" style="border-bottom: 1px solid var(--table-border);" onmouseover="this.style.backgroundColor='var(--table-row-hover)';" onmouseout="this.style.backgroundColor='transparent';">
+                    <td class="px-6 py-4 font-medium" style="color: var(--table-text-primary);">SERVER-09</td>
                     <td class="px-6 py-4"><span
-                            class="px-2 py-1 rounded bg-green-500/10 text-green-500 text-xs">System</span></td>
+                            class="px-2 py-1 rounded text-xs" style="background-color: rgba(16, 185, 129, 0.1); color: #10b981;">System</span></td>
                     <td class="px-6 py-4">Webcam activated</td>
                     <td class="px-6 py-4">12 mins ago</td>
                 </tr>

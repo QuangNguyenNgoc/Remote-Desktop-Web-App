@@ -21,7 +21,7 @@
 
 
 #components-reconnect-modal {
-    background-color: white;
+    background-color: var(--card-bg);
     width: 20rem;
     margin: 20vh auto;
     padding: 2rem;
@@ -86,22 +86,23 @@
 #components-reconnect-modal p {
     margin: 0;
     text-align: center;
+    color: var(--text-primary);
 }
 
 #components-reconnect-modal button {
     border: 0;
-    background-color: #6b9ed2;
-    color: white;
+    background-color: var(--btn-primary-bg);
+    color: var(--btn-primary-text);
     padding: 4px 24px;
     border-radius: 4px;
 }
 
     #components-reconnect-modal button:hover {
-        background-color: #3b6ea2;
+        background-color: var(--btn-primary-hover);
     }
 
     #components-reconnect-modal button:active {
-        background-color: #6b9ed2;
+        background-color: var(--btn-primary-bg);
     }
 
 .components-rejoining-animation {
