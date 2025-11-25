@@ -10,7 +10,7 @@
         {
             new AgentActivityModel
             {
-                AgentId = "DESKTOP-A41",
+                AgentId = "MayTinhCuaQuangUwU",
                 EventType = "Process",
                 BadgeTextColor = "#eab308",
                 BadgeBgColor = "rgba(234, 179, 8, 0.1)",
@@ -137,27 +137,19 @@
                 </tr>
             </thead>
             <tbody style="border-top: 1px solid var(--table-border);">
-                <tr class="transition-colors" style="border-bottom: 1px solid var(--table-border);" onmouseover="this.style.backgroundColor='var(--table-row-hover)';" onmouseout="this.style.backgroundColor='transparent';">
-                    <td class="px-6 py-4 font-medium" style="color: var(--table-text-primary);">DESKTOP-A41</td>
-                    <td class="px-6 py-4"><span
-                            class="px-2 py-1 rounded text-xs" style="background-color: rgba(234, 179, 8, 0.1); color: #eab308;">Process</span></td>
-                    <td class="px-6 py-4">Started 'chrome.exe'</td>
-                    <td class="px-6 py-4">2 mins ago</td>
-                </tr>
-                <tr class="transition-colors" style="border-bottom: 1px solid var(--table-border);" onmouseover="this.style.backgroundColor='var(--table-row-hover)';" onmouseout="this.style.backgroundColor='transparent';">
-                    <td class="px-6 py-4 font-medium" style="color: var(--table-text-primary);">LAPTOP-WRK</td>
-                    <td class="px-6 py-4"><span
-                            class="px-2 py-1 rounded text-xs" style="background-color: rgba(37, 99, 235, 0.1); color: #2563eb;">Network</span></td>
-                    <td class="px-6 py-4">Connected to Hub</td>
-                    <td class="px-6 py-4">5 mins ago</td>
-                </tr>
-                <tr class="transition-colors" style="border-bottom: 1px solid var(--table-border);" onmouseover="this.style.backgroundColor='var(--table-row-hover)';" onmouseout="this.style.backgroundColor='transparent';">
-                    <td class="px-6 py-4 font-medium" style="color: var(--table-text-primary);">SERVER-09</td>
-                    <td class="px-6 py-4"><span
-                            class="px-2 py-1 rounded text-xs" style="background-color: rgba(16, 185, 129, 0.1); color: #10b981;">System</span></td>
-                    <td class="px-6 py-4">Webcam activated</td>
-                    <td class="px-6 py-4">12 mins ago</td>
-                </tr>
+                @foreach (var activity in RecentActivities)
+                {
+                    <tr class="transition-colors" style="border-bottom: 1px solid var(--table-border);" onmouseover="this.style.backgroundColor='var(--table-row-hover)';" onmouseout="this.style.backgroundColor='transparent';">
+                        <td class="px-6 py-4 font-medium" style="color: var(--table-text-primary);">@activity.AgentId</td>
+                        <td class="px-6 py-4">
+                            <span class="px-2 py-1 rounded text-xs" style="background-color: @activity.BadgeBgColor; color: @activity.BadgeTextColor;">
+                                @activity.EventType
+                            </span>
+                        </td>
+                        <td class="px-6 py-4">@activity.Details</td>
+                        <td class="px-6 py-4">@activity.TimeAgo</td>
+                    </tr>
+                }
             </tbody>
         </table>
     </div>
