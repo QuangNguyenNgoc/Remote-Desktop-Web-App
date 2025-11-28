@@ -23,10 +23,10 @@ npm --version
 
 ## Clone repository
 
-1. Clone repo (thay `<repository-url>` bằng URL thực tế):
+1. Clone repo:
 
 ```powershell
-git clone <repository-url>
+git clone https://github.com/QuangNguyenNgoc/Remote-Desktop-Web-App.git
 ```
 
 2. Chuyển vào thư mục dự án (tên thư mục tùy vào repo):
