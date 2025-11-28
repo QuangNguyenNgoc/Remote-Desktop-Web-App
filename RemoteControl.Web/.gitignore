@@ -1,5 +1,5 @@
-# .gitignore cho Remote Control Desktop Project
-# Multi-project solution: Web (Blazor + Tailwind), Agent, Shared
+# .gitignore cho dự án Blazor (ASP.NET Core) + Tailwind CSS
+# Generated/temporary files for Visual Studio, .NET, Node/Tailwind and OS
 
 ## Visual Studio / Rider / Editor
 .vs/
