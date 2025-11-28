@@ -1,0 +1,62 @@
+# .gitignore cho dự án Blazor (ASP.NET Core) + Tailwind CSS
+# Generated/temporary files for Visual Studio, .NET, Node/Tailwind and OS
+
+## Visual Studio / Rider / Editor
+.vs/
+.vscode/
+.idea/
+*.suo
+*.user
+*.userosscache
+*.sln.docstates
+*.DotSettings.user
+
+## Build outputs
+[Bb]in/
+[Oo]bj/
+artifacts/
+TestResults/
+
+## NuGet
+*.nupkg
+packages/
+project.assets.json
+
+## Blazor / ASP.NET generated files
+wwwroot/_framework/
+wwwroot/staticwebassets.*
+**/staticwebassets.*
+
+## User/project files
+*.csproj.user
+*.userprefs
+
+## Node / Tailwind / npm
+node_modules/
+.npm/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+## Tailwind / build caches and outputs
+.cache/
+.tailwind/
+.tailwindcache/
+dist/
+build/
+public/
+
+## Logs
+logs/
+*.log
+
+## Environment files
+.env
+.env.*.local
+
+## OS generated
+.DS_Store
+Thumbs.db
+ehthumbs.db
+wwwroot/css/app.css

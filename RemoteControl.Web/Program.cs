@@ -1,4 +1,4 @@
-using Blazor_Web_App_Learning.Components;
+using RemoteControl.Web.Components;
 
 var builder = WebApplication.CreateBuilder(args);
 
