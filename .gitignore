@@ -60,3 +60,6 @@ logs/
 Thumbs.db
 ehthumbs.db
 wwwroot/css/app.css
+
+## Local Source Code
+socket-source-code/
