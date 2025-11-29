@@ -1,3 +1,5 @@
 <Solution>
+  <Project Path="RemoteControl.Agent/RemoteControl.Agent.csproj" />
+  <Project Path="RemoteControl.Shared/RemoteControl.Shared.csproj" />
   <Project Path="RemoteControl.Web/RemoteControl.Web.csproj" />
 </Solution>
