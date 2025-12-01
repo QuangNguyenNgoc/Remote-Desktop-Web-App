@@ -82,36 +82,36 @@
     protected override void OnInitialized()
     {
         var rawData = new List<ResourceDataModel>
-        {
-            new()
-            {
-                Name = "Keylogs",
-                Value = "8.4k files",
-                Percentage = 15,
-                Trend = 12.5,
-                Color = "#8b5cf6"
-            },
-            new()
-            {
-                Name = "Screenshots",
-                Value = "1.2 GB",
-                Percentage = 60,
-                Trend = 5.2,
-                Color = "#3b82f6"
-            },
-            new()
-            {
-                Name = "Webcam Rec",
-                Value = "450 MB",
-                Percentage = 25,
-                Trend = -2.0,
-                Color = "#10b981"
-            }
-        };
+{ //* Begin database (testing)
+new()
+{
+Name = "Keylogs",
+Value = "8.4k files",
+Percentage = 15,
+Trend = 12.5,
+Color = "#8b5cf6"
+},
+new()
+{
+Name = "Screenshots",
+Value = "1.2 GB",
+Percentage = 60,
+Trend = 5.2,
+Color = "#3b82f6"
+},
+new()
+{
+Name = "Webcam Rec",
+Value = "450 MB",
+Percentage = 25,
+Trend = -2.0,
+Color = "#10b981"
+}
+}; //* End database (testing)
 
         CalculateSvgSegments(rawData);
     }
-    
+
     private void CalculateSvgSegments(List<ResourceDataModel> data)
     {
         double totalPercentage = data.Sum(x => x.Percentage);
