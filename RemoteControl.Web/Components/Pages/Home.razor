@@ -1,6 +1,6 @@
 ﻿@page "/"
 
-@* --- Phần Stat Cards (Giữ nguyên như cũ của bạn) --- *@
+@* --- Stat Cards --- *@
 <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
     <StatCard Title="Active Agents" Value="12" SubText="+2 connected just now"
         ColorClass="bg-blue-500/10 text-blue-500">
@@ -55,23 +55,24 @@
     </StatCard>
 </div>
 
-@* --- Layout Mới: Chia cột cho Bảng Log và Biểu đồ --- *@
+@* --- Layout --- *@
 <div class="grid grid-cols-1 xl:grid-cols-3 gap-6">
-    
-    @* Cột Trái: Recent Activity (Chiếm 2 phần) *@
-    <div class="xl:col-span-2 rounded-xl overflow-hidden flex flex-col h-full" 
-         style="background-color: var(--card-bg); border: 1px solid var(--card-border);">
+
+    @* Cột Trái *@
+    <div class="xl:col-span-2 rounded-xl overflow-hidden flex flex-col h-full"
+        style="background-color: var(--card-bg); border: 1px solid var(--card-border);">
         <div class="px-6 py-4 flex justify-between items-center" style="border-bottom: 1px solid var(--card-border);">
             <h3 class="font-semibold text-lg" style="color: var(--text-primary);">Recent Agent Activity</h3>
-            <button class="text-sm transition-colors" style="color: var(--btn-primary-bg);" 
-                    onmouseover="this.style.color='var(--btn-primary-hover)';" 
-                    onmouseout="this.style.color='var(--btn-primary-bg)';">
+            <button class="text-sm transition-colors" style="color: var(--btn-primary-bg);"
+                onmouseover="this.style.color='var(--btn-primary-hover)';"
+                onmouseout="this.style.color='var(--btn-primary-bg)';">
                 View All Logs
             </button>
         </div>
-        <div class="overflow-x-auto flex-grow">
+        <div class="overflow-x-auto grow">
             <table class="w-full text-left text-sm" style="color: var(--table-text);">
-                <thead class="uppercase text-xs font-semibold" style="background-color: var(--table-header-bg); color: var(--table-header-text);">
+                <thead class="uppercase text-xs font-semibold"
+                    style="background-color: var(--table-header-bg); color: var(--table-header-text);">
                     <tr>
                         <th class="px-6 py-3">Agent ID</th>
                         <th class="px-6 py-3">Event Type</th>
@@ -82,12 +83,14 @@
                 <tbody style="border-top: 1px solid var(--table-border);">
                     @foreach (var activity in RecentActivities)
                     {
-                        <tr class="transition-colors" style="border-bottom: 1px solid var(--table-border);" 
-                            onmouseover="this.style.backgroundColor='var(--table-row-hover)';" 
+                        <tr class="transition-colors" style="border-bottom: 1px solid var(--table-border);"
+                            onmouseover="this.style.backgroundColor='var(--table-row-hover)';"
                             onmouseout="this.style.backgroundColor='transparent';">
-                            <td class="px-6 py-4 font-medium" style="color: var(--table-text-primary);">@activity.AgentId</td>
+                            <td class="px-6 py-4 font-medium" style="color: var(--table-text-primary);">@activity.AgentId
+                            </td>
                             <td class="px-6 py-4">
-                                <span class="px-2 py-1 rounded text-xs" style="background-color: @activity.BadgeBgColor; color: @activity.BadgeTextColor;">
+                                <span class="px-2 py-1 rounded text-xs"
+                                    style="background-color: @activity.BadgeBgColor; color: @activity.BadgeTextColor;">
                                     @activity.EventType
                                 </span>
                             </td>
@@ -100,7 +103,7 @@
         </div>
     </div>
 
-    @* Cột Phải: Resource Usage (Chiếm 1 phần) *@
+    @* Cột Phải *@
     <div class="xl:col-span-1 h-full">
         @* Gọi Component ResourceUsageCard ở đây *@
         <ResourceUsageCard />
@@ -116,35 +119,35 @@
         // MainLayout.PageTitle = "Dashboard Overview";
 
         RecentActivities = new()
-        {
-            new AgentActivityModel
-            {
-                AgentId = "MayTinhCuaQuangUwU",
-                EventType = "Process",
-                BadgeTextColor = "#eab308",
-                BadgeBgColor = "rgba(234, 179, 8, 0.1)",
-                Details = "Started 'chrome.exe'",
-                TimeAgo = "2 mins ago"
-            },
-            new AgentActivityModel
-            {
-                AgentId = "LAPTOP-WRK",
-                EventType = "Network",
-                BadgeTextColor = "#2563eb",
-                BadgeBgColor = "rgba(37, 99, 235, 0.1)",
-                Details = "Connected to Hub",
-                TimeAgo = "5 mins ago"
-            },
-            new AgentActivityModel
-            {
-                AgentId = "SERVER-09",
-                EventType = "System",
-                BadgeTextColor = "#10b981",
-                BadgeBgColor = "rgba(16, 185, 129, 0.1)",
-                Details = "Webcam activated",
-                TimeAgo = "12 mins ago"
-            }
-        };
+{
+new AgentActivityModel
+{
+AgentId = "MayTinhCuaQuangUwU",
+EventType = "Process",
+BadgeTextColor = "#eab308",
+BadgeBgColor = "rgba(234, 179, 8, 0.1)",
+Details = "Started 'chrome.exe'",
+TimeAgo = "2 mins ago"
+},
+new AgentActivityModel
+{
+AgentId = "LAPTOP-WRK",
+EventType = "Network",
+BadgeTextColor = "#2563eb",
+BadgeBgColor = "rgba(37, 99, 235, 0.1)",
+Details = "Connected to Hub",
+TimeAgo = "5 mins ago"
+},
+new AgentActivityModel
+{
+AgentId = "SERVER-09",
+EventType = "System",
+BadgeTextColor = "#10b981",
+BadgeBgColor = "rgba(16, 185, 129, 0.1)",
+Details = "Webcam activated",
+TimeAgo = "12 mins ago"
+}
+};
     }
 
     public record AgentActivityModel
