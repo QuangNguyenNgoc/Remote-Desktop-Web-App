@@ -53,10 +53,10 @@
                     <span class="text-sm font-medium" style="color: var(--text-secondary, #e2e8f0);">@item.Name</span>
                 </div>
                 <div class="flex items-center gap-4">
-                    <span class="text-sm font-semibold">@item.Value</span>
+                    <span class="w-20 text-sm font-semibold">@item.Value</span>
                     <span class="w-10 text-right text-xs text-slate-400">@item.Percentage%</span>
                     <span
-                        class="rounded-full px-2 py-0.5 text-xs font-medium @(item.Trend >= 0 ? "text-emerald-400" : "text-red-400")"
+                        class="w-16 text-center rounded-full px-2 py-0.5 text-xs font-medium @(item.Trend >= 0 ? "text-emerald-400" : "text-red-400")"
                         style="background-color: @(item.Trend >= 0 ? "rgba(16, 185, 129, 0.2)" : "rgba(239, 68, 68, 0.2)");">
                         @(item.Trend >= 0 ? "+" : "")@item.Trend%
                     </span>
@@ -82,32 +82,36 @@
     protected override void OnInitialized()
     {
         var rawData = new List<ResourceDataModel>
-{
-new() {
-Name = "Keylogs",
-Value = "8.4k files",
-Percentage = 15,
-Trend = 12.5,
-Color = "#8b5cf6"
-},
-new() {
-Name = "Screenshots",
-Value = "1.2 GB",
-Percentage = 60,
-Trend = 5.2,
-Color = "#3b82f6"
-},
-new() {
-Name = "Webcam Rec",
-Value = "450 MB",
-Percentage = 25,
-Trend = -2.0,
-Color = "#10b981"
-}
-};
+        {
+            new()
+            {
+                Name = "Keylogs",
+                Value = "8.4k files",
+                Percentage = 15,
+                Trend = 12.5,
+                Color = "#8b5cf6"
+            },
+            new()
+            {
+                Name = "Screenshots",
+                Value = "1.2 GB",
+                Percentage = 60,
+                Trend = 5.2,
+                Color = "#3b82f6"
+            },
+            new()
+            {
+                Name = "Webcam Rec",
+                Value = "450 MB",
+                Percentage = 25,
+                Trend = -2.0,
+                Color = "#10b981"
+            }
+        };
 
         CalculateSvgSegments(rawData);
     }
+    
     private void CalculateSvgSegments(List<ResourceDataModel> data)
     {
         double totalPercentage = data.Sum(x => x.Percentage);
