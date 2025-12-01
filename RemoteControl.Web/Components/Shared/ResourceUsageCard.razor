@@ -81,35 +81,28 @@
 
     protected override void OnInitialized()
     {
-        // Đổi tên biến từ 'Resource Usage' thành 'Storage Analysis' ở phần HTML
-
         var rawData = new List<ResourceDataModel>
 {
-// Màu Tím (Purple) cho Keylogs - match với card Total Keylogs
 new() {
 Name = "Keylogs",
-Value = "8.4k files", // Số lượng file
-Percentage = 15, // Chiếm 15% dung lượng
-Trend = 12.5, // Tăng trưởng
-Color = "#8b5cf6" // purple-500
+Value = "8.4k files",
+Percentage = 15,
+Trend = 12.5,
+Color = "#8b5cf6"
 },
-
-// Màu Xanh Dương (Indigo/Blue) cho Screenshots - match với card Screenshots
 new() {
 Name = "Screenshots",
 Value = "1.2 GB",
-Percentage = 60, // Chiếm nhiều nhất
+Percentage = 60,
 Trend = 5.2,
-Color = "#3b82f6" // blue-500
+Color = "#3b82f6"
 },
-
-// Màu Xanh Lá (Emerald) cho Webcam/System
 new() {
 Name = "Webcam Rec",
 Value = "450 MB",
 Percentage = 25,
 Trend = -2.0,
-Color = "#10b981" // emerald-500
+Color = "#10b981"
 }
 };
 
