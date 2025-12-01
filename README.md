@@ -104,3 +104,36 @@ Xem thư mục [docs/](./docs/) để biết thêm chi tiết về:
 ---
 
 **Status**: 🟢 Active Development
+
+graph TD
+    subgraph "Docker Container (Linux/Windows)"
+        Server[ASP.NET Core Web Host]
+        Hub[SignalR Hub]
+        Blazor[Blazor Frontend]
+        
+        Server --> Hub
+        Server --> Blazor
+    end
+
+    subgraph "Victim PC 1"
+        Agent1[C# Console Agent]
+        Screen1[Screen Capture]
+        Key1[Keylogger]
+        
+        Agent1 --> Screen1
+        Agent1 --> Key1
+    end
+
+    subgraph "Victim PC 2"
+        Agent2[C# Console Agent]
+    end
+
+    %% Communication
+    Agent1 -- "Websocket (SignalR)" --> Hub
+    Agent2 -- "Websocket (SignalR)" --> Hub
+    Blazor -- "User Action" --> Hub
+
+    %% Styling
+    style Server fill:#f9f,stroke:#333,stroke-width:2px
+    style Agent1 fill:#bbf,stroke:#333,stroke-width:2px
+    style Agent2 fill:#bbf,stroke:#333,stroke-width:2px
