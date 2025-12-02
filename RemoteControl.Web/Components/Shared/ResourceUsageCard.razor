@@ -1,0 +1,155 @@
+@using System.Globalization
+
+<div class="rounded-xl border p-6 backdrop-blur-sm h-full"
+    style="background-color: var(--card-bg, rgba(30, 41, 59, 0.5)); border-color: var(--card-border, rgba(51, 65, 85, 0.5)); color: var(--text-primary, #f1f5f9);">
+
+    @* Header *@
+    <div class="mb-6 flex items-center justify-between">
+        <h2 class="text-lg font-semibold">Storage Analysis</h2>
+        <div class="flex gap-1 rounded-lg p-1" style="background-color: rgba(15, 23, 42, 0.5);">
+            @foreach (var filter in Filters)
+            {
+                <button @onclick="() => ActiveFilter = filter"
+                    class="rounded-md px-3 py-1 text-xs font-medium transition-all @(ActiveFilter == filter ? "text-blue-400" : "text-slate-400 hover:text-slate-300")"
+                    style="@(ActiveFilter == filter ? "background-color: rgba(59, 130, 246, 0.2);" : "")">
+                    @filter
+                </button>
+            }
+        </div>
+    </div>
+
+    @* Donut Chart - Pure SVG *@
+    <div class="relative mx-auto mb-6 h-48 w-48">
+        <svg viewBox="0 0 200 200" class="h-full w-full -rotate-90 transform">
+            @* Background ring *@
+            <circle cx="100" cy="100" r="@Radius" fill="none" stroke="#1e293b" stroke-width="@StrokeWidth" />
+
+            @* Data segments *@
+            @foreach (var segment in ProcessedSegments)
+            {
+                <circle cx="100" cy="100" r="@Radius" fill="none" stroke="@segment.Color" stroke-width="@StrokeWidth"
+                    stroke-dasharray="@segment.DashArray" stroke-dashoffset="@segment.DashOffset" stroke-linecap="round"
+                    class="transition-all duration-500" style="filter: drop-shadow(0 0 6px @(segment.Color)40);" />
+            }
+        </svg>
+
+        @* Center text *@
+        <div class="absolute inset-0 flex flex-col items-center justify-center">
+            <span class="text-3xl font-bold">100%</span>
+            <span class="text-xs text-slate-400">Total Usage</span>
+        </div>
+    </div>
+
+    @* Legend/List *@
+    <div class="space-y-3">
+        @foreach (var item in ProcessedSegments)
+        {
+            <div class="flex items-center justify-between rounded-lg px-4 py-3"
+                style="background-color: rgba(15, 23, 42, 0.3);">
+                <div class="flex items-center gap-3">
+                    <div class="h-3 w-3 rounded-full"
+                        style="background-color: @item.Color; box-shadow: 0 0 8px @(item.Color)60;">
+                    </div>
+                    <span class="text-sm font-medium" style="color: var(--text-secondary, #e2e8f0);">@item.Name</span>
+                </div>
+                <div class="flex items-center gap-4">
+                    <span class="w-20 text-sm font-semibold">@item.Value</span>
+                    <span class="w-10 text-right text-xs text-slate-400">@item.Percentage%</span>
+                    <span
+                        class="w-16 text-center rounded-full px-2 py-0.5 text-xs font-medium @(item.Trend >= 0 ? "text-emerald-400" : "text-red-400")"
+                        style="background-color: @(item.Trend >= 0 ? "rgba(16, 185, 129, 0.2)" : "rgba(239, 68, 68, 0.2)");">
+                        @(item.Trend >= 0 ? "+" : "")@item.Trend%
+                    </span>
+                </div>
+            </div>
+        }
+    </div>
+</div>
+
+@code {
+    // State
+    private string ActiveFilter { get; set; } = "All";
+    private string[] Filters = { "All", "1H", "24H" };
+
+    // Constants for SVG calculation
+    private const double Radius = 80;
+    private const double StrokeWidth = 20;
+    private const double Circumference = 2 * Math.PI * Radius;
+
+    // Data List
+    private List<ResourceDataModel> ProcessedSegments { get; set; } = new();
+
+    protected override void OnInitialized()
+    {
+        var rawData = new List<ResourceDataModel>
+{ //* Begin database (testing)
+new()
+{
+Name = "Keylogs",
+Value = "8.4 KB",
+Percentage = 15,
+Trend = 12.5,
+Color = "#8b5cf6"
+},
+new()
+{
+Name = "Screenshots",
+Value = "1.2 GB",
+Percentage = 60,
+Trend = 5.2,
+Color = "#3b82f6"
+},
+new()
+{
+Name = "Webcam Rec",
+Value = "450 MB",
+Percentage = 25,
+Trend = -2.0,
+Color = "#10b981"
+}
+}; //* End database (testing)
+
+        CalculateSvgSegments(rawData);
+    }
+
+    private void CalculateSvgSegments(List<ResourceDataModel> data)
+    {
+        double totalPercentage = data.Sum(x => x.Percentage);
+        double currentCumulativePercentage = 0;
+
+        ProcessedSegments = new List<ResourceDataModel>();
+
+        foreach (var item in data)
+        {
+            // Logic tính toán SVG path giống hệt code React
+            // Convert to invariant culture string (dùng dấu chấm thay vì dấu phẩy cho số thập phân)
+
+            double segmentLength = (item.Percentage / totalPercentage) * Circumference;
+            double gapLength = Circumference - segmentLength;
+            double offset = (currentCumulativePercentage / totalPercentage) * Circumference;
+
+            // Format string cho SVG (ex: "120.5 300.2")
+            string dashArray = $"{segmentLength.ToString(CultureInfo.InvariantCulture)} {gapLength.ToString(CultureInfo.InvariantCulture)}";
+            string dashOffset = (-offset).ToString(CultureInfo.InvariantCulture);
+
+            // Clone và update properties
+            var newItem = item with { DashArray = dashArray, DashOffset = dashOffset };
+            ProcessedSegments.Add(newItem);
+
+            currentCumulativePercentage += item.Percentage;
+        }
+    }
+
+    public record ResourceDataModel
+    {
+        public string Name { get; init; } = "";
+        public string Value { get; init; } = "";
+        public double Percentage { get; init; }
+        public double Trend { get; init; }
+        public string Color { get; init; } = "";
+
+        // Calculated properties for SVG
+        public string DashArray { get; init; } = "";
+        public string DashOffset { get; init; } = "";
+    }
+}
