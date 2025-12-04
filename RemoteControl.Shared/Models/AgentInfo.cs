@@ -11,6 +11,12 @@ public class AgentInfo
     public string AgentId { get; set; } = string.Empty;
 
     /// <summary>
+    /// SignalR connection ID (assigned by Hub on connect)
+    /// Used to route commands to specific agent
+    /// </summary>
+    public string ConnectionId { get; set; } = string.Empty;
+
+    /// <summary>
     /// Machine/computer name
     /// </summary>
     public string MachineName { get; set; } = string.Empty;
