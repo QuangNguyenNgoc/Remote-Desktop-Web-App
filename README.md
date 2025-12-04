@@ -35,6 +35,47 @@ npm --version
 git clone <repository-url>
 ```
 
+## Cài đặt phụ thuộc
+
+1. Cài .NET dependencies:
+
+```powershell
+dotnet restore
+```
+
+2. Cài Node dependencies (để dùng Tailwind):
+
+```powershell
+npm install
+```
+
+## 🚀 Bắt đầu
+
+## Chạy môi trường phát triển
+
+Khởi chạy Tailwind watch (từ thư mục gốc nơi có `package.json`):
+
+```powershell
+cd RemoteControl.Web
+npm run watch
+```
+
+### Chạy Web App (trên một cửa sổ Terminal mới)
+
+```powershell
+cd RemoteControl.Web
+dotnet watch
+```
+
+Web app sẽ chạy tại `https://localhost:5001`
+
+### Chạy Agent (TODO)
+
+```powershell
+cd RemoteControl.Agent
+dotnet run
+```
+
 ## 📁 Cấu trúc Project
 
 ```
@@ -58,29 +99,6 @@ RemoteControlProject/
 ├── docker/                  # 🐳 Docker configs (TODO)
 ├── docs/                    # 📚 Documentation
 └── RemoteControl.sln        # Visual Studio Solution
-```
-
-## 🚀 Bắt đầu
-
-### Prerequisites
-
-- .NET 10.0 SDK
-- Node.js (cho Tailwind CSS)
-
-### Chạy Web App
-
-```powershell
-cd RemoteControl.Web
-dotnet watch
-```
-
-Web app sẽ chạy tại `https://localhost:5001`
-
-### Chạy Agent (TODO)
-
-```powershell
-cd RemoteControl.Agent
-dotnet run
 ```
 
 ## 🛠️ Công nghệ
