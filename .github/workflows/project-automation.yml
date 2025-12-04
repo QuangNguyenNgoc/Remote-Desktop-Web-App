@@ -1,0 +1,30 @@
+name: Project Card Automation
+
+on:
+  pull_request:
+    types: [opened, reopened, ready_for_review]
+  pull_request_review:
+    types: [submitted]
+
+jobs:
+  move-to-in-review:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Move PR to In Review
+        if: github.event_name == 'pull_request' && (github.event.action == 'opened' || github.event.action == 'reopened')
+        uses: alex-page/github-project-automation-plus@v0.9.0
+        with:
+          project: Remote Control Development  # Tên project của bạn
+          column: In Review
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
+
+  move-to-done:
+    runs-on: ubuntu-latest
+    if: github.event.pull_request.merged == true
+    steps:
+      - name: Move merged PR to Done
+        uses: alex-page/github-project-automation-plus@v0.9.0
+        with:
+          project: Remote Control Development
+          column: Done
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
