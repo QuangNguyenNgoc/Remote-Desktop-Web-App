@@ -5,9 +5,35 @@ Hệ thống điều khiển máy tính từ xa sử dụng Blazor Web App và S
 ## 🎯 Tổng quan
 
 Project bao gồm 3 thành phần chính:
+
 - **RemoteControl.Web**: Blazor Web App (Frontend + Backend) với SignalR Hub
 - **RemoteControl.Agent**: Desktop agent chạy trên máy client
 - **RemoteControl.Shared**: Shared library chứa models và constants chung
+
+## Yêu cầu (Prerequisites)
+
+- .NET SDK tương thích với `TargetFramework` của dự án (dự án hiện tại target: `net10.0`). Kiểm tra bằng:
+
+```powershell
+dotnet --list-sdks
+```
+
+- Node.js (kèm npm) để chạy Tailwind CSS build/watch. (node.js: v22.20.0 | npm: 11.6.2)
+
+```
+node --version
+npm --version
+```
+
+- Git để clone repository.
+
+## Clone repository
+
+1. Clone repo (thay `<repository-url>` bằng URL thực tế):
+
+```powershell
+git clone <repository-url>
+```
 
 ## 📁 Cấu trúc Project
 
@@ -67,6 +93,7 @@ dotnet run
 ## 📖 Documentation
 
 Xem thư mục [docs/](./docs/) để biết thêm chi tiết về:
+
 - Component guides
 - Architecture
 - SignalR flow
@@ -75,6 +102,7 @@ Xem thư mục [docs/](./docs/) để biết thêm chi tiết về:
 ## 🎨 Features (Planned)
 
 ### Web Dashboard
+
 - ✅ Danh sách devices/agents
 - ✅ Real-time status monitoring
 - 🔜 Remote screenshot viewing
@@ -82,6 +110,7 @@ Xem thư mục [docs/](./docs/) để biết thêm chi tiết về:
 - 🔜 File management
 
 ### Agent Capabilities
+
 - 🔜 Screenshot capture
 - 🔜 Keyboard monitoring
 - 🔜 Process management
