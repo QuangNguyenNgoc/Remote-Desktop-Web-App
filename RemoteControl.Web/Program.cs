@@ -28,4 +28,8 @@ app.MapRazorComponents<App>()
 // Map SignalR Hub cho remote control
 // Đường dẫn /hubs/remote-control sẽ được Agent/Web dùng để kết nối
 app.MapHub<RemoteControlHub>("/hubs/remote-control");
+// Map SignalR Hub cho remote control
+// Endpoint: /remotehub  (đúng theo checklist)
+app.MapHub<RemoteControlHub>("/remotehub");
+
 app.Run();
