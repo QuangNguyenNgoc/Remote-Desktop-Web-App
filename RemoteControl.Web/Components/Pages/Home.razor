@@ -1,5 +1,15 @@
 ﻿@page "/"
 
+@* Dùng SignalR client trong Blazor *@
+@using Microsoft.AspNetCore.SignalR.Client
+@using RemoteControl.Shared.Models
+
+@* Để component tự dispose HubConnection khi bị hủy *@
+@implements IAsyncDisposable
+
+@* Lấy base URL để build endpoint cho Hub *@
+@inject NavigationManager NavigationManager
+
 @* --- Stat Cards --- *@
 <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
     <StatCard Title="Active Agents" Value="12" SubText="+2 connected just now"
@@ -111,44 +121,153 @@
 </div>
 
 @code {
+    // ============================
+    // 1) State cho UI hiện tại
+    // ============================
+
+    // Danh sách activity dùng để bind vào bảng Recent Agent Activity
     private List<AgentActivityModel> RecentActivities { get; set; } = new();
 
-    protected override void OnInitialized()
-    {
-        // Giả lập MainLayout.PageTitle nếu chưa có cơ chế set title
-        // MainLayout.PageTitle = "Dashboard Overview";
+    // Lưu lại kết quả command mới nhất (nếu cần hiển thị thêm sau này)
+    private CommandResult? _lastCommandResult;
 
-        RecentActivities = new()
-{
-new AgentActivityModel
-{
-AgentId = "MayTinhCuaQuangUwU",
-EventType = "Process",
-BadgeTextColor = "#eab308",
-BadgeBgColor = "rgba(234, 179, 8, 0.1)",
-Details = "Started 'chrome.exe'",
-TimeAgo = "2 mins ago"
-},
-new AgentActivityModel
-{
-AgentId = "LAPTOP-WRK",
-EventType = "Network",
-BadgeTextColor = "#2563eb",
-BadgeBgColor = "rgba(37, 99, 235, 0.1)",
-Details = "Connected to Hub",
-TimeAgo = "5 mins ago"
-},
-new AgentActivityModel
-{
-AgentId = "SERVER-09",
-EventType = "System",
-BadgeTextColor = "#10b981",
-BadgeBgColor = "rgba(16, 185, 129, 0.1)",
-Details = "Webcam activated",
-TimeAgo = "12 mins ago"
-}
-};
+    // ============================
+    // 2) SignalR connection
+    // ============================
+
+    // Field HubConnection theo checklist
+    private HubConnection? _hubConnection;
+
+    // Thuộc tính tiện để biết có đang connect hay không (nếu muốn disable/enable nút UI)
+    private bool IsConnected =>
+        _hubConnection?.State == HubConnectionState.Connected;
+
+    // ============================
+    // 3) Khởi tạo component + tạo SignalR connection
+    // ============================
+
+    // Thay vì OnInitialized(), ta dùng OnInitializedAsync()
+    // để vừa seed dữ liệu giả, vừa khởi tạo connection SignalR.
+    protected override async Task OnInitializedAsync()
+    {
+        // 3.1 Seed dữ liệu mock như code cũ (cho UI có sẵn vài dòng mẫu)
+        SeedMockRecentActivities();
+
+        // 3.2 Tạo HubConnection tới RemoteControlHub
+        // Endpoint "/hubs/remote-control" phải trùng với MapHub<RemoteControlHub> trong Program.cs
+        _hubConnection = new HubConnectionBuilder()
+            .WithUrl(NavigationManager.ToAbsoluteUri("/hubs/remote-control"))
+            .WithAutomaticReconnect()                // cho phép tự reconnect khi mất kết nối
+            .Build();
+
+        // 3.3 Đăng ký (subscribe) các event từ server
+
+        // Khi server gửi event "AgentRegistered" -> có agent mới connect
+        _hubConnection.On<AgentInfo>("AgentRegistered", agent =>
+        {
+            Console.WriteLine($"[Home] AgentRegistered: {agent.AgentId}");
+
+            // Thêm 1 activity mới lên đầu danh sách để UI cập nhật
+            RecentActivities.Insert(0, new AgentActivityModel
+            {
+                AgentId = agent.AgentId,
+                EventType = "Network",                       // tùy ý đặt nhãn
+                BadgeTextColor = "#2563eb",
+                BadgeBgColor = "rgba(37, 99, 235, 0.1)",
+                Details = "Connected to Hub",
+                TimeAgo = "Just now"
+            });
+
+            // Vì callback SignalR chạy trên background thread,
+            // cần InvokeAsync(StateHasChanged) để Blazor re-render UI.
+            InvokeAsync(StateHasChanged);
+        });
+
+        // Khi server broadcast kết quả command
+        _hubConnection.On<CommandResult>("CommandResultReceived", result =>
+        {
+            Console.WriteLine($"[Home] CommandCompleted: {result.CommandId}, Success = {result.Success}");
+
+            _lastCommandResult = result;
+
+            // Thêm activity hiển thị kết quả command
+            RecentActivities.Insert(0, new AgentActivityModel
+            {
+                AgentId = result.AgentId,
+                EventType = "Command",
+                BadgeTextColor = result.Success ? "#10b981" : "#ef4444",
+                BadgeBgColor = result.Success
+                    ? "rgba(16, 185, 129, 0.1)"
+                    : "rgba(239, 68, 68, 0.1)",
+                Details = $"Command {result.CommandId} completed (Success = {result.Success})",
+                TimeAgo = "Just now"
+            });
+
+            InvokeAsync(StateHasChanged);
+        });
+
+        // 3.4 Bắt đầu kết nối tới Hub
+        try
+        {
+            await _hubConnection.StartAsync();
+            Console.WriteLine("[Home] Hub connection started");
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[Home] Cannot start hub connection: {ex.Message}");
+        }
     }
+
+    // Hàm private giữ lại logic seed dữ liệu cũ để code gọn gàng hơn
+    private void SeedMockRecentActivities()
+    {
+        RecentActivities = new()
+        {
+            new AgentActivityModel
+            {
+                AgentId = "MayTinhCuaQuangUwU",
+                EventType = "Process",
+                BadgeTextColor = "#eab308",
+                BadgeBgColor = "rgba(234, 179, 8, 0.1)",
+                Details = "Started 'chrome.exe'",
+                TimeAgo = "2 mins ago"
+            },
+            new AgentActivityModel
+            {
+                AgentId = "LAPTOP-WRK",
+                EventType = "Network",
+                BadgeTextColor = "#2563eb",
+                BadgeBgColor = "rgba(37, 99, 235, 0.1)",
+                Details = "Connected to Hub",
+                TimeAgo = "5 mins ago"
+            },
+            new AgentActivityModel
+            {
+                AgentId = "SERVER-09",
+                EventType = "System",
+                BadgeTextColor = "#10b981",
+                BadgeBgColor = "rgba(16, 185, 129, 0.1)",
+                Details = "Webcam activated",
+                TimeAgo = "12 mins ago"
+            }
+        };
+    }
+
+    // ============================
+    // 4) Dọn dẹp connection khi rời trang
+    // ============================
+
+    public async ValueTask DisposeAsync()
+    {
+        if (_hubConnection is not null)
+        {
+            await _hubConnection.DisposeAsync();
+        }
+    }
+
+    // ============================
+    // 5) Model dùng cho bảng activity
+    // ============================
 
     public record AgentActivityModel
     {
