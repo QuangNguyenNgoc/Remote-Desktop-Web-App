@@ -1,5 +1,4 @@
 using RemoteControl.Web.Components;
-using RemoteControl.Web.Hubs;            // dùng RemoteControlHub cho SignalR
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -7,7 +6,6 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddRazorComponents()
     .AddInteractiveServerComponents();
 
-builder.Services.AddSignalR(); // Đăng ký dịch vụ SignalR cho web
 var app = builder.Build();
 
 // Configure the HTTP request pipeline.
@@ -25,8 +23,5 @@ app.UseAntiforgery();
 app.MapStaticAssets();
 app.MapRazorComponents<App>()
     .AddInteractiveServerRenderMode();
-// Map SignalR Hub cho remote control
-// Endpoint: /remotehub - Agent và Dashboard sẽ connect vào đây
-app.MapHub<RemoteControlHub>("/remotehub");
 
 app.Run();
