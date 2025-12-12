@@ -8,7 +8,8 @@ using System.Collections.Concurrent;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.SignalR;
 using Microsoft.Extensions.Logging;
-using RemoteControl.Shared.Models; // chứa AgentInfo, CommandRequest, CommandResult
+using RemoteControl.Shared.Models;
+using RemoteControl.Shared.Constants; // HubEvents constants
 
 namespace RemoteControl.Web.Hubs
 {
@@ -51,8 +52,8 @@ namespace RemoteControl.Web.Hubs
                 "RegisterAgent: Agent {AgentId} đăng ký với Connection {ConnectionId}",
                 agent.AgentId, connectionId);
 
-            // Gửi sự kiện "AgentRegistered" cho tất cả client (dashboard, log viewer, …)
-            await Clients.All.SendAsync("AgentRegistered", agent);
+            // Gửi sự kiện AgentConnected cho tất cả client (dashboard, log viewer, …)
+            await Clients.All.SendAsync(HubEvents.AgentConnected, agent);
         }
 
         // ====================================
@@ -120,7 +121,7 @@ namespace RemoteControl.Web.Hubs
             // TODO: sau này có thể lưu DB / log chi tiết tại đây
 
             // Broadcast kết quả cho tất cả client
-            await Clients.All.SendAsync("CommandResultReceived", result);
+            await Clients.All.SendAsync(HubEvents.CommandCompleted, result);
         }
 
         // ========================
