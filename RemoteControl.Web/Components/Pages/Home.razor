@@ -3,6 +3,7 @@
 @* Dùng SignalR client trong Blazor *@
 @using Microsoft.AspNetCore.SignalR.Client
 @using RemoteControl.Shared.Models
+@using RemoteControl.Shared.Constants
 
 @* Để component tự dispose HubConnection khi bị hủy *@
 @implements IAsyncDisposable
@@ -154,16 +155,16 @@
         SeedMockRecentActivities();
 
         // 3.2 Tạo HubConnection tới RemoteControlHub
-        // Endpoint "/hubs/remote-control" phải trùng với MapHub<RemoteControlHub> trong Program.cs
+        // Endpoint "/remotehub" phải trùng với MapHub<RemoteControlHub> trong Program.cs
         _hubConnection = new HubConnectionBuilder()
-            .WithUrl(NavigationManager.ToAbsoluteUri("/hubs/remote-control"))
+            .WithUrl(NavigationManager.ToAbsoluteUri("/remotehub"))
             .WithAutomaticReconnect()                // cho phép tự reconnect khi mất kết nối
             .Build();
 
         // 3.3 Đăng ký (subscribe) các event từ server
 
-        // Khi server gửi event "AgentRegistered" -> có agent mới connect
-        _hubConnection.On<AgentInfo>("AgentRegistered", agent =>
+        // Khi server gửi event AgentConnected -> có agent mới connect
+        _hubConnection.On<AgentInfo>(HubEvents.AgentConnected, agent =>
         {
             Console.WriteLine($"[Home] AgentRegistered: {agent.AgentId}");
 
@@ -184,7 +185,7 @@
         });
 
         // Khi server broadcast kết quả command
-        _hubConnection.On<CommandResult>("CommandResultReceived", result =>
+        _hubConnection.On<CommandResult>(HubEvents.CommandCompleted, result =>
         {
             Console.WriteLine($"[Home] CommandCompleted: {result.CommandId}, Success = {result.Success}");
 
