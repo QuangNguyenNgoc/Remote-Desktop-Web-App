@@ -1,97 +1,95 @@
+// ProcessService: Quản lý processes (List/Kill/Start)
+// Sử dụng Shared Models để đồng bộ với Web/Hub
+
 using System.Diagnostics;
+using RemoteControl.Shared.Models;
 
 namespace RemoteControl.Agent.Services;
 
 public class ProcessService
 {
     // ====== Lấy danh sách process ======
+    // Trả về ProcessListResult từ Shared để Web hiểu được
     public ProcessListResult ListProcesses()
     {
+        var result = new ProcessListResult();
+
         try
         {
             var processes = Process.GetProcesses();
-            var processModels = new List<ProcessModel>();
 
             foreach (var p in processes)
             {
                 try
                 {
-                    processModels.Add(new ProcessModel
+                    result.Processes.Add(new ProcessInfo
                     {
-                        Id = p.Id,
-                        Name = p.ProcessName,
+                        ProcessId = p.Id,
+                        ProcessName = p.ProcessName,
                         WindowTitle = p.MainWindowTitle,
-                        // Memory usage in MB
-                        MemoryUsageMB = p.WorkingSet64 / 1024.0 / 1024.0
+                        MemoryUsageMB = p.WorkingSet64 / 1024 / 1024,  // Convert to MB (long)
+                        ThreadCount = p.Threads.Count
+                        // CpuUsage cần PerformanceCounter, tạm để 0
                     });
                 }
                 catch
                 {
-                    // Ignore processes we can't access
+                    // Ignore processes we can't access (permission denied)
                 }
             }
 
-            return new ProcessListResult
-            {
-                Processes = processModels.OrderBy(p => p.Name).ToList(),
-                Count = processModels.Count,
-                Success = true
-            };
+            // Sắp xếp theo tên
+            result.Processes = result.Processes.OrderBy(p => p.ProcessName).ToList();
         }
         catch (Exception ex)
         {
-            return new ProcessListResult
-            {
-                Success = false,
-                Message = ex.Message
-            };
+            Console.WriteLine($"[ProcessService] ListProcesses error: {ex.Message}");
         }
+
+        return result;
     }
 
-    // ====== Kill process ======
-    public bool KillProcess(int pid)
+    // ====== Kill process theo PID ======
+    public (bool success, string message) KillProcess(int pid)
     {
         try
         {
             var process = Process.GetProcessById(pid);
+            var name = process.ProcessName;
             process.Kill();
-            return true;
+            process.WaitForExit(3000); // Chờ tối đa 3s
+            return (true, $"Đã diệt process {name} (PID: {pid})");
+        }
+        catch (ArgumentException)
+        {
+            return (false, $"Process với PID {pid} không tồn tại");
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"[ProcessService] Kill failed: {ex.Message}");
-            return false;
+            return (false, $"Lỗi khi diệt process: {ex.Message}");
         }
     }
 
     // ====== Start process ======
-    public bool StartProcess(string name)
+    public (bool success, string message) StartProcess(string name)
     {
         try
         {
-            Process.Start(name);
-            return true;
+            var process = Process.Start(new ProcessStartInfo
+            {
+                FileName = name,
+                UseShellExecute = true  // Cho phép mở bằng shell (VD: notepad, chrome)
+            });
+
+            if (process != null)
+            {
+                return (true, $"Đã khởi động {name} (PID: {process.Id})");
+            }
+            return (true, $"Đã khởi động {name}");
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"[ProcessService] Start failed: {ex.Message}");
-            return false;
+            return (false, $"Lỗi khi khởi động {name}: {ex.Message}");
         }
     }
-}
-
-public class ProcessListResult
-{
-    public List<ProcessModel> Processes { get; set; } = new();
-    public int Count { get; set; }
-    public bool Success { get; set; }
-    public string? Message { get; set; }
-}
-
-public class ProcessModel
-{
-    public int Id { get; set; }
-    public string Name { get; set; } = string.Empty;
-    public string WindowTitle { get; set; } = string.Empty;
-    public double MemoryUsageMB { get; set; }
 }

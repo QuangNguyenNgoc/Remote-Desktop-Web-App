@@ -44,45 +44,45 @@ var processService = new ProcessService();
 
 // 1. List Processes
 var processResult = processService.ListProcesses();
-if (processResult.Success)
+if (processResult.Processes.Count > 0)
 {
-    Console.WriteLine($"[OK] Process list retrieved! Count: {processResult.Count}");
+    Console.WriteLine($"[OK] Process list retrieved! Count: {processResult.Processes.Count}");
     Console.WriteLine("     Top 5 processes by name:");
     foreach (var p in processResult.Processes.Take(5))
     {
-        Console.WriteLine($"     - [{p.Id}] {p.Name} ({p.MemoryUsageMB:F2} MB)");
+        Console.WriteLine($"     - [{p.ProcessId}] {p.ProcessName} ({p.MemoryUsageMB} MB)");
     }
 }
 else
 {
-    Console.WriteLine($"[FAIL] List processes failed: {processResult.Message}");
+    Console.WriteLine("[FAIL] No processes found or error occurred");
 }
 
 // 2. Start Process (Notepad)
 Console.WriteLine("\n[Test] Starting Notepad...");
-bool started = processService.StartProcess("notepad");
+var (started, startMsg) = processService.StartProcess("notepad");
 if (started)
 {
-    Console.WriteLine("[OK] Notepad started.");
+    Console.WriteLine($"[OK] {startMsg}");
     
     // Wait for it to start
     Thread.Sleep(2000); 
 
     // 3. Find and Kill Notepad
     var listAgain = processService.ListProcesses();
-    var notepad = listAgain.Processes.FirstOrDefault(p => p.Name.Equals("notepad", StringComparison.OrdinalIgnoreCase));
+    var notepad = listAgain.Processes.FirstOrDefault(p => p.ProcessName.Equals("notepad", StringComparison.OrdinalIgnoreCase));
     
     if (notepad != null)
     {
-        Console.WriteLine($"[Found] Notepad is running with ID: {notepad.Id}. Killing it...");
-        bool killed = processService.KillProcess(notepad.Id);
+        Console.WriteLine($"[Found] Notepad is running with ID: {notepad.ProcessId}. Killing it...");
+        var (killed, killMsg) = processService.KillProcess(notepad.ProcessId);
         if (killed)
         {
-            Console.WriteLine("[OK] Notepad killed successfully.");
+            Console.WriteLine($"[OK] {killMsg}");
         }
         else
         {
-            Console.WriteLine("[FAIL] Failed to kill Notepad.");
+            Console.WriteLine($"[FAIL] {killMsg}");
         }
     }
     else
@@ -92,7 +92,7 @@ if (started)
 }
 else
 {
-    Console.WriteLine("[FAIL] Failed to start Notepad.");
+    Console.WriteLine($"[FAIL] {startMsg}");
 }
 
 Console.WriteLine();
