@@ -9,92 +9,16 @@ Console.WriteLine("  RemoteControl Agent v1.0");
 Console.WriteLine("=================================");
 Console.WriteLine();
 
+var systemInfoService = new SystemInfoService();
 
-// Test ScreenshotService
-Console.WriteLine("[Test] Testing ScreenshotService...");
-
-var screenshotService = new ScreenshotService();
-var result = screenshotService.CaptureScreen(quality: 50);
-
-if (!string.IsNullOrEmpty(result.ImageBase64) && result.Format != "error")
-{
-    Console.WriteLine("[OK] Screenshot captured successfully!");
-    Console.WriteLine($"     - Size: {result.Width}x{result.Height}");
-    Console.WriteLine($"     - Format: {result.Format}");
-    // Console.WriteLine($"     - Base64 length: {result.ImageBase64.Length} characters");
-    Console.WriteLine($"     - Captured at: {result.CapturedAt:yyyy-MM-dd HH:mm:ss}");
-    
-    // Save to file for verification
-    var bytes = Convert.FromBase64String(result.ImageBase64);
-    var filePath = Path.Combine(Environment.CurrentDirectory, "test_screenshot.jpg");
-    File.WriteAllBytes(filePath, bytes);
-    Console.WriteLine($"     - Saved to: {filePath}");
-}
-else
-{
-    Console.WriteLine("[FAIL] Screenshot capture failed!");
-    Console.WriteLine($"     - Format: {result.Format}");
-}
-
-Console.WriteLine();
-
-// Test ProcessService
-Console.WriteLine("[Test] Testing ProcessService...");
-var processService = new ProcessService();
-
-// 1. List Processes
-var processResult = processService.ListProcesses();
-if (processResult.Processes.Count > 0)
-{
-    Console.WriteLine($"[OK] Process list retrieved! Count: {processResult.Processes.Count}");
-    Console.WriteLine("     Top 5 processes by name:");
-    foreach (var p in processResult.Processes.Take(5))
-    {
-        Console.WriteLine($"     - [{p.ProcessId}] {p.ProcessName} ({p.MemoryUsageMB} MB)");
-    }
-}
-else
-{
-    Console.WriteLine("[FAIL] No processes found or error occurred");
-}
-
-// 2. Start Process (Notepad)
-Console.WriteLine("\n[Test] Starting Notepad...");
-var (started, startMsg) = processService.StartProcess("notepad");
-if (started)
-{
-    Console.WriteLine($"[OK] {startMsg}");
-    
-    // Wait for it to start
-    Thread.Sleep(2000); 
-
-    // 3. Find and Kill Notepad
-    var listAgain = processService.ListProcesses();
-    var notepad = listAgain.Processes.FirstOrDefault(p => p.ProcessName.Equals("notepad", StringComparison.OrdinalIgnoreCase));
-    
-    if (notepad != null)
-    {
-        Console.WriteLine($"[Found] Notepad is running with ID: {notepad.ProcessId}. Killing it...");
-        var (killed, killMsg) = processService.KillProcess(notepad.ProcessId);
-        if (killed)
-        {
-            Console.WriteLine($"[OK] {killMsg}");
-        }
-        else
-        {
-            Console.WriteLine($"[FAIL] {killMsg}");
-        }
-    }
-    else
-    {
-        Console.WriteLine("[FAIL] Notepad process not found after starting.");
-    }
-}
-else
-{
-    Console.WriteLine($"[FAIL] {startMsg}");
-}
+var sysInfo = systemInfoService.GetSystemInfo();
+Console.WriteLine($"[OK] System Info retrieved:");
+Console.WriteLine($"- CPU Usage: {sysInfo.CpuUsage}%");
+Console.WriteLine($"- Memory Usage: {sysInfo.MemoryUsage}%");
+Console.WriteLine($"- Total Memory: {sysInfo.TotalMemoryMB} MB");
+Console.WriteLine($"- Process Count: {sysInfo.ProcessCount}");
 
 Console.WriteLine();
 Console.WriteLine("Press any key to exit...");
 Console.ReadKey();
+
