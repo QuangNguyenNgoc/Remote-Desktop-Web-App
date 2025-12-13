@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.SignalR;
 using Microsoft.Extensions.Logging;
 using Moq;
 using RemoteControl.Shared.Models;
+using RemoteControl.Shared.Constants;
 using RemoteControl.Web.Hubs;
 
 namespace RemoteControl.Web.Tests;
@@ -69,11 +70,11 @@ public class RemoteControlHubTests
         // Assert - Kiểm tra đầu ra
         _allClientsMock.Verify(
             c => c.SendCoreAsync(
-                "AgentRegistered",
+                HubEvents.AgentConnected,
                 It.Is<object[]>(o => o.Length == 1 && o[0] == agent),
                 default),
             Times.Once,
-            "Phải broadcast AgentRegistered 1 lần với agent info");
+            "Phải broadcast AgentConnected 1 lần với agent info");
     }
 
     /// <summary>
@@ -225,11 +226,11 @@ public class RemoteControlHubTests
         // Assert
         _allClientsMock.Verify(
             c => c.SendCoreAsync(
-                "CommandResultReceived",
+                HubEvents.CommandCompleted,
                 It.Is<object[]>(o => o.Length == 1 && o[0] == result),
                 default),
             Times.Once,
-            "Phải broadcast CommandResultReceived cho tất cả clients");
+            "Phải broadcast CommandCompleted cho tất cả clients");
     }
 
     /// <summary>
@@ -274,6 +275,53 @@ public class RemoteControlHubTests
             c => c.SendCoreAsync(It.IsAny<string>(), It.IsAny<object[]>(), default),
             Times.Never,
             "Không được broadcast khi AgentId rỗng");
+    }
+
+    #endregion
+
+    #region GetAllAgents Tests
+
+    /// <summary>
+    /// Test: GetAllAgents trả về List (không null)
+    /// Expected: List không null, có thể rỗng hoặc chứa agents
+    /// </summary>
+    [Fact]
+    public void GetAllAgents_ShouldReturnNonNullList()
+    {
+        // Act
+        var result = _hub.GetAllAgents();
+
+        // Assert
+        Assert.NotNull(result);
+        Assert.IsType<List<AgentInfo>>(result);
+    }
+
+    /// <summary>
+    /// Test: GetAllAgents sau khi đã register agent mới
+    /// Expected: Agent mới phải có trong list
+    /// </summary>
+    [Fact]
+    public async Task GetAllAgents_AfterRegisterAgent_ShouldContainNewAgent()
+    {
+        // Arrange - Tạo agent với ID unique
+        var uniqueId = $"agent-{Guid.NewGuid()}";
+        var agent = new AgentInfo
+        {
+            AgentId = uniqueId,
+            MachineName = "TEST-PC-UNIQUE",
+            IpAddress = "10.0.0.99"
+        };
+        _contextMock.Setup(c => c.ConnectionId).Returns($"conn-{Guid.NewGuid()}");
+
+        // Act
+        await _hub.RegisterAgent(agent);
+        var result = _hub.GetAllAgents();
+
+        // Assert - Agent mới phải có trong list
+        var foundAgent = result.FirstOrDefault(a => a.AgentId == uniqueId);
+        Assert.NotNull(foundAgent);
+        Assert.Equal("TEST-PC-UNIQUE", foundAgent.MachineName);
+        Assert.Equal(AgentStatus.Online, foundAgent.Status);
     }
 
     #endregion
