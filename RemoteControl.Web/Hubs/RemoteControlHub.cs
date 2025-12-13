@@ -18,10 +18,10 @@ namespace RemoteControl.Web.Hubs
         // Logger để ghi log cho từng action trong hub
         private readonly ILogger<RemoteControlHub> _logger;
 
-        // Bảng lưu ánh xạ: AgentId -> ConnectionId
+        // Bảng lưu ánh xạ: AgentId -> AgentInfo (bao gồm cả ConnectionId)
         // ConcurrentDictionary dùng cho môi trường multi-thread (nhiều kết nối cùng lúc)
-        private static readonly ConcurrentDictionary<string, string> AgentConnections
-            = new ConcurrentDictionary<string, string>();
+        private static readonly ConcurrentDictionary<string, AgentInfo> ConnectedAgents
+            = new ConcurrentDictionary<string, AgentInfo>();
 
         public RemoteControlHub(ILogger<RemoteControlHub> logger)
         {
@@ -45,15 +45,30 @@ namespace RemoteControl.Web.Hubs
                 return;
             }
 
-            // Lưu / cập nhật AgentId -> ConnectionId
-            AgentConnections[agent.AgentId] = connectionId;
+            // Gán ConnectionId vào AgentInfo
+            agent.ConnectionId = connectionId;
+            agent.Status = AgentStatus.Online;
+            agent.LastSeen = DateTime.UtcNow;
+
+            // Lưu / cập nhật AgentInfo vào dictionary
+            ConnectedAgents[agent.AgentId] = agent;
 
             _logger.LogInformation(
-                "RegisterAgent: Agent {AgentId} đăng ký với Connection {ConnectionId}",
-                agent.AgentId, connectionId);
+                "RegisterAgent: Agent {AgentId} ({MachineName}) đăng ký với Connection {ConnectionId}",
+                agent.AgentId, agent.MachineName, connectionId);
 
             // Gửi sự kiện AgentConnected cho tất cả client (dashboard, log viewer, …)
             await Clients.All.SendAsync(HubEvents.AgentConnected, agent);
+        }
+
+        // ==========================
+        // 2) Lấy danh sách tất cả agents (cho Dashboard)
+        // ==========================
+        public List<AgentInfo> GetAllAgents()
+        {
+            var agents = ConnectedAgents.Values.ToList();
+            _logger.LogInformation("GetAllAgents: Trả về {Count} agents", agents.Count);
+            return agents;
         }
 
         // ====================================
@@ -73,8 +88,8 @@ namespace RemoteControl.Web.Hubs
 
             var targetAgentId = request.AgentId;
 
-            // Tìm connectionId của agent
-            if (!AgentConnections.TryGetValue(targetAgentId, out var connectionId))
+            // Tìm agent trong dictionary
+            if (!ConnectedAgents.TryGetValue(targetAgentId, out var agent))
             {
                 _logger.LogWarning(
                     "SendCommand: Agent {AgentId} không kết nối",
@@ -93,10 +108,10 @@ namespace RemoteControl.Web.Hubs
                 "SendCommand: Command {CommandId} -> Agent {AgentId} (Conn {ConnectionId})",
                 request.CommandId,
                 targetAgentId,
-                connectionId);
+                agent.ConnectionId);
 
             // Gửi command xuống đúng agent
-            await Clients.Client(connectionId).SendAsync("ReceiveCommand", request);
+            await Clients.Client(agent.ConnectionId).SendAsync(HubEvents.ExecuteCommand, request);
         }
 
         // ==================================
@@ -136,19 +151,24 @@ namespace RemoteControl.Web.Hubs
         }
 
         // Khi client disconnect
-        public override Task OnDisconnectedAsync(Exception? exception)
+        public override async Task OnDisconnectedAsync(Exception? exception)
         {
             var connectionId = Context.ConnectionId;
 
-            // Xoá mọi AgentId có dùng connectionId này
-            foreach (var kvp in AgentConnections)
+            // Tìm và xóa agent có connectionId này
+            foreach (var kvp in ConnectedAgents)
             {
-                if (kvp.Value == connectionId)
+                if (kvp.Value.ConnectionId == connectionId)
                 {
-                    AgentConnections.TryRemove(kvp.Key, out _);
-                    _logger.LogInformation(
-                        "OnDisconnected: xoá Agent {AgentId} (Conn {ConnectionId})",
-                        kvp.Key, connectionId);
+                    if (ConnectedAgents.TryRemove(kvp.Key, out var removedAgent))
+                    {
+                        _logger.LogInformation(
+                            "OnDisconnected: xoá Agent {AgentId} ({MachineName})",
+                            kvp.Key, removedAgent.MachineName);
+
+                        // Broadcast cho dashboard biết agent đã disconnect
+                        await Clients.All.SendAsync(HubEvents.AgentDisconnected, kvp.Key);
+                    }
                 }
             }
 
@@ -162,7 +182,7 @@ namespace RemoteControl.Web.Hubs
                 _logger.LogInformation("Client disconnected: {ConnectionId}", connectionId);
             }
 
-            return base.OnDisconnectedAsync(exception);
+            await base.OnDisconnectedAsync(exception);
         }
     }
 }
