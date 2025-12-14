@@ -93,9 +93,7 @@ public class ScreenshotService
     // ====== Lấy kích thước màn hình chính ======
     private Rectangle GetPrimaryScreenBounds()
     {
-        // Fix DPI scaling issue: Make process DPI aware to get real pixels
-        SetProcessDPIAware();
-
+        // DPI is handled globally in Program.cs
         // Windows API: lấy width/height màn hình
         int width = GetSystemMetrics(SM_CXSCREEN);
         int height = GetSystemMetrics(SM_CYSCREEN);
@@ -142,7 +140,4 @@ public class ScreenshotService
     
     [System.Runtime.InteropServices.DllImport("user32.dll")]
     private static extern int GetSystemMetrics(int nIndex);
-
-    [System.Runtime.InteropServices.DllImport("user32.dll")]
-    private static extern bool SetProcessDPIAware();
 }
