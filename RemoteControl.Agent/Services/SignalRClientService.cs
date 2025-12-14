@@ -1,0 +1,171 @@
+using Microsoft.AspNetCore.SignalR.Client;
+using RemoteControl.Agent.Handlers;
+using RemoteControl.Shared.Models;
+using System.Net;
+using System.Net.Sockets;
+
+namespace RemoteControl.Agent.Services;
+
+public class SignalRClientService
+{
+    private readonly HubConnection _hubConnection;
+    private readonly CommandHandler _commandHandler;
+    private readonly System.Timers.Timer _heartbeatTimer;
+    private bool _isConnected;
+    private readonly string _agentId;
+
+    public event Action<string>? OnStatusChanged;
+    public event Action<string>? OnConnectionStateChanged;
+
+    public SignalRClientService(CommandHandler commandHandler)
+    {
+        _commandHandler = commandHandler;
+        _agentId = Environment.MachineName; // Simple Agent ID for now
+
+        _hubConnection = new HubConnectionBuilder()
+            .WithUrl("http://localhost:5048/remotehub")
+            .WithAutomaticReconnect()
+            .Build();
+
+        _hubConnection.Reconnecting += OnReconnecting;
+        _hubConnection.Reconnected += OnReconnected;
+        _hubConnection.Closed += OnClosed;
+
+        _heartbeatTimer = new System.Timers.Timer(10000); // 10s
+        _heartbeatTimer.Elapsed += async (s, e) => await SendHeartbeat();
+
+        RegisterHandlers();
+    }
+
+    public async Task ConnectAsync()
+    {
+        try
+        {
+            UpdateStatus("Connecting to Hub...");
+            await _hubConnection.StartAsync();
+            _isConnected = true;
+            UpdateStatus("Connected to Hub");
+            OnConnectionStateChanged?.Invoke("Connected");
+
+            await RegisterAgentAsync();
+            _heartbeatTimer.Start();
+        }
+        catch (Exception ex)
+        {
+            UpdateStatus($"Connection failed: {ex.Message}");
+            OnConnectionStateChanged?.Invoke("Disconnected");
+            _isConnected = false;
+        }
+    }
+
+    private void RegisterHandlers()
+    {
+        _hubConnection.On<CommandRequest>("ExecuteCommand", async (request) =>
+        {
+            UpdateStatus($"Received command: {request.Type}");
+            
+            // Execute locally
+            var result = _commandHandler.HandleCommand(request);
+            
+            // Send result back
+            await SendResultAsync(result);
+        });
+    }
+
+    private async Task RegisterAgentAsync()
+    {
+        var info = new AgentInfo
+        {
+            AgentId = _agentId,
+            MachineName = Environment.MachineName,
+            IpAddress = GetLocalIPAddress(),
+            OsVersion = Environment.OSVersion.ToString(),
+            Status = AgentStatus.Online,
+            ConnectedAt = DateTime.UtcNow,
+            SystemInfo = new SystemInfo() // Initial empty info
+        };
+
+        try
+        {
+            await _hubConnection.InvokeAsync("RegisterAgent", info);
+            UpdateStatus("Agent Registered successfully");
+        }
+        catch (Exception ex)
+        {
+            UpdateStatus($"Registration failed: {ex.Message}");
+        }
+    }
+
+    private async Task SendHeartbeat()
+    {
+        if (!_isConnected) return;
+
+        try
+        {
+            await _hubConnection.InvokeAsync("SendHeartbeat", _agentId);
+        }
+        catch (Exception ex)
+        {
+            // UpdateStatus($"Heartbeat failed: {ex.Message}");
+            // Silent fail for heartbeat to avoid spam
+        }
+    }
+
+    private async Task SendResultAsync(CommandResult result)
+    {
+        if (!_isConnected) return;
+         try
+        {
+            await _hubConnection.InvokeAsync("SendResult", result);
+            UpdateStatus($"Result sent for {result.CommandId}");
+        }
+        catch (Exception ex)
+        {
+             UpdateStatus($"Failed to send result: {ex.Message}");
+        }
+    }
+
+    private Task OnReconnecting(Exception? arg)
+    {
+        _isConnected = false;
+        UpdateStatus("Reconnecting...");
+        OnConnectionStateChanged?.Invoke("Reconnecting");
+        return Task.CompletedTask;
+    }
+
+    private Task OnReconnected(string? arg)
+    {
+        _isConnected = true;
+        UpdateStatus("Reconnected");
+        OnConnectionStateChanged?.Invoke("Connected");
+        // Re-register might be needed depending on Server logic, but usually ConnectionId changes
+        _ = RegisterAgentAsync(); 
+        return Task.CompletedTask;
+    }
+
+    private Task OnClosed(Exception? arg)
+    {
+        _isConnected = false;
+        UpdateStatus($"Connection Closed: {arg?.Message}");
+        OnConnectionStateChanged?.Invoke("Disconnected");
+        return Task.CompletedTask;
+    }
+
+    private void UpdateStatus(string message)
+    {
+        OnStatusChanged?.Invoke(message);
+    }
+
+    private string GetLocalIPAddress()
+    {
+        var host = Dns.GetHostEntry(Dns.GetHostName());
+        foreach (var ip in host.AddressList)
+        {
+            if (ip.AddressFamily == AddressFamily.InterNetwork)
+            {
+                return ip.ToString();
+            }
+        }
+        return "127.0.0.1";
+    }
+}

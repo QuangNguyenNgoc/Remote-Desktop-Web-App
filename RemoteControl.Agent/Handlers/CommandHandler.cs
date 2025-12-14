@@ -14,6 +14,7 @@ public class CommandHandler
     private readonly SystemInfoService _systemInfoService;
     private readonly KeyLoggerService _keyLoggerService;
     private readonly WebCamService _webCamService;
+    private readonly PowerService _powerService;
 
     public CommandHandler()
     {
@@ -22,6 +23,7 @@ public class CommandHandler
         _systemInfoService = new SystemInfoService();
         _keyLoggerService = new KeyLoggerService();
         _webCamService = new WebCamService();
+        _powerService = new PowerService();
     }
 
     // ====== Main Handler ======
@@ -59,6 +61,8 @@ public class CommandHandler
                 // ===== System Control =====
                 CommandType.Shutdown => HandleShutdown(request),
                 CommandType.Restart => HandleRestart(request),
+                CommandType.Sleep => HandleSleep(request),
+                CommandType.Lock => HandleLock(request),
 
                 // ===== Unknown =====
                 _ => HandleUnknownCommand(request)
@@ -136,8 +140,6 @@ public class CommandHandler
     // ====== Webcam Handlers ======
     private CommandResult HandleWebcamOn(CommandRequest request)
     {
-        // Webcam streaming cần callback, ở đây chỉ start
-        // Thực tế sẽ dùng SignalR để stream frames
         return CreateSuccessResult(request, "Webcam ready (use streaming endpoint)");
     }
 
@@ -150,16 +152,26 @@ public class CommandHandler
     // ====== System Control Handlers ======
     private CommandResult HandleShutdown(CommandRequest request)
     {
-        Console.WriteLine("[CommandHandler] Shutdown requested");
-        // System.Diagnostics.Process.Start("shutdown", "/s /t 0");
-        return CreateSuccessResult(request, "Shutdown command sent");
+        var (success, message) = _powerService.Shutdown();
+        return success ? CreateSuccessResult(request, message) : CreateErrorResult(request, message);
     }
 
     private CommandResult HandleRestart(CommandRequest request)
     {
-        Console.WriteLine("[CommandHandler] Restart requested");
-        // System.Diagnostics.Process.Start("shutdown", "/r /t 0");
-        return CreateSuccessResult(request, "Restart command sent");
+       var (success, message) = _powerService.Restart();
+       return success ? CreateSuccessResult(request, message) : CreateErrorResult(request, message);
+    }
+
+    private CommandResult HandleSleep(CommandRequest request)
+    {
+       var (success, message) = _powerService.Sleep();
+       return success ? CreateSuccessResult(request, message) : CreateErrorResult(request, message);
+    }
+
+    private CommandResult HandleLock(CommandRequest request)
+    {
+       var (success, message) = _powerService.Lock();
+       return success ? CreateSuccessResult(request, message) : CreateErrorResult(request, message);
     }
 
     // ====== Unknown Command Handler ======
