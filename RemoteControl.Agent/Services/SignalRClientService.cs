@@ -17,13 +17,15 @@ public class SignalRClientService
     public event Action<string>? OnStatusChanged;
     public event Action<string>? OnConnectionStateChanged;
 
-    public SignalRClientService(CommandHandler commandHandler)
+    public SignalRClientService(CommandHandler commandHandler, Microsoft.Extensions.Configuration.IConfiguration configuration)
     {
         _commandHandler = commandHandler;
         _agentId = Environment.MachineName; // Simple Agent ID for now
 
+        string hubUrl = configuration["SignalR:HubUrl"] ?? "http://localhost:5048/remotehub";
+
         _hubConnection = new HubConnectionBuilder()
-            .WithUrl("http://localhost:5048/remotehub")
+            .WithUrl(hubUrl)
             .WithAutomaticReconnect()
             .Build();
 

