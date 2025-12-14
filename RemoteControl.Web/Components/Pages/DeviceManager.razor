@@ -1,50 +1,181 @@
 @page "/devices"
+@using Microsoft.AspNetCore.SignalR.Client
+@using RemoteControl.Shared.Models
+@using RemoteControl.Shared.Constants
+@implements IAsyncDisposable
 @inject NavigationManager Nav
-
-@code {
-    // Fix CS0105: Đã xóa dòng using Components.Layout vì nó đã có trong _Imports.razor
-
-    protected override void OnInitialized()
-    {
-        // Cách set title an toàn hơn nếu MainLayout không static
-        // MainLayout.PageTitle = "Device Manager";
-    }
-
-    // Fix CS8618: Khởi tạo giá trị mặc định cho các thuộc tính
-    class Device
-    {
-        public string Name { get; set; } = ""; // Gán rỗng để tránh null
-        public string Ip { get; set; } = "";
-        public string OS { get; set; } = "";
-        public bool IsOnline { get; set; }
-        public string LastSeen { get; set; } = "";
-    }
-
-    List<Device> Devices = new List<Device> {
-        new Device { Name = "HR-ADMIN-01", Ip = "192.168.1.101", OS = "Windows 11", IsOnline = true, LastSeen = "Now" },
-        new Device { Name = "DEV-WORKSTATION", Ip = "192.168.1.105", OS = "Windows 10", IsOnline = true, LastSeen = "Now" },
-        new Device { Name = "RECEPTION-FRONT", Ip = "192.168.1.112", OS = "Windows 10", IsOnline = false, LastSeen = "2h ago" },
-        new Device { Name = "SERVER-BACKUP", Ip = "192.168.1.200", OS = "Windows Server", IsOnline = true, LastSeen = "Now" },
-        new Device { Name = "GUEST-LAPTOP", Ip = "192.168.1.150", OS = "Windows 11", IsOnline = false, LastSeen = "1d ago" },
-    };
-
-    // Hàm điều hướng: Khi bấm nút sẽ nhảy sang trang /devices/{tên_máy}
-    void Connect(string name)
-    {
-        Nav.NavigateTo($"/devices/{name}");
-    }
-}
 
 <SearchInput />
 
-<div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
-    @foreach (var device in Devices)
+@* Loading State *@
+@if (_isLoading)
+{
+    <div class="flex justify-center items-center py-12">
+        <div class="animate-spin rounded-full h-8 w-8 border-b-2" style="border-color: var(--btn-primary-bg);"></div>
+        <span class="ml-3" style="color: var(--text-secondary);">Đang tải danh sách agents...</span>
+    </div>
+}
+else if (_agents.Count == 0)
+{
+    @* Empty State *@
+    <div class="text-center py-12 rounded-xl" style="background-color: var(--card-bg); border: 1px solid var(--card-border);">
+        <svg class="w-16 h-16 mx-auto mb-4" style="color: var(--text-quaternary);" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" 
+                  d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+        </svg>
+        <h3 class="text-lg font-semibold mb-2" style="color: var(--text-primary);">Chưa có Agent nào kết nối</h3>
+        <p class="text-sm" style="color: var(--text-secondary);">
+            Chạy RemoteControl.Agent trên máy cần điều khiển để bắt đầu.
+        </p>
+    </div>
+}
+else
+{
+    @* Agents Grid *@
+    <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
+        @foreach (var agent in _agents)
+        {
+            <DeviceCard Name="@agent.MachineName"
+                        Ip="@agent.IpAddress"
+                        OS="@agent.OsVersion"
+                        IsOnline="@(agent.Status == AgentStatus.Online)"
+                        LastSeen="@FormatLastSeen(agent.LastSeen)"
+                        OnConnect="() => Connect(agent.AgentId)" />
+        }
+    </div>
+}
+
+@* Connection Status *@
+<div class="fixed bottom-4 right-4 px-3 py-2 rounded-lg text-sm" 
+     style="background-color: var(--card-bg); border: 1px solid var(--card-border);">
+    @if (IsConnected)
     {
-        <DeviceCard Name="@device.Name"
-                    Ip="@device.Ip"
-                    OS="@device.OS"
-                    IsOnline="@device.IsOnline"
-                    LastSeen="@device.LastSeen"
-                    OnConnect="() => Connect(device.Name)" />
+        <span class="flex items-center gap-2" style="color: var(--status-badge-online-text);">
+            <span class="w-2 h-2 rounded-full bg-green-500 animate-pulse"></span>
+            Hub Connected
+        </span>
+    }
+    else
+    {
+        <span class="flex items-center gap-2" style="color: var(--status-badge-offline-text);">
+            <span class="w-2 h-2 rounded-full bg-red-500"></span>
+            Disconnected
+        </span>
     }
 </div>
+
+@code {
+    // ============================
+    // State
+    // ============================
+    
+    private List<AgentInfo> _agents = new();
+    private HubConnection? _hubConnection;
+    private bool _isLoading = true;
+    
+    private bool IsConnected => _hubConnection?.State == HubConnectionState.Connected;
+
+    // ============================
+    // Lifecycle
+    // ============================
+    
+    protected override async Task OnInitializedAsync()
+    {
+        // Khởi tạo HubConnection
+        _hubConnection = new HubConnectionBuilder()
+            .WithUrl(Nav.ToAbsoluteUri("/remotehub"))
+            .WithAutomaticReconnect()
+            .Build();
+
+        // Subscribe events từ Hub
+        _hubConnection.On<AgentInfo>(HubEvents.AgentConnected, OnAgentConnected);
+        _hubConnection.On<string>(HubEvents.AgentDisconnected, OnAgentDisconnected);
+
+        // Start connection
+        try
+        {
+            await _hubConnection.StartAsync();
+            Console.WriteLine("[DeviceManager] Hub connected");
+
+            // Lấy danh sách agents hiện tại
+            _agents = await _hubConnection.InvokeAsync<List<AgentInfo>>(HubEvents.GetAllAgents);
+            Console.WriteLine($"[DeviceManager] Loaded {_agents.Count} agents");
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[DeviceManager] Hub connection failed: {ex.Message}");
+        }
+        finally
+        {
+            _isLoading = false;
+        }
+    }
+
+    // ============================
+    // Event Handlers
+    // ============================
+    
+    private void OnAgentConnected(AgentInfo agent)
+    {
+        Console.WriteLine($"[DeviceManager] Agent connected: {agent.AgentId}");
+        
+        // Kiểm tra agent đã có trong list chưa (tránh duplicate)
+        var existing = _agents.FirstOrDefault(a => a.AgentId == agent.AgentId);
+        if (existing != null)
+        {
+            // Update existing
+            _agents.Remove(existing);
+        }
+        
+        _agents.Insert(0, agent); // Thêm vào đầu list
+        InvokeAsync(StateHasChanged);
+    }
+
+    private void OnAgentDisconnected(string agentId)
+    {
+        Console.WriteLine($"[DeviceManager] Agent disconnected: {agentId}");
+        
+        var agent = _agents.FirstOrDefault(a => a.AgentId == agentId);
+        if (agent != null)
+        {
+            _agents.Remove(agent);
+            InvokeAsync(StateHasChanged);
+        }
+    }
+
+    // ============================
+    // Navigation
+    // ============================
+    
+    private void Connect(string agentId)
+    {
+        Nav.NavigateTo($"/devices/{agentId}");
+    }
+
+    // ============================
+    // Helpers
+    // ============================
+    
+    private string FormatLastSeen(DateTime lastSeen)
+    {
+        var diff = DateTime.UtcNow - lastSeen;
+        
+        if (diff.TotalSeconds < 30) return "Now";
+        if (diff.TotalMinutes < 1) return $"{(int)diff.TotalSeconds}s ago";
+        if (diff.TotalMinutes < 60) return $"{(int)diff.TotalMinutes}m ago";
+        if (diff.TotalHours < 24) return $"{(int)diff.TotalHours}h ago";
+        return $"{(int)diff.TotalDays}d ago";
+    }
+
+    // ============================
+    // Cleanup
+    // ============================
+    
+    public async ValueTask DisposeAsync()
+    {
+        if (_hubConnection is not null)
+        {
+            await _hubConnection.DisposeAsync();
+        }
+    }
+}
