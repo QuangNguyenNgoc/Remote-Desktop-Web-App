@@ -78,12 +78,17 @@ public class WebCamService
     }
 
     // ====== Callback xử lý frame ======
+    private int _frameCount = 0;
     private void video_NewFrame(object sender, NewFrameEventArgs eventArgs)
     {
         if (_onFrameCallback == null) return;
 
         try
         {
+            _frameCount++;
+            if (_frameCount % 30 == 0) // Log mỗi 30 frames (khoảng 1 giây)
+                Console.WriteLine($"[WebCamService] Frame #{_frameCount} received");
+
             using var ms = new MemoryStream();
             lock (_lock)
             {
@@ -95,6 +100,9 @@ public class WebCamService
             }
             _onFrameCallback.Invoke(ms.ToArray());
         }
-        catch { /* Ignore drop frame errors */ }
+        catch (Exception ex) 
+        { 
+            Console.WriteLine($"[WebCamService] Frame error: {ex.Message}");
+        }
     }
 }
