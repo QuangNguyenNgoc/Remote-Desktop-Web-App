@@ -4,6 +4,7 @@
 using RemoteControl.Agent.UI;
 
 // ====== Khởi chạy giao diện WinForms ======
+Application.SetHighDpiMode(HighDpiMode.SystemAware);
 Application.EnableVisualStyles();
 Application.SetCompatibleTextRenderingDefault(false);
-Application.Run(new WebCamForm());
+Application.Run(new AgentDebugForm());

