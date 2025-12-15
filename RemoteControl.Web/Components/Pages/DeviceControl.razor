@@ -1,28 +1,395 @@
 @page "/devices/{Id}"
+
+@using Microsoft.AspNetCore.SignalR.Client
+@using RemoteControl.Shared.Models
+@using System.Text.Json
 @inject NavigationManager Nav
 
+@implements IAsyncDisposable
+
+<div class="flex flex-col gap-4 h-full">
+    <!-- Header: thông tin thiết bị + nút back nếu cần -->
+    <DeviceHeader DeviceId="@Id" />
+
+    <div class="grid grid-cols-1 xl:grid-cols-3 gap-4 h-full">
+        <!-- Cột trái: các action + log -->
+        <div class="xl:col-span-2 flex flex-col gap-4">
+            <!-- Card chứa các action điều khiển -->
+            <div class="rounded-xl border border-slate-200/80 bg-white/60 dark:bg-slate-900/40 dark:border-slate-700/80 shadow-sm p-4 flex flex-col gap-5">
+                <div class="flex items-center justify-between">
+                    <div class="flex items-center gap-2">
+                        <span class="font-semibold text-lg">Device Control</span>
+                        <span class="text-xs px-2 py-0.5 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-500">
+                            ID: @Id
+                        </span>
+                    </div>
+
+                    <div class="flex items-center gap-2">
+                        <span class="w-2 h-2 rounded-full @(IsConnected ? "bg-emerald-500" : "bg-red-500")"></span>
+                        <span class="text-xs text-slate-500">
+                            @(IsConnected ? "Connected" : "Disconnected")
+                        </span>
+
+                        <button class="text-xs px-2 py-1 rounded border border-slate-300 text-slate-600 hover:bg-slate-100"
+                                @onclick="GoBack">
+                            ← Back
+                        </button>
+                    </div>
+                </div>
+
+                @if (!string.IsNullOrEmpty(errorMessage))
+                {
+                    <div class="text-sm text-red-500 bg-red-50 dark:bg-red-950/40 border border-red-200 dark:border-red-900 px-3 py-2 rounded">
+                        @errorMessage
+                    </div>
+                }
+
+                <!-- Screenshot Actions -->
+                <section class="space-y-2">
+                    <h3 class="font-semibold text-sm text-slate-700 dark:text-slate-200">
+                        Screenshot Actions
+                    </h3>
+
+                    <div class="flex flex-wrap items-center gap-3">
+                        <button class="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-medium
+                                       bg-indigo-600 text-white hover:bg-indigo-700 disabled:opacity-60 disabled:cursor-not-allowed"
+                                disabled="@(!IsConnected || isScreenshotBusy)"
+                                @onclick="CaptureScreenshotAsync">
+                            <span>📸</span>
+                            <span>@(isScreenshotBusy ? "Capturing..." : "Capture Screenshot")</span>
+                        </button>
+
+                        <span class="text-xs text-slate-500">
+                            Gửi lệnh chụp màn hình đến Agent, kết quả sẽ hiển thị ở RemoteScreen.
+                        </span>
+                    </div>
+                </section>
+
+                <hr class="border-slate-200 dark:border-slate-700" />
+
+                <!-- Process Management UI -->
+                <section class="space-y-3">
+                    <h3 class="font-semibold text-sm text-slate-700 dark:text-slate-200">
+                        Process Management
+                    </h3>
+
+                    <div class="flex flex-wrap items-center gap-3">
+                        <button class="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-medium
+                                       bg-slate-800 text-white hover:bg-slate-900 disabled:opacity-60 disabled:cursor-not-allowed"
+                                disabled="@(!IsConnected || isProcessBusy)"
+                                @onclick="ListProcessesAsync">
+                            <span>📋</span>
+                            <span>@(isProcessBusy ? "Loading..." : "List Processes")</span>
+                        </button>
+
+                        <span class="text-xs text-slate-500">
+                            Lấy danh sách process hiện tại từ Agent.
+                        </span>
+                    </div>
+
+                    <!-- Input + button Start Process -->
+                    <div class="flex flex-wrap items-center gap-3">
+                        <input class="px-2 py-1 rounded border border-slate-300 text-sm w-48"
+                               placeholder="Process name (e.g. notepad.exe)"
+                               @bind="newProcessName" />
+
+                        <button class="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-medium
+                                       bg-emerald-600 text-white hover:bg-emerald-700 disabled:opacity-60 disabled:cursor-not-allowed"
+                                disabled="@(!IsConnected || isProcessBusy || string.IsNullOrWhiteSpace(newProcessName))"
+                                @onclick="StartProcessAsync">
+                            ▶ Start Process
+                        </button>
+                    </div>
+
+                    <!-- Input + button Kill Process (PID) -->
+                    <div class="flex flex-wrap items-center gap-3">
+                        <input class="px-2 py-1 rounded border border-slate-300 text-sm w-32"
+                               type="number"
+                               placeholder="PID"
+                               @bind="killProcessPidString" />
+
+                        <button class="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-medium
+                                       bg-red-600 text-white hover:bg-red-700 disabled:opacity-60 disabled:cursor-not-allowed"
+                                disabled="@(!IsConnected || isProcessBusy || string.IsNullOrWhiteSpace(killProcessPidString))"
+                                @onclick="KillProcessAsync">
+                            ✖ Kill Process
+                        </button>
+
+                        <span class="text-xs text-slate-500">
+                            (Tạm thời nhập PID thủ công – sau có thể click từ bảng Process List)
+                        </span>
+                    </div>
+                </section>
+
+                <hr class="border-slate-200 dark:border-slate-700" />
+
+                <!-- System Info -->
+                <section class="space-y-3">
+                    <h3 class="font-semibold text-sm text-slate-700 dark:text-slate-200">
+                        System Info
+                    </h3>
+
+                    <div class="flex flex-wrap items-center gap-3">
+                        <button class="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-medium
+                                       bg-sky-600 text-white hover:bg-sky-700 disabled:opacity-60 disabled:cursor-not-allowed"
+                                disabled="@(!IsConnected || isSystemInfoBusy)"
+                                @onclick="RefreshSystemInfoAsync">
+                            🔄 Refresh Info
+                        </button>
+
+                        <span class="text-xs text-slate-500">
+                            Hiển thị CPU/RAM usage của Agent, tự động update khi nhận event <code>SystemInfoUpdated</code>.
+                        </span>
+                    </div>
+
+                    @if (latestSystemInfoJson is not null)
+                    {
+                        <pre class="mt-1 text-xs bg-slate-50 dark:bg-slate-900/60 border border-slate-200 dark:border-slate-700 rounded px-3 py-2 overflow-x-auto">
+@latestSystemInfoJson
+                        </pre>
+                    }
+                    else
+                    {
+                        <div class="text-xs text-slate-400">
+                            Chưa có system info nào – bấm "Refresh Info" để lấy lần đầu.
+                        </div>
+                    }
+                </section>
+
+                <!-- Loading state chung -->
+                @if (isScreenshotBusy || isProcessBusy || isSystemInfoBusy)
+                {
+                    <div class="pt-2 flex items-center gap-2 text-xs text-slate-500">
+                        <span class="inline-block w-3 h-3 rounded-full border-2 border-slate-300 border-t-slate-500 animate-spin"></span>
+                        <span>Đang xử lý command...</span>
+                    </div>
+                }
+            </div>
+
+            <!-- Terminal Log -->
+            <TerminalLog DeviceId="@Id" />
+        </div>
+
+        <!-- Cột phải: Remote Screen hoặc các card khác -->
+        <div class="xl:col-span-1 flex flex-col gap-4">
+            <RemoteScreen DeviceId="@Id" />
+        </div>
+    </div>
+</div>
+
 @code {
-    // Fix CS8618: Thêm "= default!" để báo với C# rằng: "Yên tâm, cái này Blazor tự điền, không null đâu"
+    // Route parameter
     [Parameter]
     public string Id { get; set; } = default!;
 
-    protected override void OnInitialized()
+    // Kết nối SignalR
+    private HubConnection? hubConnection;
+
+    private bool IsConnected => hubConnection?.State == HubConnectionState.Connected;
+
+    // Loading states
+    private bool isScreenshotBusy;
+    private bool isProcessBusy;
+    private bool isSystemInfoBusy;
+
+    // Error message
+    private string? errorMessage;
+
+    // Input cho Process
+    private string? newProcessName;
+    private string? killProcessPidString;
+
+    // System info (tạm giữ dạng JSON thô để tránh lệ thuộc model)
+    private string? latestSystemInfoJson;
+
+    protected override async Task OnInitializedAsync()
     {
-        // Logic khởi tạo nếu cần
+        // Build hub url: baseUri + /hubs/remote-control
+        var baseUri = Nav.BaseUri.TrimEnd('/');
+        var hubUrl = $"{baseUri}/hubs/remote-control";
+
+        hubConnection = new HubConnectionBuilder()
+            .WithUrl(hubUrl)
+            .WithAutomaticReconnect()
+            .Build();
+
+        // Subscribe events
+        // 1) CommandCompleted: kết quả của mọi command (screenshot, process, ...)
+        hubConnection.On<JsonElement>("CommandCompleted", payload =>
+        {
+            // Ở đây tạm thời chỉ log ra console.
+            // Sau này có thể parse payload thành CommandResult thật nếu muốn.
+            Console.WriteLine($"[DeviceControl] CommandCompleted: {payload}");
+        });
+
+        // 2) SystemInfoUpdated: cập nhật CPU/RAM từ Agent
+        hubConnection.On<JsonElement>("SystemInfoUpdated", payload =>
+        {
+            // Lưu lại JSON thô để hiển thị – không phụ thuộc vào model cụ thể
+            latestSystemInfoJson = JsonSerializer.Serialize(payload, new JsonSerializerOptions
+            {
+                WriteIndented = true
+            });
+
+            InvokeStateHasChangedSafe();
+        });
+
+        try
+        {
+            await hubConnection.StartAsync();
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Không thể kết nối tới Hub: {ex.Message}";
+        }
     }
 
-    // Hàm quay lại danh sách thiết bị
-    void GoBack()
+    // Gửi command chung
+    private async Task SendCommandAsync(CommandRequest request, string scope)
+    {
+        if (hubConnection is null)
+        {
+            errorMessage = "Hub connection chưa được khởi tạo.";
+            return;
+        }
+
+        if (hubConnection.State != HubConnectionState.Connected)
+        {
+            errorMessage = "Không kết nối được tới Hub.";
+            return;
+        }
+
+        SetBusy(scope, true);
+        errorMessage = null;
+
+        try
+        {
+            await hubConnection.InvokeAsync("SendCommand", request);
+        }
+        catch (Exception ex)
+        {
+            errorMessage = ex.Message;
+        }
+        finally
+        {
+            SetBusy(scope, false);
+            InvokeStateHasChangedSafe();
+        }
+    }
+
+    private void SetBusy(string scope, bool value)
+    {
+        switch (scope)
+        {
+            case "screenshot":
+                isScreenshotBusy = value;
+                break;
+            case "process":
+                isProcessBusy = value;
+                break;
+            case "system":
+                isSystemInfoBusy = value;
+                break;
+        }
+    }
+
+    // === Các handler cho nút bấm ===
+
+    // 1) Screenshot
+    private async Task CaptureScreenshotAsync()
+    {
+        // TODO: nếu CommandRequest có property tên khác (vd AgentId) thì đổi DeviceId = Id cho khớp
+        var req = new CommandRequest
+        {
+            DeviceId = Id,
+            Type = CommandType.CaptureScreen
+        };
+
+        await SendCommandAsync(req, "screenshot");
+    }
+
+    // 2) List processes
+    private async Task ListProcessesAsync()
+    {
+        var req = new CommandRequest
+        {
+            DeviceId = Id,
+            Type = CommandType.ListProcesses
+        };
+
+        await SendCommandAsync(req, "process");
+    }
+
+    // 3) Kill process theo PID nhập tay
+    private async Task KillProcessAsync()
+    {
+        if (!int.TryParse(killProcessPidString, out var pid))
+            return;
+
+        var req = new CommandRequest
+        {
+            DeviceId = Id,
+            Type = CommandType.KillProcess,
+            // TODO: nếu CommandRequest dùng tên khác (vd Pid) thì sửa lại:
+            ProcessId = pid
+        };
+
+        await SendCommandAsync(req, "process");
+    }
+
+    // 4) Start process theo tên
+    private async Task StartProcessAsync()
+    {
+        if (string.IsNullOrWhiteSpace(newProcessName))
+            return;
+
+        var req = new CommandRequest
+        {
+            DeviceId = Id,
+            Type = CommandType.StartProcess,
+            // TODO: nếu property tên khác (vd ExecutableName) thì đổi cho đúng
+            ProcessName = newProcessName
+        };
+
+        await SendCommandAsync(req, "process");
+        newProcessName = string.Empty;
+    }
+
+    // 5) Refresh system info
+    private async Task RefreshSystemInfoAsync()
+    {
+        var req = new CommandRequest
+        {
+            DeviceId = Id,
+            Type = CommandType.GetSystemInfo
+        };
+
+        await SendCommandAsync(req, "system");
+    }
+
+    // Điều hướng quay lại danh sách
+    private void GoBack()
     {
         Nav.NavigateTo("/devices");
     }
+
+    private void InvokeStateHasChangedSafe()
+    {
+        try
+        {
+            InvokeAsync(StateHasChanged);
+        }
+        catch
+        {
+            // ignore
+        }
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        if (hubConnection is not null)
+        {
+            await hubConnection.DisposeAsync();
+        }
+    }
 }
-
-<!-- Info Bar & Actions -->
-<DeviceHeader DeviceId="@Id" />
-
-<!-- Tabs & Remote Screen -->
-<RemoteScreen />
-
-<!-- Terminal Log -->
-<TerminalLog DeviceId="@Id" />
