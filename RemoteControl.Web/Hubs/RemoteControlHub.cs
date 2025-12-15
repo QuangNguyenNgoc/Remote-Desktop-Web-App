@@ -29,14 +29,6 @@ namespace RemoteControl.Web.Hubs
         }
 
         // ==========================
-        // 0) Lấy danh sách tất cả agents (cho DeviceManager)
-        // ==========================
-        public List<AgentInfo> GetAllAgents()
-        {
-            return ConnectedAgents.Values.ToList();
-        }
-
-        // ==========================
         // 1) Agent đăng ký với server
         // ==========================
         // - Được gọi từ phía Agent khi connect xong
