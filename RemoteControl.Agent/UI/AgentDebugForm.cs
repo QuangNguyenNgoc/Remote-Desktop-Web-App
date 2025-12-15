@@ -21,25 +21,25 @@ public class AgentDebugForm : Form
     private readonly Microsoft.Extensions.Configuration.IConfiguration _configuration;
 
     // Dashboard
-    private Label _lblCpu, _lblRam, _lblUptime, _lblProcessCount;
-    private System.Windows.Forms.Timer _sysInfoTimer;
+    private Label _lblCpu = null!, _lblRam = null!, _lblUptime = null!, _lblProcessCount = null!;
+    private System.Windows.Forms.Timer _sysInfoTimer = null!;
 
     // Processes
-    private ListView _lvProcesses;
-    private TextBox _txtStartProc;
+    private ListView _lvProcesses = null!;
+    private TextBox _txtStartProc = null!;
 
     // Screenshot
-    private PictureBox _pbScreenshot;
-    private Label _lblScreenshotInfo;
+    private PictureBox _pbScreenshot = null!;
+    private Label _lblScreenshotInfo = null!;
 
     // Webcam
-    private PictureBox _pbWebcam;
-    private Button _btnStartCam, _btnStopCam;
+    private PictureBox _pbWebcam = null!;
+    private Button _btnStartCam = null!, _btnStopCam = null!;
 
     // KeyLogs
-    private TextBox _txtKeyLogs;
-    private Button _btnStartKeyLog, _btnStopKeyLog;
-    private System.Windows.Forms.Timer _logTimer;
+    private TextBox _txtKeyLogs = null!;
+    private Button _btnStartKeyLog = null!, _btnStopKeyLog = null!;
+    private System.Windows.Forms.Timer _logTimer = null!;
 
     public AgentDebugForm(Microsoft.Extensions.Configuration.IConfiguration configuration)
     {

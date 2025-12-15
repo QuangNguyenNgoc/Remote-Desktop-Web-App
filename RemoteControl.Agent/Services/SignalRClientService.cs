@@ -106,9 +106,8 @@ public class SignalRClientService
         {
             await _hubConnection.InvokeAsync("SendHeartbeat", _agentId);
         }
-        catch (Exception ex)
+        catch
         {
-            // UpdateStatus($"Heartbeat failed: {ex.Message}");
             // Silent fail for heartbeat to avoid spam
         }
     }
