@@ -42,24 +42,7 @@ else
     </div>
 }
 
-<!-- Connection Status -->
-<div class="fixed bottom-4 right-4 px-3 py-2 rounded-lg text-sm" 
-     style="background-color: var(--card-bg); border: 1px solid var(--card-border);">
-    @if (IsConnected)
-    {
-        <span class="flex items-center gap-2" style="color: var(--status-badge-online-text);">
-            <span class="w-2 h-2 rounded-full bg-green-500 animate-pulse"></span>
-            Hub Connected
-        </span>
-    }
-    else
-    {
-        <span class="flex items-center gap-2" style="color: var(--status-badge-offline-text);">
-            <span class="w-2 h-2 rounded-full bg-red-500"></span>
-            Disconnected
-        </span>
-    }
-</div>
+
 
 @code {
     private HubConnection? _hubConnection;
