@@ -60,11 +60,21 @@ namespace RemoteControl.Web.Hubs
             ConnectedAgents[agent.AgentId] = agent;
 
             _logger.LogInformation(
-                "RegisterAgent: Agent {AgentId} đăng ký với Connection {ConnectionId}",
-                agent.AgentId, connectionId);
+                "RegisterAgent: Agent {AgentId} ({MachineName}) đăng ký với Connection {ConnectionId}",
+                agent.AgentId, agent.MachineName, connectionId);
 
             // Gửi sự kiện AgentConnected cho tất cả client (dashboard, log viewer, …)
             await Clients.All.SendAsync(HubEvents.AgentConnected, agent);
+        }
+
+        // ==========================
+        // 2) Lấy danh sách tất cả agents (cho Dashboard)
+        // ==========================
+        public List<AgentInfo> GetAllAgents()
+        {
+            var agents = ConnectedAgents.Values.ToList();
+            _logger.LogInformation("GetAllAgents: Trả về {Count} agents", agents.Count);
+            return agents;
         }
 
         // ====================================
