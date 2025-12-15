@@ -114,6 +114,16 @@ public enum CommandType
     /// </summary>
     Restart,
 
+    /// <summary>
+    /// Put system to sleep
+    /// </summary>
+    Sleep,
+
+    /// <summary>
+    /// Lock the workstation
+    /// </summary>
+    Lock,
+
     // ===== Webcam (future implementation) =====
     /// <summary>
     /// Turn on webcam

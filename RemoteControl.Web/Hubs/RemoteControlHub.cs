@@ -18,7 +18,7 @@ namespace RemoteControl.Web.Hubs
         // Logger để ghi log cho từng action trong hub
         private readonly ILogger<RemoteControlHub> _logger;
 
-        // Bảng lưu ánh xạ: AgentId -> AgentInfo (bao gồm cả ConnectionId)
+        // Bảng lưu ánh xạ: AgentId -> AgentInfo (full info including ConnectionId)
         // ConcurrentDictionary dùng cho môi trường multi-thread (nhiều kết nối cùng lúc)
         private static readonly ConcurrentDictionary<string, AgentInfo> ConnectedAgents
             = new ConcurrentDictionary<string, AgentInfo>();
@@ -26,6 +26,14 @@ namespace RemoteControl.Web.Hubs
         public RemoteControlHub(ILogger<RemoteControlHub> logger)
         {
             _logger = logger;
+        }
+
+        // ==========================
+        // 0) Lấy danh sách tất cả agents (cho DeviceManager)
+        // ==========================
+        public List<AgentInfo> GetAllAgents()
+        {
+            return ConnectedAgents.Values.ToList();
         }
 
         // ==========================
@@ -45,12 +53,10 @@ namespace RemoteControl.Web.Hubs
                 return;
             }
 
-            // Gán ConnectionId vào AgentInfo
+            // Lưu / cập nhật AgentInfo với ConnectionId
             agent.ConnectionId = connectionId;
             agent.Status = AgentStatus.Online;
             agent.LastSeen = DateTime.UtcNow;
-
-            // Lưu / cập nhật AgentInfo vào dictionary
             ConnectedAgents[agent.AgentId] = agent;
 
             _logger.LogInformation(
@@ -88,8 +94,8 @@ namespace RemoteControl.Web.Hubs
 
             var targetAgentId = request.AgentId;
 
-            // Tìm agent trong dictionary
-            if (!ConnectedAgents.TryGetValue(targetAgentId, out var agent))
+            // Tìm agent và lấy connectionId
+            if (!ConnectedAgents.TryGetValue(targetAgentId, out var agentInfo))
             {
                 _logger.LogWarning(
                     "SendCommand: Agent {AgentId} không kết nối",
@@ -104,14 +110,16 @@ namespace RemoteControl.Web.Hubs
                 return;
             }
 
+            var agentConnectionId = agentInfo.ConnectionId;
+            
             _logger.LogInformation(
                 "SendCommand: Command {CommandId} -> Agent {AgentId} (Conn {ConnectionId})",
                 request.CommandId,
                 targetAgentId,
-                agent.ConnectionId);
+                agentConnectionId);
 
             // Gửi command xuống đúng agent
-            await Clients.Client(agent.ConnectionId).SendAsync(HubEvents.ExecuteCommand, request);
+            await Clients.Client(agentConnectionId).SendAsync(HubEvents.ExecuteCommand, request);
         }
 
         // ==================================
@@ -155,20 +163,18 @@ namespace RemoteControl.Web.Hubs
         {
             var connectionId = Context.ConnectionId;
 
-            // Tìm và xóa agent có connectionId này
+            // Xoá mọi AgentId có dùng connectionId này và broadcast AgentDisconnected
             foreach (var kvp in ConnectedAgents)
             {
                 if (kvp.Value.ConnectionId == connectionId)
                 {
-                    if (ConnectedAgents.TryRemove(kvp.Key, out var removedAgent))
-                    {
-                        _logger.LogInformation(
-                            "OnDisconnected: xoá Agent {AgentId} ({MachineName})",
-                            kvp.Key, removedAgent.MachineName);
-
-                        // Broadcast cho dashboard biết agent đã disconnect
-                        await Clients.All.SendAsync(HubEvents.AgentDisconnected, kvp.Key);
-                    }
+                    ConnectedAgents.TryRemove(kvp.Key, out _);
+                    _logger.LogInformation(
+                        "OnDisconnected: xoá Agent {AgentId} (Conn {ConnectionId})",
+                        kvp.Key, connectionId);
+                    
+                    // Broadcast AgentDisconnected event
+                    await Clients.All.SendAsync(HubEvents.AgentDisconnected, kvp.Key);
                 }
             }
 

