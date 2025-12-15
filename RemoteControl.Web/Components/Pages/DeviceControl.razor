@@ -2,6 +2,7 @@
 
 @using Microsoft.AspNetCore.SignalR.Client
 @using RemoteControl.Shared.Models
+@using RemoteControl.Shared.Constants
 @using System.Text.Json
 @inject NavigationManager Nav
 
@@ -172,7 +173,9 @@
 
         <!-- Cột phải: Remote Screen hoặc các card khác -->
         <div class="xl:col-span-1 flex flex-col gap-4">
-            <RemoteScreen DeviceId="@Id" />
+            <RemoteScreen DeviceId="@Id"
+                          ScreenshotBase64="@lastScreenshotBase64"
+                          IsLoading="@isScreenshotBusy" />
         </div>
     </div>
 </div>
@@ -199,37 +202,67 @@
     private string? newProcessName;
     private string? killProcessPidString;
 
-    // System info (tạm giữ dạng JSON thô để tránh lệ thuộc model)
+    // System info (JSON thô)
     private string? latestSystemInfoJson;
+
+    // Screenshot mới nhất (base64) để truyền xuống RemoteScreen
+    private string? lastScreenshotBase64;
 
     protected override async Task OnInitializedAsync()
     {
-        // Build hub url: baseUri + /hubs/remote-control
-        var baseUri = Nav.BaseUri.TrimEnd('/');
-        var hubUrl = $"{baseUri}/hubs/remote-control";
+        // Đúng endpoint đã map trong Program.cs
+        var hubUrl = Nav.ToAbsoluteUri("/remotehub").ToString();
 
         hubConnection = new HubConnectionBuilder()
             .WithUrl(hubUrl)
             .WithAutomaticReconnect()
             .Build();
 
-        // Subscribe events
-        // 1) CommandCompleted: kết quả của mọi command (screenshot, process, ...)
-        hubConnection.On<JsonElement>("CommandCompleted", payload =>
+        // Nhận kết quả command từ hub (CommandResult)
+        hubConnection.On<JsonElement>(HubEvents.CommandCompleted, payload =>
         {
-            // Ở đây tạm thời chỉ log ra console.
-            // Sau này có thể parse payload thành CommandResult thật nếu muốn.
-            Console.WriteLine($"[DeviceControl] CommandCompleted: {payload}");
+            try
+            {
+                Console.WriteLine($"[DeviceControl] CommandCompleted: {payload}");
+
+                // Chỉ quan tâm kết quả của đúng Agent hiện tại
+                if (!payload.TryGetProperty("agentId", out var agentIdProp))
+                    return;
+
+                var agentId = agentIdProp.GetString();
+                if (!string.Equals(agentId, Id, StringComparison.OrdinalIgnoreCase))
+                    return;
+
+                // Lấy phần Data
+                if (!payload.TryGetProperty("data", out var dataElement))
+                    return;
+                if (dataElement.ValueKind != JsonValueKind.Object)
+                    return;
+
+                // Kiểm tra xem có phải ScreenshotResult hay không
+                JsonElement imgProp;
+                if (!(dataElement.TryGetProperty("imageBase64", out imgProp) ||
+                      dataElement.TryGetProperty("ImageBase64", out imgProp)))
+                {
+                    // Không phải screenshot → bỏ qua (có thể là kết quả Process, Registry, ...)
+                    return;
+                }
+
+                lastScreenshotBase64 = imgProp.GetString();
+                InvokeStateHasChangedSafe();
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"[DeviceControl] Error handling CommandCompleted: {ex}");
+            }
         });
 
-        // 2) SystemInfoUpdated: cập nhật CPU/RAM từ Agent
-        hubConnection.On<JsonElement>("SystemInfoUpdated", payload =>
+        // Nhận system info update
+        hubConnection.On<JsonElement>(HubEvents.SystemInfoUpdated, payload =>
         {
-            // Lưu lại JSON thô để hiển thị – không phụ thuộc vào model cụ thể
-            latestSystemInfoJson = JsonSerializer.Serialize(payload, new JsonSerializerOptions
-            {
-                WriteIndented = true
-            });
+            latestSystemInfoJson = JsonSerializer.Serialize(
+                payload,
+                new JsonSerializerOptions { WriteIndented = true });
 
             InvokeStateHasChangedSafe();
         });
@@ -262,9 +295,12 @@
         SetBusy(scope, true);
         errorMessage = null;
 
+        // Render ngay để thấy nút đổi text / spinner
+        InvokeStateHasChangedSafe();
+
         try
         {
-            await hubConnection.InvokeAsync("SendCommand", request);
+            await hubConnection.InvokeAsync(HubEvents.SendCommand, request);
         }
         catch (Exception ex)
         {
@@ -298,25 +334,14 @@
     // 1) Screenshot
     private async Task CaptureScreenshotAsync()
     {
-        // TODO: nếu CommandRequest có property tên khác (vd AgentId) thì đổi DeviceId = Id cho khớp
-        var req = new CommandRequest
-        {
-            DeviceId = Id,
-            Type = CommandType.CaptureScreen
-        };
-
+        var req = CommandRequest.CreateCaptureScreen(Id);
         await SendCommandAsync(req, "screenshot");
     }
 
     // 2) List processes
     private async Task ListProcessesAsync()
     {
-        var req = new CommandRequest
-        {
-            DeviceId = Id,
-            Type = CommandType.ListProcesses
-        };
-
+        var req = CommandRequest.CreateListProcesses(Id);
         await SendCommandAsync(req, "process");
     }
 
@@ -326,14 +351,7 @@
         if (!int.TryParse(killProcessPidString, out var pid))
             return;
 
-        var req = new CommandRequest
-        {
-            DeviceId = Id,
-            Type = CommandType.KillProcess,
-            // TODO: nếu CommandRequest dùng tên khác (vd Pid) thì sửa lại:
-            ProcessId = pid
-        };
-
+        var req = CommandRequest.CreateKillProcess(Id, pid);
         await SendCommandAsync(req, "process");
     }
 
@@ -343,14 +361,7 @@
         if (string.IsNullOrWhiteSpace(newProcessName))
             return;
 
-        var req = new CommandRequest
-        {
-            DeviceId = Id,
-            Type = CommandType.StartProcess,
-            // TODO: nếu property tên khác (vd ExecutableName) thì đổi cho đúng
-            ProcessName = newProcessName
-        };
-
+        var req = CommandRequest.CreateStartProcess(Id, newProcessName);
         await SendCommandAsync(req, "process");
         newProcessName = string.Empty;
     }
@@ -358,12 +369,7 @@
     // 5) Refresh system info
     private async Task RefreshSystemInfoAsync()
     {
-        var req = new CommandRequest
-        {
-            DeviceId = Id,
-            Type = CommandType.GetSystemInfo
-        };
-
+        var req = CommandRequest.CreateGetSystemInfo(Id);
         await SendCommandAsync(req, "system");
     }
 
