@@ -18,14 +18,22 @@ namespace RemoteControl.Web.Hubs
         // Logger để ghi log cho từng action trong hub
         private readonly ILogger<RemoteControlHub> _logger;
 
-        // Bảng lưu ánh xạ: AgentId -> ConnectionId
+        // Bảng lưu ánh xạ: AgentId -> AgentInfo (full info including ConnectionId)
         // ConcurrentDictionary dùng cho môi trường multi-thread (nhiều kết nối cùng lúc)
-        private static readonly ConcurrentDictionary<string, string> AgentConnections
-            = new ConcurrentDictionary<string, string>();
+        private static readonly ConcurrentDictionary<string, AgentInfo> ConnectedAgents
+            = new ConcurrentDictionary<string, AgentInfo>();
 
         public RemoteControlHub(ILogger<RemoteControlHub> logger)
         {
             _logger = logger;
+        }
+
+        // ==========================
+        // 0) Lấy danh sách tất cả agents (cho DeviceManager)
+        // ==========================
+        public List<AgentInfo> GetAllAgents()
+        {
+            return ConnectedAgents.Values.ToList();
         }
 
         // ==========================
@@ -45,8 +53,11 @@ namespace RemoteControl.Web.Hubs
                 return;
             }
 
-            // Lưu / cập nhật AgentId -> ConnectionId
-            AgentConnections[agent.AgentId] = connectionId;
+            // Lưu / cập nhật AgentInfo với ConnectionId
+            agent.ConnectionId = connectionId;
+            agent.Status = AgentStatus.Online;
+            agent.LastSeen = DateTime.UtcNow;
+            ConnectedAgents[agent.AgentId] = agent;
 
             _logger.LogInformation(
                 "RegisterAgent: Agent {AgentId} đăng ký với Connection {ConnectionId}",
@@ -73,8 +84,8 @@ namespace RemoteControl.Web.Hubs
 
             var targetAgentId = request.AgentId;
 
-            // Tìm connectionId của agent
-            if (!AgentConnections.TryGetValue(targetAgentId, out var connectionId))
+            // Tìm agent và lấy connectionId
+            if (!ConnectedAgents.TryGetValue(targetAgentId, out var agentInfo))
             {
                 _logger.LogWarning(
                     "SendCommand: Agent {AgentId} không kết nối",
@@ -89,14 +100,16 @@ namespace RemoteControl.Web.Hubs
                 return;
             }
 
+            var agentConnectionId = agentInfo.ConnectionId;
+            
             _logger.LogInformation(
                 "SendCommand: Command {CommandId} -> Agent {AgentId} (Conn {ConnectionId})",
                 request.CommandId,
                 targetAgentId,
-                connectionId);
+                agentConnectionId);
 
             // Gửi command xuống đúng agent
-            await Clients.Client(connectionId).SendAsync("ReceiveCommand", request);
+            await Clients.Client(agentConnectionId).SendAsync(HubEvents.ExecuteCommand, request);
         }
 
         // ==================================
@@ -136,19 +149,22 @@ namespace RemoteControl.Web.Hubs
         }
 
         // Khi client disconnect
-        public override Task OnDisconnectedAsync(Exception? exception)
+        public override async Task OnDisconnectedAsync(Exception? exception)
         {
             var connectionId = Context.ConnectionId;
 
-            // Xoá mọi AgentId có dùng connectionId này
-            foreach (var kvp in AgentConnections)
+            // Xoá mọi AgentId có dùng connectionId này và broadcast AgentDisconnected
+            foreach (var kvp in ConnectedAgents)
             {
-                if (kvp.Value == connectionId)
+                if (kvp.Value.ConnectionId == connectionId)
                 {
-                    AgentConnections.TryRemove(kvp.Key, out _);
+                    ConnectedAgents.TryRemove(kvp.Key, out _);
                     _logger.LogInformation(
                         "OnDisconnected: xoá Agent {AgentId} (Conn {ConnectionId})",
                         kvp.Key, connectionId);
+                    
+                    // Broadcast AgentDisconnected event
+                    await Clients.All.SendAsync(HubEvents.AgentDisconnected, kvp.Key);
                 }
             }
 
@@ -162,7 +178,7 @@ namespace RemoteControl.Web.Hubs
                 _logger.LogInformation("Client disconnected: {ConnectionId}", connectionId);
             }
 
-            return base.OnDisconnectedAsync(exception);
+            await base.OnDisconnectedAsync(exception);
         }
     }
 }

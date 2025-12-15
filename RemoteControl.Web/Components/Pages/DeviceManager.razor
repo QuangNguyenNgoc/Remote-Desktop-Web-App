@@ -1,50 +1,115 @@
 @page "/devices"
 @inject NavigationManager Nav
-
-@code {
-    // Fix CS0105: Đã xóa dòng using Components.Layout vì nó đã có trong _Imports.razor
-
-    protected override void OnInitialized()
-    {
-        // Cách set title an toàn hơn nếu MainLayout không static
-        // MainLayout.PageTitle = "Device Manager";
-    }
-
-    // Fix CS8618: Khởi tạo giá trị mặc định cho các thuộc tính
-    class Device
-    {
-        public string Name { get; set; } = ""; // Gán rỗng để tránh null
-        public string Ip { get; set; } = "";
-        public string OS { get; set; } = "";
-        public bool IsOnline { get; set; }
-        public string LastSeen { get; set; } = "";
-    }
-
-    List<Device> Devices = new List<Device> {
-        new Device { Name = "HR-ADMIN-01", Ip = "192.168.1.101", OS = "Windows 11", IsOnline = true, LastSeen = "Now" },
-        new Device { Name = "DEV-WORKSTATION", Ip = "192.168.1.105", OS = "Windows 10", IsOnline = true, LastSeen = "Now" },
-        new Device { Name = "RECEPTION-FRONT", Ip = "192.168.1.112", OS = "Windows 10", IsOnline = false, LastSeen = "2h ago" },
-        new Device { Name = "SERVER-BACKUP", Ip = "192.168.1.200", OS = "Windows Server", IsOnline = true, LastSeen = "Now" },
-        new Device { Name = "GUEST-LAPTOP", Ip = "192.168.1.150", OS = "Windows 11", IsOnline = false, LastSeen = "1d ago" },
-    };
-
-    // Hàm điều hướng: Khi bấm nút sẽ nhảy sang trang /devices/{tên_máy}
-    void Connect(string name)
-    {
-        Nav.NavigateTo($"/devices/{name}");
-    }
-}
+@using Microsoft.AspNetCore.SignalR.Client
+@using RemoteControl.Shared.Models
+@using RemoteControl.Shared.Constants
+@implements IAsyncDisposable
 
 <SearchInput />
 
-<div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
-    @foreach (var device in Devices)
+@if (_isLoading)
+{
+    <div class="flex justify-center items-center h-64">
+        <div class="text-gray-400">Loading agents...</div>
+    </div>
+}
+else if (_agents.Count == 0)
+{
+    <div class="flex flex-col justify-center items-center h-64 text-gray-400">
+        <div class="text-xl mb-2">No agents connected</div>
+        <div class="text-sm">Start an agent to see it here</div>
+    </div>
+}
+else
+{
+    <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
+        @foreach (var agent in _agents)
+        {
+            <DeviceCard Name="@agent.MachineName"
+                        Ip="@agent.IpAddress"
+                        OS="@agent.OsVersion"
+                        IsOnline="@(agent.Status == AgentStatus.Online)"
+                        LastSeen="@FormatLastSeen(agent.LastSeen)"
+                        OnConnect="() => Connect(agent.AgentId)" />
+        }
+    </div>
+}
+
+
+
+@code {
+    private HubConnection? _hubConnection;
+    private List<AgentInfo> _agents = new();
+    private bool _isLoading = true;
+    private bool _isConnected => _hubConnection?.State == HubConnectionState.Connected;
+
+    protected override async Task OnInitializedAsync()
     {
-        <DeviceCard Name="@device.Name"
-                    Ip="@device.Ip"
-                    OS="@device.OS"
-                    IsOnline="@device.IsOnline"
-                    LastSeen="@device.LastSeen"
-                    OnConnect="() => Connect(device.Name)" />
+        // Create SignalR connection
+        _hubConnection = new HubConnectionBuilder()
+            .WithUrl(Nav.ToAbsoluteUri("/remotehub"))
+            .WithAutomaticReconnect()
+            .Build();
+
+        // Subscribe to agent events
+        _hubConnection.On<AgentInfo>(HubEvents.AgentConnected, OnAgentConnected);
+        _hubConnection.On<string>(HubEvents.AgentDisconnected, OnAgentDisconnected);
+
+        try
+        {
+            await _hubConnection.StartAsync();
+            
+            // Fetch initial agent list
+            _agents = await _hubConnection.InvokeAsync<List<AgentInfo>>(HubEvents.GetAllAgents);
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"SignalR connection error: {ex.Message}");
+        }
+        finally
+        {
+            _isLoading = false;
+        }
     }
-</div>
+
+    private void OnAgentConnected(AgentInfo agent)
+    {
+        // Remove existing if reconnecting
+        _agents.RemoveAll(a => a.AgentId == agent.AgentId);
+        _agents.Insert(0, agent);
+        InvokeAsync(StateHasChanged);
+    }
+
+    private void OnAgentDisconnected(string agentId)
+    {
+        var agent = _agents.FirstOrDefault(a => a.AgentId == agentId);
+        if (agent != null)
+        {
+            _agents.Remove(agent);
+            InvokeAsync(StateHasChanged);
+        }
+    }
+
+    private string FormatLastSeen(DateTime? lastSeen)
+    {
+        if (lastSeen == null) return "Unknown";
+        var diff = DateTime.UtcNow - lastSeen.Value;
+        if (diff.TotalMinutes < 1) return "Now";
+        if (diff.TotalHours < 1) return $"{(int)diff.TotalMinutes}m ago";
+        if (diff.TotalDays < 1) return $"{(int)diff.TotalHours}h ago";
+        return $"{(int)diff.TotalDays}d ago";
+    }
+
+    void Connect(string agentId)
+    {
+        Nav.NavigateTo($"/devices/{agentId}");
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        if (_hubConnection is not null)
+        {
+            await _hubConnection.DisposeAsync();
+        }
+    }
+}
