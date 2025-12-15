@@ -4,46 +4,9 @@
 @using RemoteControl.Shared.Constants
 @implements IAsyncDisposable
 @inject NavigationManager Nav
-@using Microsoft.AspNetCore.SignalR.Client
-@using RemoteControl.Shared.Models
-@using RemoteControl.Shared.Constants
-@implements IAsyncDisposable
 
 <SearchInput />
 
-@if (_isLoading)
-{
-    <div class="flex justify-center items-center h-64">
-        <div class="text-gray-400">Loading agents...</div>
-    </div>
-}
-else if (_agents.Count == 0)
-{
-    <div class="flex flex-col justify-center items-center h-64 text-gray-400">
-        <div class="text-xl mb-2">No agents connected</div>
-        <div class="text-sm">Start an agent to see it here</div>
-    </div>
-}
-else
-{
-    <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
-        @foreach (var agent in _agents)
-        {
-            <DeviceCard Name="@agent.MachineName"
-                        Ip="@agent.IpAddress"
-                        OS="@agent.OsVersion"
-                        IsOnline="@(agent.Status == AgentStatus.Online)"
-                        LastSeen="@FormatLastSeen(agent.LastSeen)"
-                        OnConnect="() => Connect(agent.AgentId)" />
-        }
-    </div>
-}
-
-
-
-<SearchInput />
-
-@* Loading State *@
 @if (_isLoading)
 {
     <div class="flex justify-center items-center py-12">
@@ -53,7 +16,6 @@ else
 }
 else if (_agents.Count == 0)
 {
-    @* Empty State *@
     <div class="text-center py-12 rounded-xl" style="background-color: var(--card-bg); border: 1px solid var(--card-border);">
         <svg class="w-16 h-16 mx-auto mb-4" style="color: var(--text-quaternary);" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" 
@@ -67,7 +29,6 @@ else if (_agents.Count == 0)
 }
 else
 {
-    @* Agents Grid *@
     <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
         @foreach (var agent in _agents)
         {
@@ -81,7 +42,7 @@ else
     </div>
 }
 
-@* Connection Status *@
+<!-- Connection Status -->
 <div class="fixed bottom-4 right-4 px-3 py-2 rounded-lg text-sm" 
      style="background-color: var(--card-bg); border: 1px solid var(--card-border);">
     @if (IsConnected)
@@ -104,25 +65,21 @@ else
     private HubConnection? _hubConnection;
     private List<AgentInfo> _agents = new();
     private bool _isLoading = true;
-    private bool _isConnected => _hubConnection?.State == HubConnectionState.Connected;
+    private bool IsConnected => _hubConnection?.State == HubConnectionState.Connected;
 
     protected override async Task OnInitializedAsync()
     {
-        // Create SignalR connection
         _hubConnection = new HubConnectionBuilder()
             .WithUrl(Nav.ToAbsoluteUri("/remotehub"))
             .WithAutomaticReconnect()
             .Build();
 
-        // Subscribe to agent events
         _hubConnection.On<AgentInfo>(HubEvents.AgentConnected, OnAgentConnected);
         _hubConnection.On<string>(HubEvents.AgentDisconnected, OnAgentDisconnected);
 
         try
         {
             await _hubConnection.StartAsync();
-            
-            // Fetch initial agent list
             _agents = await _hubConnection.InvokeAsync<List<AgentInfo>>(HubEvents.GetAllAgents);
         }
         catch (Exception ex)
@@ -137,7 +94,6 @@ else
 
     private void OnAgentConnected(AgentInfo agent)
     {
-        // Remove existing if reconnecting
         _agents.RemoveAll(a => a.AgentId == agent.AgentId);
         _agents.Insert(0, agent);
         InvokeAsync(StateHasChanged);
