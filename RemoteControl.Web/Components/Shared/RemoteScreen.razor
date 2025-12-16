@@ -27,6 +27,18 @@
             Task Manager
         </button>
 
+        <!-- System Monitor Tab -->
+        <button @onclick="() => activeTab = TabType.SystemMonitor" 
+                class="px-6 py-4 font-medium text-sm flex items-center gap-2 @(activeTab == TabType.SystemMonitor ? "" : "hover-theme")" 
+                style="@GetTabStyle(TabType.SystemMonitor)">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                      d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z">
+                </path>
+            </svg>
+            System Monitor
+        </button>
+
         <!-- Keylogger Tab -->
         <button @onclick="() => activeTab = TabType.Keylogger" 
                 class="px-6 py-4 font-medium text-sm flex items-center gap-2 @(activeTab == TabType.Keylogger ? "" : "hover-theme")" 
@@ -86,6 +98,10 @@
             <TaskManagerTab />
             break;
 
+        case TabType.SystemMonitor:
+            <SystemMonitorTab />
+            break;
+
         case TabType.Keylogger:
             <KeyloggerTab />
             break;
@@ -101,7 +117,7 @@
 </div>
 
 @code {
-    enum TabType { RemoteScreen, TaskManager, Keylogger, Webcam, Power }
+    enum TabType { RemoteScreen, TaskManager, SystemMonitor, Keylogger, Webcam, Power }
     TabType activeTab = TabType.RemoteScreen;
 
     string GetTabStyle(TabType tab)
