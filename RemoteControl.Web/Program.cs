@@ -1,5 +1,6 @@
 using RemoteControl.Web.Components;
 using RemoteControl.Web.Hubs;
+using RemoteControl.Web.Services;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -7,11 +8,14 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddRazorComponents()
     .AddInteractiveServerComponents();
 
-// IMPORTANT: Screenshot base64 rất lớn -> tăng giới hạn nhận message của SignalR
+// SignalR với MaxMessageSize lớn cho Screenshot base64
 builder.Services.AddSignalR(o =>
 {
     o.MaximumReceiveMessageSize = 20 * 1024 * 1024; // 20MB
 });
+
+// UDP Discovery Broadcaster - cho Agent tự động tìm Server
+builder.Services.AddHostedService<DiscoveryBroadcaster>();
 
 var app = builder.Build();
 
