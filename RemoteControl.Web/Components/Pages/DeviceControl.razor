@@ -1,117 +1,28 @@
 @page "/devices/{Id}"
 @inject NavigationManager Nav
-@using Components.Pages.DeviceFeatures 
 
 @code {
+    // Fix CS8618: Thêm "= default!" để báo với C# rằng: "Yên tâm, cái này Blazor tự điền, không null đâu"
     [Parameter]
     public string Id { get; set; } = default!;
 
-    enum TabType { RemoteScreen, TaskManager, Keylogger, Webcam, Power }
-    TabType activeTab = TabType.RemoteScreen;
-
-    void GoBack() => Nav.NavigateTo("/devices");
-
-    // Hàm style cho Tab bo tròn đẹp (Rounded Tabs)
-    string GetTabClass(TabType tab)
+    protected override void OnInitialized()
     {
-        // rounded-t-xl: Bo tròn góc trên
-        // mr-1: Tạo khe hở nhỏ giữa các tab
-        var common = "px-6 py-3 font-medium text-sm flex items-center gap-2 transition-all rounded-t-xl mr-1 border-t border-l border-r";
-        
-        if (activeTab == tab)
-        {
-            // Active: Màu nền trùng với nội dung bên dưới (gray-800), viền sáng hơn chút
-            return $"{common} bg-gray-800 text-white border-gray-700 border-b-0 relative top-[1px] z-10";
-        }
-        else
-        {
-            // Inactive: Màu tối hơn, border trong suốt
-            return $"{common} bg-gray-900/40 text-gray-500 border-transparent hover:bg-gray-800/50 hover:text-gray-300";
-        }
+        // Logic khởi tạo nếu cần
+    }
+
+    // Hàm quay lại danh sách thiết bị
+    void GoBack()
+    {
+        Nav.NavigateTo("/devices");
     }
 }
 
-<!-- Header: Title & Back Button -->
-<div class="flex justify-between items-center mb-6">
-    <div class="flex items-center gap-4">
-        <div class="w-14 h-14 bg-gradient-to-br from-gray-800 to-gray-900 rounded-2xl border border-gray-700/50 flex items-center justify-center text-gray-400 shadow-lg">
-             <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"></path></svg>
-        </div>
-        <div>
-            <h2 class="text-2xl font-bold text-white tracking-tight">@Id</h2>
-            <div class="flex items-center gap-2 text-sm mt-1">
-                <span class="flex h-2 w-2 relative">
-                    <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
-                    <span class="relative inline-flex rounded-full h-2 w-2 bg-green-500"></span>
-                </span>
-                <span class="text-green-400 font-medium">Online</span>
-                <span class="text-gray-600 mx-1">|</span>
-                <span class="text-gray-400 font-mono">192.168.1.104</span>
-            </div>
-        </div>
-    </div>
-    
-    <button @onclick="GoBack" class="group p-2 pr-4 bg-gray-800 hover:bg-gray-700 text-gray-400 hover:text-white rounded-xl transition-all border border-gray-700 hover:border-gray-600 flex items-center gap-2">
-        <div class="p-1 rounded-lg bg-gray-700 group-hover:bg-gray-600 transition-colors">
-            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
-        </div>
-        <span class="text-sm font-medium">Close Session</span>
-    </button>
-</div>
+<!-- Info Bar & Actions -->
+<DeviceHeader DeviceId="@Id" />
 
-<!-- Main Content Area with Rounded Tabs -->
-<div class="flex flex-col">
-    
-    <!-- Tab Navigation Bar -->
-    <!-- pl-4: Padding trái để tab đầu tiên không dính sát lề -->
-    <div class="flex border-b border-gray-700 px-4">
-        <button @onclick="() => activeTab = TabType.RemoteScreen" class="@GetTabClass(TabType.RemoteScreen)">
-            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"></path></svg>
-            Remote Screen
-        </button>
-        <button @onclick="() => activeTab = TabType.TaskManager" class="@GetTabClass(TabType.TaskManager)">
-            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 002 2h2a2 2 0 002-2z"></path></svg>
-            Task Manager
-        </button>
-        <button @onclick="() => activeTab = TabType.Keylogger" class="@GetTabClass(TabType.Keylogger)">
-            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"></path></svg>
-            Keylogger
-        </button>
-        <button @onclick="() => activeTab = TabType.Webcam" class="@GetTabClass(TabType.Webcam)">
-            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"></path></svg>
-            Webcam
-        </button>
-        <button @onclick="() => activeTab = TabType.Power" class="@GetTabClass(TabType.Power) hover:text-red-400">
-            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path></svg>
-            Power
-        </button>
-    </div>
-
-    <!-- Content Pane (Bo tròn góc dưới để khớp với tổng thể) -->
-    <div class="bg-gray-800 border border-t-0 border-gray-700 rounded-b-xl shadow-xl min-h-[450px]">
-        @switch (activeTab)
-        {
-            case TabType.RemoteScreen: <RemoteScreenTab /> break;
-            case TabType.TaskManager:  <TaskManagerTab /> break;
-            case TabType.Keylogger:    <KeyloggerTab /> break;
-            case TabType.Webcam:       <WebcamTab /> break;
-            case TabType.Power:        <PowerTab /> break;
-        }
-    </div>
-</div>
+<!-- Tabs & Remote Screen -->
+<RemoteScreen />
 
 <!-- Terminal Log -->
-<div class="mt-8">
-    <div class="bg-black/80 backdrop-blur rounded-xl border border-gray-800 p-4 font-mono text-xs h-40 overflow-y-auto shadow-inner">
-        <div class="text-gray-500 mb-2 border-b border-gray-800 pb-2 flex justify-between sticky top-0 bg-black/80">
-            <span class="font-bold">>_ SYSTEM CONSOLE</span>
-            <span>Connected: 500ms</span>
-        </div>
-        <div class="space-y-1.5">
-            <p class="text-blue-400">[15:30:01] System initialized. SignalR hub connection established.</p>
-            <p class="text-green-400">[15:30:02] Service: AgentManagerService started successfully.</p>
-            <p class="text-gray-400">[15:46:50] User switched view to <span class="text-white font-bold">@activeTab</span></p>
-            <p class="text-gray-500 typing-effect">_</p>
-        </div>
-    </div>
-</div>
+<TerminalLog DeviceId="@Id" />
