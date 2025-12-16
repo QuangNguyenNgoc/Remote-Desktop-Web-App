@@ -1,18 +1,158 @@
-<div class="p-6 bg-gray-800 rounded-b-xl flex flex-col items-center justify-center min-h-[400px]">
-    <div class="relative bg-black border-4 border-gray-700 rounded-lg overflow-hidden w-full max-w-lg aspect-[4/3] flex items-center justify-center mb-4">
-        <!-- Mockup Camera Feed -->
-        <div class="text-gray-500 flex flex-col items-center">
-            <svg class="w-12 h-12 mb-2 opacity-50" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"></path></svg>
-            <span>Waiting for Camera Stream...</span>
-        </div>
-        
-        <div class="absolute top-2 right-2 flex items-center gap-1 bg-red-600/80 text-white text-xs px-2 py-0.5 rounded">
-            <span>REC</span>
+@* Webcam Tab Component *@
+<div class="webcam-container">
+    <div class="webcam-feed-wrapper">
+        <div class="webcam-feed">
+            <!-- Camera Feed Placeholder -->
+            <div class="webcam-placeholder">
+                <svg class="camera-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"></path>
+                </svg>
+                <span class="placeholder-text">Waiting for Camera Stream...</span>
+            </div>
+            
+            <!-- Recording Indicator -->
+            <div class="recording-badge">
+                <span class="rec-dot"></span>
+                <span class="rec-text">REC</span>
+            </div>
         </div>
     </div>
     
-    <div class="flex gap-4">
-        <button class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-medium">Capture Photo</button>
-        <button class="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg text-sm font-medium">Stop Stream</button>
+    <div class="webcam-controls">
+        <button class="webcam-button capture-button">
+            <svg class="btn-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"></path>
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z"></path>
+            </svg>
+            Capture Photo
+        </button>
+        <button class="webcam-button stop-button">
+            <svg class="btn-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 10a1 1 0 011-1h4a1 1 0 011 1v4a1 1 0 01-1 1h-4a1 1 0 01-1-1v-4z"></path>
+            </svg>
+            Stop Stream
+        </button>
     </div>
 </div>
+
+<style>
+    .webcam-container {
+        padding: 1.5rem;
+        background-color: var(--card-bg);
+        border-radius: 0 0 0.75rem 0.75rem;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        min-height: 400px;
+        gap: 1.5rem;
+    }
+    
+    .webcam-feed-wrapper {
+        width: 100%;
+        max-width: 32rem;
+    }
+    
+    .webcam-feed {
+        position: relative;
+        background-color: #000000;
+        border: 4px solid var(--card-border);
+        border-radius: 0.5rem;
+        overflow: hidden;
+        width: 100%;
+        aspect-ratio: 4 / 3;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+    
+    .webcam-placeholder {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 0.5rem;
+        color: var(--text-quaternary);
+    }
+    
+    .camera-icon {
+        width: 3rem;
+        height: 3rem;
+        opacity: 0.5;
+    }
+    
+    .placeholder-text {
+        font-size: 0.875rem;
+    }
+    
+    .recording-badge {
+        position: absolute;
+        top: 0.5rem;
+        right: 0.5rem;
+        display: flex;
+        align-items: center;
+        gap: 0.25rem;
+        background-color: rgba(239, 68, 68, 0.9);
+        color: white;
+        font-size: 0.75rem;
+        font-weight: 600;
+        padding: 0.25rem 0.5rem;
+        border-radius: 0.25rem;
+    }
+    
+    .rec-dot {
+        width: 0.5rem;
+        height: 0.5rem;
+        background-color: white;
+        border-radius: 50%;
+        animation: pulse 2s infinite;
+    }
+    
+    @@keyframes pulse {
+        0%, 100% { opacity: 1; }
+        50% { opacity: 0.5; }
+    }
+    
+    .webcam-controls {
+        display: flex;
+        gap: 1rem;
+        flex-wrap: wrap;
+        justify-content: center;
+    }
+    
+    .webcam-button {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        padding: 0.625rem 1.25rem;
+        font-size: 0.875rem;
+        font-weight: 500;
+        border-radius: 0.5rem;
+        transition: all 0.2s ease;
+        border: none;
+        cursor: pointer;
+    }
+    
+    .btn-icon {
+        width: 1rem;
+        height: 1rem;
+    }
+    
+    .capture-button {
+        background-color: var(--btn-primary-bg);
+        color: white;
+    }
+    
+    .capture-button:hover {
+        background-color: var(--btn-primary-hover);
+    }
+    
+    .stop-button {
+        background-color: #ef4444;
+        color: white;
+    }
+    
+    .stop-button:hover {
+        background-color: #dc2626;
+    }
+</style>

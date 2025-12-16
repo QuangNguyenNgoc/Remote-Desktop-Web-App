@@ -1,36 +1,120 @@
-<div class="p-0 bg-gray-800 rounded-b-xl min-h-[400px] overflow-hidden">
-    <table class="w-full text-left text-sm text-gray-400">
-        <thead class="bg-gray-900/50 uppercase text-xs font-semibold text-gray-500">
-            <tr>
-                <th class="px-6 py-3">Process Name</th>
-                <th class="px-6 py-3">PID</th>
-                <th class="px-6 py-3">CPU %</th>
-                <th class="px-6 py-3">Memory</th>
-                <th class="px-6 py-3 text-right">Action</th>
-            </tr>
-        </thead>
-        <tbody class="divide-y divide-gray-700">
-            <tr class="hover:bg-gray-700/50">
-                <td class="px-6 py-4 text-white">chrome.exe</td>
-                <td class="px-6 py-4">1244</td>
-                <td class="px-6 py-4">12%</td>
-                <td class="px-6 py-4">450 MB</td>
-                <td class="px-6 py-4 text-right"><button class="text-red-400 hover:text-red-300">Kill</button></td>
-            </tr>
-            <tr class="hover:bg-gray-700/50">
-                <td class="px-6 py-4 text-white">System</td>
-                <td class="px-6 py-4">4</td>
-                <td class="px-6 py-4">2%</td>
-                <td class="px-6 py-4">120 MB</td>
-                <td class="px-6 py-4 text-right"></td>
-            </tr>
-             <tr class="hover:bg-gray-700/50">
-                <td class="px-6 py-4 text-white">Explorer.exe</td>
-                <td class="px-6 py-4">5622</td>
-                <td class="px-6 py-4">1%</td>
-                <td class="px-6 py-4">80 MB</td>
-                <td class="px-6 py-4 text-right"><button class="text-red-400 hover:text-red-300">Kill</button></td>
-            </tr>
-        </tbody>
-    </table>
+@* Task Manager Tab Component *@
+<div class="task-manager-container">
+    <div class="task-manager-table-wrapper">
+        <table class="task-table">
+            <thead>
+                <tr>
+                    <th>PROCESS NAME</th>
+                    <th>PID</th>
+                    <th>CPU %</th>
+                    <th>MEMORY</th>
+                    <th class="text-right">ACTION</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td class="font-semibold process-name">chrome.exe</td>
+                    <td>1244</td>
+                    <td>12%</td>
+                    <td>450 MB</td>
+                    <td class="text-right">
+                        <button class="action-button kill-button">Kill</button>
+                    </td>
+                </tr>
+                <tr>
+                    <td class="font-semibold process-name">System</td>
+                    <td>4</td>
+                    <td>2%</td>
+                    <td>120 MB</td>
+                    <td class="text-right"></td>
+                </tr>
+                <tr>
+                    <td class="font-semibold process-name">Explorer.exe</td>
+                    <td>5622</td>
+                    <td>1%</td>
+                    <td>80 MB</td>
+                    <td class="text-right">
+                        <button class="action-button kill-button">Kill</button>
+                    </td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
 </div>
+
+<style>
+    .task-manager-container {
+        min-height: 400px;
+        background-color: var(--table-bg);
+        border-radius: 0 0 0.75rem 0.75rem;
+        overflow: hidden;
+    }
+    
+    .task-manager-table-wrapper {
+        overflow-x: auto;
+    }
+    
+    .task-table {
+        width: 100%;
+        text-align: left;
+        font-size: 0.875rem;
+    }
+    
+    .task-table thead {
+        background-color: var(--table-header-bg);
+        color: var(--table-header-text);
+        text-transform: uppercase;
+        font-size: 0.75rem;
+        font-weight: 600;
+        letter-spacing: 0.05em;
+    }
+    
+    .task-table th {
+        padding: 0.75rem 1.5rem;
+        font-weight: 600;
+    }
+    
+    .task-table tbody {
+        color: var(--table-text);
+    }
+    
+    .task-table tbody tr {
+        border-bottom: 1px solid var(--table-border);
+        transition: background-color 0.15s ease;
+    }
+    
+    .task-table tbody tr:hover {
+        background-color: var(--table-row-hover);
+    }
+    
+    .task-table td {
+        padding: 1rem 1.5rem;
+    }
+    
+    .process-name {
+        color: var(--table-text-primary);
+    }
+    
+    .action-button {
+        font-size: 0.875rem;
+        font-weight: 500;
+        transition: all 0.2s ease;
+    }
+    
+    .kill-button {
+        color: #ef4444;
+    }
+    
+    .kill-button:hover {
+        color: #dc2626;
+        text-decoration: underline;
+    }
+    
+    .text-right {
+        text-align: right;
+    }
+    
+    .font-semibold {
+        font-weight: 600;
+    }
+</style>
