@@ -10,20 +10,30 @@ namespace RemoteControl.Agent.Services;
 
 public class SignalRClientService
 {
-    private readonly HubConnection _hubConnection;
+    private HubConnection? _hubConnection;
     private readonly CommandHandler _commandHandler;
     private readonly SystemInfoService _systemInfoService;
+    private readonly Microsoft.Extensions.Configuration.IConfiguration _configuration;
+    private readonly DiscoveryListener _discoveryListener;
 
     private readonly System.Timers.Timer _heartbeatTimer;
     private readonly System.Timers.Timer _systemInfoTimer;
 
     private bool _isConnected;
     private readonly string _agentId;
-
-    private int _sendingSystemInfo; // chống overlap timer
+    private string? _manualHubUrl;
+    private int _sendingSystemInfo;
 
     public event Action<string>? OnStatusChanged;
     public event Action<string>? OnConnectionStateChanged;
+
+    /// <summary>
+    /// Set Hub URL manually (from connection dialog)
+    /// </summary>
+    public void SetHubUrl(string hubUrl)
+    {
+        _manualHubUrl = hubUrl;
+    }
 
     public SignalRClientService(
         CommandHandler commandHandler,
@@ -32,33 +42,42 @@ public class SignalRClientService
     {
         _commandHandler = commandHandler;
         _systemInfoService = systemInfoService;
+        _configuration = configuration;
+        _discoveryListener = new DiscoveryListener();
+        _agentId = Environment.MachineName;
 
-        _agentId = Environment.MachineName; // Simple Agent ID for now
-
-        string hubUrl = configuration["SignalR:HubUrl"] ?? "http://localhost:5048/remotehub";
-
-        _hubConnection = new HubConnectionBuilder()
-            .WithUrl(hubUrl)
-            .WithAutomaticReconnect()
-            .Build();
-
-        _hubConnection.Reconnecting += OnReconnecting;
-        _hubConnection.Reconnected += OnReconnected;
-        _hubConnection.Closed += OnClosed;
-
-        _heartbeatTimer = new System.Timers.Timer(10000); // 10s
+        _heartbeatTimer = new System.Timers.Timer(10000);
         _heartbeatTimer.Elapsed += async (s, e) => await SendHeartbeat();
 
-        _systemInfoTimer = new System.Timers.Timer(10000); // 10s
+        _systemInfoTimer = new System.Timers.Timer(10000);
         _systemInfoTimer.Elapsed += async (s, e) => await SendSystemInfoAsync();
-
-        RegisterHandlers();
     }
 
     public async Task ConnectAsync()
     {
         try
         {
+            var hubUrl = await GetHubUrlAsync();
+            if (string.IsNullOrEmpty(hubUrl))
+            {
+                UpdateStatus("No server found. Check network or config.");
+                OnConnectionStateChanged?.Invoke("Disconnected");
+                return;
+            }
+
+            UpdateStatus($"Found server: {hubUrl}");
+
+            _hubConnection = new HubConnectionBuilder()
+                .WithUrl(hubUrl)
+                .WithAutomaticReconnect()
+                .Build();
+
+            _hubConnection.Reconnecting += OnReconnecting;
+            _hubConnection.Reconnected += OnReconnected;
+            _hubConnection.Closed += OnClosed;
+
+            RegisterHandlers();
+
             UpdateStatus("Connecting to Hub...");
             await _hubConnection.StartAsync();
             _isConnected = true;
@@ -69,7 +88,7 @@ public class SignalRClientService
             await RegisterAgentAsync();
 
             _heartbeatTimer.Start();
-            _systemInfoTimer.Start(); // (3) gửi system info định kỳ
+            _systemInfoTimer.Start();
         }
         catch (Exception ex)
         {
@@ -79,22 +98,55 @@ public class SignalRClientService
         }
     }
 
+    private async Task<string?> GetHubUrlAsync()
+    {
+        if (!string.IsNullOrEmpty(_manualHubUrl))
+        {
+            UpdateStatus($"Using manual URL: {_manualHubUrl}");
+            return _manualHubUrl;
+        }
+
+        var configUrl = _configuration["SignalR:HubUrl"];
+        
+        if (!string.IsNullOrEmpty(configUrl) && !configUrl.Contains("localhost"))
+        {
+            UpdateStatus($"Using configured URL: {configUrl}");
+            return configUrl;
+        }
+
+        UpdateStatus("Auto-discovering server on LAN...");
+        var discoveredUrl = await _discoveryListener.DiscoverServerAsync();
+        
+        if (!string.IsNullOrEmpty(discoveredUrl))
+        {
+            return discoveredUrl;
+        }
+
+        if (!string.IsNullOrEmpty(configUrl))
+        {
+            UpdateStatus($"Fallback to config: {configUrl}");
+            return configUrl;
+        }
+
+        return "http://localhost:5048/remotehub";
+    }
+
     private void RegisterHandlers()
     {
+        if (_hubConnection == null) return;
+
         _hubConnection.On<CommandRequest>(HubEvents.ExecuteCommand, async (request) =>
         {
             UpdateStatus($"Received command: {request.Type}");
-
-            // Execute locally
             var result = _commandHandler.HandleCommand(request);
-
-            // Send result back
             await SendResultAsync(result);
         });
     }
 
     private async Task RegisterAgentAsync()
     {
+        if (_hubConnection == null) return;
+
         var info = new AgentInfo
         {
             AgentId = _agentId,
@@ -120,23 +172,18 @@ public class SignalRClientService
 
     private async Task SendHeartbeat()
     {
-        if (!_isConnected) return;
+        if (!_isConnected || _hubConnection == null) return;
 
         try
         {
-            // hiện hub bạn chưa có method này -> fail silent như bạn đang làm
             await _hubConnection.InvokeAsync("SendHeartbeat", _agentId);
         }
-        catch
-        {
-            // Silent fail
-        }
+        catch { }
     }
 
-    // (3) Timer tick: gửi SystemInfo lên hub
     private async Task SendSystemInfoAsync()
     {
-        if (!_isConnected) return;
+        if (!_isConnected || _hubConnection == null) return;
 
         if (Interlocked.Exchange(ref _sendingSystemInfo, 1) == 1)
             return;
@@ -146,10 +193,7 @@ public class SignalRClientService
             var info = _systemInfoService.GetSystemInfo();
             await _hubConnection.InvokeAsync(HubEvents.UpdateSystemInfo, _agentId, info);
         }
-        catch
-        {
-            // Silent fail (tránh spam log)
-        }
+        catch { }
         finally
         {
             Interlocked.Exchange(ref _sendingSystemInfo, 0);
@@ -158,7 +202,7 @@ public class SignalRClientService
 
     private async Task SendResultAsync(CommandResult result)
     {
-        if (!_isConnected) return;
+        if (!_isConnected || _hubConnection == null) return;
         try
         {
             await _hubConnection.InvokeAsync(HubEvents.SendResult, result);
@@ -183,12 +227,9 @@ public class SignalRClientService
         _isConnected = true;
         UpdateStatus("Reconnected");
         OnConnectionStateChanged?.Invoke("Connected");
-
         _ = RegisterAgentAsync();
-
         _heartbeatTimer.Start();
         _systemInfoTimer.Start();
-
         return Task.CompletedTask;
     }
 
@@ -197,10 +238,8 @@ public class SignalRClientService
         _isConnected = false;
         UpdateStatus($"Connection Closed: {arg?.Message}");
         OnConnectionStateChanged?.Invoke("Disconnected");
-
         _heartbeatTimer.Stop();
         _systemInfoTimer.Stop();
-
         return Task.CompletedTask;
     }
 
