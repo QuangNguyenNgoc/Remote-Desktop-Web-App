@@ -1,5 +1,6 @@
 using RemoteControl.Web.Components;
 using RemoteControl.Web.Hubs;            // dùng RemoteControlHub cho SignalR
+using RemoteControl.Web.Services;        // DiscoveryBroadcaster
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -8,6 +9,10 @@ builder.Services.AddRazorComponents()
     .AddInteractiveServerComponents();
 
 builder.Services.AddSignalR(); // Đăng ký dịch vụ SignalR cho web
+
+// UDP Discovery Broadcaster - cho Agent tự động tìm Server
+builder.Services.AddHostedService<DiscoveryBroadcaster>();
+
 var app = builder.Build();
 
 // Configure the HTTP request pipeline.
