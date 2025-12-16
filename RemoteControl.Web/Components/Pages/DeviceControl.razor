@@ -4,6 +4,7 @@
 @using RemoteControl.Shared.Models
 @using RemoteControl.Shared.Constants
 @using System.Text.Json
+@using System.Linq
 @inject NavigationManager Nav
 
 @implements IAsyncDisposable
@@ -226,13 +227,10 @@
 </div>
 
 @code {
-    // Route parameter
     [Parameter]
     public string Id { get; set; } = default!;
 
-    // Kết nối SignalR
     private HubConnection? hubConnection;
-
     private bool IsConnected => hubConnection?.State == HubConnectionState.Connected;
 
     // Loading states
@@ -243,17 +241,17 @@
     // Error message
     private string? errorMessage;
 
-    // Input cho Process
+    // Inputs
     private string? newProcessName;
     private string? killProcessPidString;
 
-    // System info (JSON thô)
+    // System info (JSON)
     private string? latestSystemInfoJson;
 
-    // Screenshot mới nhất (base64) để truyền xuống RemoteScreen
+    // Screenshot base64
     private string? lastScreenshotBase64;
 
-    // Process list để render table
+    // Process list
     private readonly List<ProcessInfo> processList = new();
 
     // Pending commands: CommandId -> scope ("screenshot"/"process"/"system")
@@ -263,7 +261,6 @@
 
     protected override async Task OnInitializedAsync()
     {
-        // Đúng endpoint đã map trong Program.cs
         var hubUrl = Nav.ToAbsoluteUri("/remotehub").ToString();
 
         hubConnection = new HubConnectionBuilder()
@@ -272,13 +269,13 @@
             .Build();
 
         // =========================
-        // (1) CommandCompleted: xử lý Screenshot / Processes / SystemInfo
+        // CommandCompleted: xử lý Screenshot / Processes / SystemInfo
+        // + Clear loading theo CommandId (hoặc fallback theo scope nếu thiếu CommandId)
         // =========================
         hubConnection.On<JsonElement>(HubEvents.CommandCompleted, payload =>
         {
             try
             {
-                // Chỉ quan tâm kết quả của đúng Agent hiện tại
                 if (!TryGetPropertyIgnoreCase(payload, "agentId", out var agentIdProp))
                     return;
 
@@ -286,24 +283,25 @@
                 if (!string.Equals(agentId, Id, StringComparison.OrdinalIgnoreCase))
                     return;
 
-                // CommandId để clear loading đúng nghĩa “chờ response”
                 string? commandId = null;
                 if (TryGetPropertyIgnoreCase(payload, "commandId", out var cmdIdProp))
                     commandId = cmdIdProp.GetString();
 
-                // Success/Message (nếu có)
                 bool? success = null;
-                if (TryGetPropertyIgnoreCase(payload, "success", out var successProp) && successProp.ValueKind is JsonValueKind.True or JsonValueKind.False)
+                if (TryGetPropertyIgnoreCase(payload, "success", out var successProp) &&
+                    (successProp.ValueKind == JsonValueKind.True || successProp.ValueKind == JsonValueKind.False))
                     success = successProp.GetBoolean();
 
                 string? message = null;
                 if (TryGetPropertyIgnoreCase(payload, "message", out var msgProp))
                     message = msgProp.GetString();
 
-                // Lấy phần Data
+                bool gotScreenshot = false;
+                bool gotProcesses = false;
+                bool gotSystemInfo = false;
+
                 if (!TryGetPropertyIgnoreCase(payload, "data", out var dataElement))
                 {
-                    // vẫn clear pending nếu có commandId
                     if (!string.IsNullOrWhiteSpace(commandId)) CompletePending(commandId!);
                     if (success == false && !string.IsNullOrWhiteSpace(message)) errorMessage = message;
                     InvokeStateHasChangedSafe();
@@ -313,17 +311,21 @@
                 if (dataElement.ValueKind == JsonValueKind.Object)
                 {
                     // 1) Screenshot
-                    if (TryGetPropertyIgnoreCase(dataElement, "imageBase64", out var imgProp) && imgProp.ValueKind == JsonValueKind.String)
+                    if (TryGetPropertyIgnoreCase(dataElement, "imageBase64", out var imgProp) &&
+                        imgProp.ValueKind == JsonValueKind.String)
                     {
                         lastScreenshotBase64 = imgProp.GetString();
+                        gotScreenshot = true;
                     }
 
                     // 2) Processes[]
-                    if (TryGetPropertyIgnoreCase(dataElement, "processes", out var procsProp) && procsProp.ValueKind == JsonValueKind.Array)
+                    if (TryGetPropertyIgnoreCase(dataElement, "processes", out var procsProp) &&
+                        procsProp.ValueKind == JsonValueKind.Array)
                     {
                         var newList = ParseProcessList(procsProp);
                         processList.Clear();
                         processList.AddRange(newList);
+                        gotProcesses = true;
                     }
 
                     // 3) SystemInfo (trong CommandCompleted)
@@ -331,14 +333,24 @@
                     {
                         latestSystemInfoJson = JsonSerializer.Serialize(sysInfoFromCmd,
                             new JsonSerializerOptions { WriteIndented = true });
+                        gotSystemInfo = true;
                     }
                 }
 
-                // Clear busy theo đúng commandId khi nhận response
+                // Clear busy đúng nghĩa “chờ response”
                 if (!string.IsNullOrWhiteSpace(commandId))
+                {
                     CompletePending(commandId!);
+                }
+                else
+                {
+                    // Fallback: nếu payload không có commandId, nhưng đã nhận được data,
+                    // vẫn phải tắt busy đúng scope để khỏi kẹt "Capturing..."
+                    if (gotScreenshot) ClearPendingScope("screenshot");
+                    if (gotProcesses) ClearPendingScope("process");
+                    if (gotSystemInfo) ClearPendingScope("system");
+                }
 
-                // Nếu command fail (Success=false) thì show message
                 if (success == false && !string.IsNullOrWhiteSpace(message))
                     errorMessage = message;
 
@@ -351,7 +363,7 @@
         });
 
         // =========================
-        // (1) CommandFailed: Agent offline / command fail
+        // CommandFailed: Agent offline / route fail
         // Server gửi: (CommandRequest request, string message)
         // =========================
         hubConnection.On<CommandRequest, string>(HubEvent_CommandFailed, (request, message) =>
@@ -363,9 +375,10 @@
 
                 errorMessage = message;
 
-                // clear loading đúng command
                 if (!string.IsNullOrWhiteSpace(request.CommandId))
                     CompletePending(request.CommandId);
+                else
+                    RecomputeBusyFromPending();
 
                 InvokeStateHasChangedSafe();
             }
@@ -378,11 +391,11 @@
         // =========================
         // SystemInfoUpdated: chuẩn 2 params (agentId, systemInfo)
         // =========================
-        hubConnection.On<string, SystemInfo>(HubEvents.SystemInfoUpdated, (agentId, systemInfo) =>
+        hubConnection.On<string, SystemInfo>(HubEvents.SystemInfoUpdated, (agentId2, systemInfo) =>
         {
             try
             {
-                if (!string.Equals(agentId, Id, StringComparison.OrdinalIgnoreCase))
+                if (!string.Equals(agentId2, Id, StringComparison.OrdinalIgnoreCase))
                     return;
 
                 latestSystemInfoJson = JsonSerializer.Serialize(systemInfo,
@@ -406,9 +419,7 @@
         }
     }
 
-    // =========================
-    // (Validate online) trước khi gửi command
-    // =========================
+    // Validate agent online trước khi gửi command
     private async Task<bool> EnsureAgentOnlineAsync()
     {
         if (hubConnection is null || hubConnection.State != HubConnectionState.Connected)
@@ -429,13 +440,13 @@
         }
         catch
         {
-            // Nếu lỗi call GetAllAgents, vẫn cho phép gửi (fallback),
-            // vì CommandFailed phía server sẽ trả nếu offline.
+            // fallback: nếu lỗi call GetAllAgents, vẫn cho phép gửi.
+            // CommandFailed phía server sẽ trả nếu offline.
             return true;
         }
     }
 
-    // Gửi command chung (giữ busy cho tới khi nhận CommandCompleted/CommandFailed theo CommandId)
+    // Gửi command (giữ busy cho tới khi nhận CommandCompleted/CommandFailed)
     private async Task SendCommandAsync(CommandRequest request, string scope)
     {
         if (hubConnection is null)
@@ -450,8 +461,8 @@
             return;
         }
 
-        // validate agent online trước khi gửi
         errorMessage = null;
+
         if (!await EnsureAgentOnlineAsync())
         {
             InvokeStateHasChangedSafe();
@@ -464,7 +475,7 @@
         try
         {
             await hubConnection.InvokeAsync(HubEvents.SendCommand, request);
-            // IMPORTANT: KHÔNG clear busy ở đây (đợi response)
+            // KHÔNG clear busy ở đây (đợi response)
         }
         catch (Exception ex)
         {
@@ -477,7 +488,6 @@
     private void MarkPending(string commandId, string scope)
     {
         if (string.IsNullOrWhiteSpace(commandId)) return;
-
         pendingCommands[commandId] = scope;
         RecomputeBusyFromPending();
     }
@@ -485,8 +495,22 @@
     private void CompletePending(string commandId)
     {
         if (string.IsNullOrWhiteSpace(commandId)) return;
-
         pendingCommands.Remove(commandId);
+        RecomputeBusyFromPending();
+    }
+
+    private void ClearPendingScope(string scope)
+    {
+        var toRemove = new List<string>();
+        foreach (var kv in pendingCommands)
+        {
+            if (string.Equals(kv.Value, scope, StringComparison.OrdinalIgnoreCase))
+                toRemove.Add(kv.Key);
+        }
+
+        foreach (var k in toRemove)
+            pendingCommands.Remove(k);
+
         RecomputeBusyFromPending();
     }
 
@@ -507,23 +531,20 @@
         return false;
     }
 
-    // === Các handler cho nút bấm ===
+    // === Button handlers ===
 
-    // 1) Screenshot
     private async Task CaptureScreenshotAsync()
     {
         var req = CommandRequest.CreateCaptureScreen(Id);
         await SendCommandAsync(req, "screenshot");
     }
 
-    // 2) List processes
     private async Task ListProcessesAsync()
     {
         var req = CommandRequest.CreateListProcesses(Id);
         await SendCommandAsync(req, "process");
     }
 
-    // 3) Kill process theo PID nhập tay
     private async Task KillProcessAsync()
     {
         if (!int.TryParse(killProcessPidString, out var pid))
@@ -533,16 +554,13 @@
         await SendCommandAsync(req, "process");
     }
 
-    // 4) Kill theo row
     private async Task KillProcessRowAsync(int pid, string processName)
     {
         var req = CommandRequest.CreateKillProcess(Id, pid);
-        // base hiện tại không có CreateKillProcess(Id, pid, name) => set thêm ProcessName theo đúng model đang có
-        req.ProcessName = processName;
+        req.ProcessName = processName; // thêm name theo base model
         await SendCommandAsync(req, "process");
     }
 
-    // 5) Start process theo tên
     private async Task StartProcessAsync()
     {
         if (string.IsNullOrWhiteSpace(newProcessName))
@@ -553,14 +571,12 @@
         newProcessName = string.Empty;
     }
 
-    // 6) Refresh system info
     private async Task RefreshSystemInfoAsync()
     {
         var req = CommandRequest.CreateGetSystemInfo(Id);
         await SendCommandAsync(req, "system");
     }
 
-    // Điều hướng quay lại danh sách
     private void GoBack()
     {
         Nav.NavigateTo("/devices");
@@ -569,7 +585,7 @@
     private void InvokeStateHasChangedSafe()
     {
         try { InvokeAsync(StateHasChanged); }
-        catch { /* ignore */ }
+        catch { }
     }
 
     private static bool TryGetPropertyIgnoreCase(JsonElement obj, string name, out JsonElement value)
