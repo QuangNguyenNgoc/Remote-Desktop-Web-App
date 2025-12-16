@@ -8,9 +8,11 @@ namespace RemoteControl.Agent.Services;
 
 public class SignalRClientService
 {
-    private readonly HubConnection _hubConnection;
+    private HubConnection? _hubConnection;
     private readonly CommandHandler _commandHandler;
     private readonly System.Timers.Timer _heartbeatTimer;
+    private readonly Microsoft.Extensions.Configuration.IConfiguration _configuration;
+    private readonly DiscoveryListener _discoveryListener;
     private bool _isConnected;
     private readonly string _agentId;
 
@@ -20,29 +22,42 @@ public class SignalRClientService
     public SignalRClientService(CommandHandler commandHandler, Microsoft.Extensions.Configuration.IConfiguration configuration)
     {
         _commandHandler = commandHandler;
-        _agentId = Environment.MachineName; // Simple Agent ID for now
-
-        string hubUrl = configuration["SignalR:HubUrl"] ?? "http://localhost:5048/remotehub";
-
-        _hubConnection = new HubConnectionBuilder()
-            .WithUrl(hubUrl)
-            .WithAutomaticReconnect()
-            .Build();
-
-        _hubConnection.Reconnecting += OnReconnecting;
-        _hubConnection.Reconnected += OnReconnected;
-        _hubConnection.Closed += OnClosed;
+        _configuration = configuration;
+        _discoveryListener = new DiscoveryListener();
+        _agentId = Environment.MachineName;
 
         _heartbeatTimer = new System.Timers.Timer(10000); // 10s
         _heartbeatTimer.Elapsed += async (s, e) => await SendHeartbeat();
-
-        RegisterHandlers();
     }
 
     public async Task ConnectAsync()
     {
         try
         {
+            // Step 1: Get Hub URL (auto-discover or from config)
+            var hubUrl = await GetHubUrlAsync();
+            if (string.IsNullOrEmpty(hubUrl))
+            {
+                UpdateStatus("No server found. Check network or config.");
+                OnConnectionStateChanged?.Invoke("Disconnected");
+                return;
+            }
+
+            UpdateStatus($"Found server: {hubUrl}");
+
+            // Step 2: Build HubConnection
+            _hubConnection = new HubConnectionBuilder()
+                .WithUrl(hubUrl)
+                .WithAutomaticReconnect()
+                .Build();
+
+            _hubConnection.Reconnecting += OnReconnecting;
+            _hubConnection.Reconnected += OnReconnected;
+            _hubConnection.Closed += OnClosed;
+
+            RegisterHandlers();
+
+            // Step 3: Connect
             UpdateStatus("Connecting to Hub...");
             await _hubConnection.StartAsync();
             _isConnected = true;
@@ -60,8 +75,44 @@ public class SignalRClientService
         }
     }
 
+    /// <summary>
+    /// Try to get Hub URL: first from config, then auto-discover
+    /// </summary>
+    private async Task<string?> GetHubUrlAsync()
+    {
+        // 1. Check if manual config exists and is not localhost
+        var configUrl = _configuration["SignalR:HubUrl"];
+        
+        if (!string.IsNullOrEmpty(configUrl) && !configUrl.Contains("localhost"))
+        {
+            UpdateStatus($"Using configured URL: {configUrl}");
+            return configUrl;
+        }
+
+        // 2. Try auto-discovery
+        UpdateStatus("Auto-discovering server on LAN...");
+        var discoveredUrl = await _discoveryListener.DiscoverServerAsync();
+        
+        if (!string.IsNullOrEmpty(discoveredUrl))
+        {
+            return discoveredUrl;
+        }
+
+        // 3. Fallback to config (even if localhost)
+        if (!string.IsNullOrEmpty(configUrl))
+        {
+            UpdateStatus($"Fallback to config: {configUrl}");
+            return configUrl;
+        }
+
+        // 4. Default localhost
+        return "http://localhost:5048/remotehub";
+    }
+
     private void RegisterHandlers()
     {
+        if (_hubConnection == null) return;
+
         _hubConnection.On<CommandRequest>("ExecuteCommand", async (request) =>
         {
             UpdateStatus($"Received command: {request.Type}");
@@ -76,6 +127,8 @@ public class SignalRClientService
 
     private async Task RegisterAgentAsync()
     {
+        if (_hubConnection == null) return;
+
         var info = new AgentInfo
         {
             AgentId = _agentId,
@@ -84,7 +137,7 @@ public class SignalRClientService
             OsVersion = Environment.OSVersion.ToString(),
             Status = AgentStatus.Online,
             ConnectedAt = DateTime.UtcNow,
-            SystemInfo = new SystemInfo() // Initial empty info
+            SystemInfo = new SystemInfo()
         };
 
         try
@@ -100,7 +153,7 @@ public class SignalRClientService
 
     private async Task SendHeartbeat()
     {
-        if (!_isConnected) return;
+        if (!_isConnected || _hubConnection == null) return;
 
         try
         {
@@ -108,21 +161,21 @@ public class SignalRClientService
         }
         catch
         {
-            // Silent fail for heartbeat to avoid spam
+            // Silent fail for heartbeat
         }
     }
 
     private async Task SendResultAsync(CommandResult result)
     {
-        if (!_isConnected) return;
-         try
+        if (!_isConnected || _hubConnection == null) return;
+        try
         {
             await _hubConnection.InvokeAsync("SendResult", result);
             UpdateStatus($"Result sent for {result.CommandId}");
         }
         catch (Exception ex)
         {
-             UpdateStatus($"Failed to send result: {ex.Message}");
+            UpdateStatus($"Failed to send result: {ex.Message}");
         }
     }
 
@@ -139,8 +192,7 @@ public class SignalRClientService
         _isConnected = true;
         UpdateStatus("Reconnected");
         OnConnectionStateChanged?.Invoke("Connected");
-        // Re-register might be needed depending on Server logic, but usually ConnectionId changes
-        _ = RegisterAgentAsync(); 
+        _ = RegisterAgentAsync();
         return Task.CompletedTask;
     }
 
