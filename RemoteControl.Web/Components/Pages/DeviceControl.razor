@@ -117,9 +117,54 @@
                         </button>
 
                         <span class="text-xs text-slate-500">
-                            (Tạm thời nhập PID thủ công – sau có thể click từ bảng Process List)
+                            (Bạn có thể Kill theo từng dòng ở bảng bên dưới)
                         </span>
                     </div>
+
+                    <!-- Process Table -->
+                    @if (processList.Count > 0)
+                    {
+                        <div class="mt-2 overflow-x-auto border border-slate-200 dark:border-slate-700 rounded-lg">
+                            <table class="min-w-full text-sm">
+                                <thead class="bg-slate-50 dark:bg-slate-900/60">
+                                    <tr class="text-left text-slate-600 dark:text-slate-200">
+                                        <th class="px-3 py-2">PID</th>
+                                        <th class="px-3 py-2">Name</th>
+                                        <th class="px-3 py-2">Memory (MB)</th>
+                                        <th class="px-3 py-2">CPU (%)</th>
+                                        <th class="px-3 py-2">Threads</th>
+                                        <th class="px-3 py-2">Action</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @foreach (var p in processList)
+                                    {
+                                        <tr class="border-t border-slate-200 dark:border-slate-700">
+                                            <td class="px-3 py-2 text-slate-700 dark:text-slate-100">@p.ProcessId</td>
+                                            <td class="px-3 py-2 text-slate-700 dark:text-slate-100">@p.ProcessName</td>
+                                            <td class="px-3 py-2 text-slate-700 dark:text-slate-100">@p.MemoryUsageMB</td>
+                                            <td class="px-3 py-2 text-slate-700 dark:text-slate-100">@p.CpuUsage</td>
+                                            <td class="px-3 py-2 text-slate-700 dark:text-slate-100">@p.ThreadCount</td>
+                                            <td class="px-3 py-2">
+                                                <button class="inline-flex items-center gap-2 px-2 py-1 rounded text-xs font-medium
+                                                               bg-red-600 text-white hover:bg-red-700 disabled:opacity-60 disabled:cursor-not-allowed"
+                                                        disabled="@(!IsConnected || isProcessBusy)"
+                                                        @onclick="() => KillProcessRowAsync(p.ProcessId, p.ProcessName)">
+                                                    ✖ Kill
+                                                </button>
+                                            </td>
+                                        </tr>
+                                    }
+                                </tbody>
+                            </table>
+                        </div>
+                    }
+                    else
+                    {
+                        <div class="text-xs text-slate-400">
+                            Chưa có danh sách process – bấm "List Processes" để lấy.
+                        </div>
+                    }
                 </section>
 
                 <hr class="border-slate-200 dark:border-slate-700" />
@@ -162,7 +207,7 @@
                 {
                     <div class="pt-2 flex items-center gap-2 text-xs text-slate-500">
                         <span class="inline-block w-3 h-3 rounded-full border-2 border-slate-300 border-t-slate-500 animate-spin"></span>
-                        <span>Đang xử lý command...</span>
+                        <span>Đang chờ response...</span>
                     </div>
                 }
             </div>
@@ -208,6 +253,14 @@
     // Screenshot mới nhất (base64) để truyền xuống RemoteScreen
     private string? lastScreenshotBase64;
 
+    // Process list để render table
+    private readonly List<ProcessInfo> processList = new();
+
+    // Pending commands: CommandId -> scope ("screenshot"/"process"/"system")
+    private readonly Dictionary<string, string> pendingCommands = new(StringComparer.OrdinalIgnoreCase);
+
+    private const string HubEvent_CommandFailed = "CommandFailed";
+
     protected override async Task OnInitializedAsync()
     {
         // Đúng endpoint đã map trong Program.cs
@@ -218,37 +271,77 @@
             .WithAutomaticReconnect()
             .Build();
 
-        // Nhận kết quả command từ hub (CommandResult)
+        // =========================
+        // (1) CommandCompleted: xử lý Screenshot / Processes / SystemInfo
+        // =========================
         hubConnection.On<JsonElement>(HubEvents.CommandCompleted, payload =>
         {
             try
             {
-                Console.WriteLine($"[DeviceControl] CommandCompleted: {payload}");
-
                 // Chỉ quan tâm kết quả của đúng Agent hiện tại
-                if (!payload.TryGetProperty("agentId", out var agentIdProp))
+                if (!TryGetPropertyIgnoreCase(payload, "agentId", out var agentIdProp))
                     return;
 
                 var agentId = agentIdProp.GetString();
                 if (!string.Equals(agentId, Id, StringComparison.OrdinalIgnoreCase))
                     return;
 
-                // Lấy phần Data
-                if (!payload.TryGetProperty("data", out var dataElement))
-                    return;
-                if (dataElement.ValueKind != JsonValueKind.Object)
-                    return;
+                // CommandId để clear loading đúng nghĩa “chờ response”
+                string? commandId = null;
+                if (TryGetPropertyIgnoreCase(payload, "commandId", out var cmdIdProp))
+                    commandId = cmdIdProp.GetString();
 
-                // Kiểm tra xem có phải ScreenshotResult hay không
-                JsonElement imgProp;
-                if (!(dataElement.TryGetProperty("imageBase64", out imgProp) ||
-                      dataElement.TryGetProperty("ImageBase64", out imgProp)))
+                // Success/Message (nếu có)
+                bool? success = null;
+                if (TryGetPropertyIgnoreCase(payload, "success", out var successProp) && successProp.ValueKind is JsonValueKind.True or JsonValueKind.False)
+                    success = successProp.GetBoolean();
+
+                string? message = null;
+                if (TryGetPropertyIgnoreCase(payload, "message", out var msgProp))
+                    message = msgProp.GetString();
+
+                // Lấy phần Data
+                if (!TryGetPropertyIgnoreCase(payload, "data", out var dataElement))
                 {
-                    // Không phải screenshot → bỏ qua (có thể là kết quả Process, Registry, ...)
+                    // vẫn clear pending nếu có commandId
+                    if (!string.IsNullOrWhiteSpace(commandId)) CompletePending(commandId!);
+                    if (success == false && !string.IsNullOrWhiteSpace(message)) errorMessage = message;
+                    InvokeStateHasChangedSafe();
                     return;
                 }
 
-                lastScreenshotBase64 = imgProp.GetString();
+                if (dataElement.ValueKind == JsonValueKind.Object)
+                {
+                    // 1) Screenshot
+                    if (TryGetPropertyIgnoreCase(dataElement, "imageBase64", out var imgProp) && imgProp.ValueKind == JsonValueKind.String)
+                    {
+                        lastScreenshotBase64 = imgProp.GetString();
+                    }
+
+                    // 2) Processes[]
+                    if (TryGetPropertyIgnoreCase(dataElement, "processes", out var procsProp) && procsProp.ValueKind == JsonValueKind.Array)
+                    {
+                        var newList = ParseProcessList(procsProp);
+                        processList.Clear();
+                        processList.AddRange(newList);
+                    }
+
+                    // 3) SystemInfo (trong CommandCompleted)
+                    if (TryParseSystemInfoFromObject(dataElement, out var sysInfoFromCmd))
+                    {
+                        latestSystemInfoJson = JsonSerializer.Serialize(sysInfoFromCmd,
+                            new JsonSerializerOptions { WriteIndented = true });
+                    }
+                }
+
+                // Clear busy theo đúng commandId khi nhận response
+                if (!string.IsNullOrWhiteSpace(commandId))
+                    CompletePending(commandId!);
+
+                // Nếu command fail (Success=false) thì show message
+                if (success == false && !string.IsNullOrWhiteSpace(message))
+                    errorMessage = message;
+
                 InvokeStateHasChangedSafe();
             }
             catch (Exception ex)
@@ -257,14 +350,50 @@
             }
         });
 
-        // Nhận system info update
-        hubConnection.On<JsonElement>(HubEvents.SystemInfoUpdated, payload =>
+        // =========================
+        // (1) CommandFailed: Agent offline / command fail
+        // Server gửi: (CommandRequest request, string message)
+        // =========================
+        hubConnection.On<CommandRequest, string>(HubEvent_CommandFailed, (request, message) =>
         {
-            latestSystemInfoJson = JsonSerializer.Serialize(
-                payload,
-                new JsonSerializerOptions { WriteIndented = true });
+            try
+            {
+                if (!string.Equals(request.AgentId, Id, StringComparison.OrdinalIgnoreCase))
+                    return;
 
-            InvokeStateHasChangedSafe();
+                errorMessage = message;
+
+                // clear loading đúng command
+                if (!string.IsNullOrWhiteSpace(request.CommandId))
+                    CompletePending(request.CommandId);
+
+                InvokeStateHasChangedSafe();
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"[DeviceControl] Error handling CommandFailed: {ex}");
+            }
+        });
+
+        // =========================
+        // SystemInfoUpdated: chuẩn 2 params (agentId, systemInfo)
+        // =========================
+        hubConnection.On<string, SystemInfo>(HubEvents.SystemInfoUpdated, (agentId, systemInfo) =>
+        {
+            try
+            {
+                if (!string.Equals(agentId, Id, StringComparison.OrdinalIgnoreCase))
+                    return;
+
+                latestSystemInfoJson = JsonSerializer.Serialize(systemInfo,
+                    new JsonSerializerOptions { WriteIndented = true });
+
+                InvokeStateHasChangedSafe();
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"[DeviceControl] Error handling SystemInfoUpdated: {ex}");
+            }
         });
 
         try
@@ -277,7 +406,36 @@
         }
     }
 
-    // Gửi command chung
+    // =========================
+    // (Validate online) trước khi gửi command
+    // =========================
+    private async Task<bool> EnsureAgentOnlineAsync()
+    {
+        if (hubConnection is null || hubConnection.State != HubConnectionState.Connected)
+            return false;
+
+        try
+        {
+            var agents = await hubConnection.InvokeAsync<List<AgentInfo>>(HubEvents.GetAllAgents);
+            var found = agents.FirstOrDefault(a => string.Equals(a.AgentId, Id, StringComparison.OrdinalIgnoreCase));
+
+            if (found is null || found.Status != AgentStatus.Online)
+            {
+                errorMessage = $"Agent {Id} đang offline";
+                return false;
+            }
+
+            return true;
+        }
+        catch
+        {
+            // Nếu lỗi call GetAllAgents, vẫn cho phép gửi (fallback),
+            // vì CommandFailed phía server sẽ trả nếu offline.
+            return true;
+        }
+    }
+
+    // Gửi command chung (giữ busy cho tới khi nhận CommandCompleted/CommandFailed theo CommandId)
     private async Task SendCommandAsync(CommandRequest request, string scope)
     {
         if (hubConnection is null)
@@ -292,41 +450,61 @@
             return;
         }
 
-        SetBusy(scope, true);
+        // validate agent online trước khi gửi
         errorMessage = null;
+        if (!await EnsureAgentOnlineAsync())
+        {
+            InvokeStateHasChangedSafe();
+            return;
+        }
 
-        // Render ngay để thấy nút đổi text / spinner
+        MarkPending(request.CommandId, scope);
         InvokeStateHasChangedSafe();
 
         try
         {
             await hubConnection.InvokeAsync(HubEvents.SendCommand, request);
+            // IMPORTANT: KHÔNG clear busy ở đây (đợi response)
         }
         catch (Exception ex)
         {
             errorMessage = ex.Message;
-        }
-        finally
-        {
-            SetBusy(scope, false);
+            CompletePending(request.CommandId);
             InvokeStateHasChangedSafe();
         }
     }
 
-    private void SetBusy(string scope, bool value)
+    private void MarkPending(string commandId, string scope)
     {
-        switch (scope)
+        if (string.IsNullOrWhiteSpace(commandId)) return;
+
+        pendingCommands[commandId] = scope;
+        RecomputeBusyFromPending();
+    }
+
+    private void CompletePending(string commandId)
+    {
+        if (string.IsNullOrWhiteSpace(commandId)) return;
+
+        pendingCommands.Remove(commandId);
+        RecomputeBusyFromPending();
+    }
+
+    private void RecomputeBusyFromPending()
+    {
+        isScreenshotBusy = AnyPendingScope("screenshot");
+        isProcessBusy = AnyPendingScope("process");
+        isSystemInfoBusy = AnyPendingScope("system");
+    }
+
+    private bool AnyPendingScope(string scope)
+    {
+        foreach (var kv in pendingCommands)
         {
-            case "screenshot":
-                isScreenshotBusy = value;
-                break;
-            case "process":
-                isProcessBusy = value;
-                break;
-            case "system":
-                isSystemInfoBusy = value;
-                break;
+            if (string.Equals(kv.Value, scope, StringComparison.OrdinalIgnoreCase))
+                return true;
         }
+        return false;
     }
 
     // === Các handler cho nút bấm ===
@@ -355,7 +533,16 @@
         await SendCommandAsync(req, "process");
     }
 
-    // 4) Start process theo tên
+    // 4) Kill theo row
+    private async Task KillProcessRowAsync(int pid, string processName)
+    {
+        var req = CommandRequest.CreateKillProcess(Id, pid);
+        // base hiện tại không có CreateKillProcess(Id, pid, name) => set thêm ProcessName theo đúng model đang có
+        req.ProcessName = processName;
+        await SendCommandAsync(req, "process");
+    }
+
+    // 5) Start process theo tên
     private async Task StartProcessAsync()
     {
         if (string.IsNullOrWhiteSpace(newProcessName))
@@ -366,7 +553,7 @@
         newProcessName = string.Empty;
     }
 
-    // 5) Refresh system info
+    // 6) Refresh system info
     private async Task RefreshSystemInfoAsync()
     {
         var req = CommandRequest.CreateGetSystemInfo(Id);
@@ -381,14 +568,99 @@
 
     private void InvokeStateHasChangedSafe()
     {
-        try
+        try { InvokeAsync(StateHasChanged); }
+        catch { /* ignore */ }
+    }
+
+    private static bool TryGetPropertyIgnoreCase(JsonElement obj, string name, out JsonElement value)
+    {
+        value = default;
+
+        if (obj.ValueKind != JsonValueKind.Object)
+            return false;
+
+        if (obj.TryGetProperty(name, out value))
+            return true;
+
+        foreach (var p in obj.EnumerateObject())
         {
-            InvokeAsync(StateHasChanged);
+            if (string.Equals(p.Name, name, StringComparison.OrdinalIgnoreCase))
+            {
+                value = p.Value;
+                return true;
+            }
         }
-        catch
+
+        return false;
+    }
+
+    private static List<ProcessInfo> ParseProcessList(JsonElement arr)
+    {
+        var list = new List<ProcessInfo>();
+
+        foreach (var item in arr.EnumerateArray())
         {
-            // ignore
+            if (item.ValueKind != JsonValueKind.Object)
+                continue;
+
+            var pi = new ProcessInfo();
+
+            if (TryGetPropertyIgnoreCase(item, "processId", out var pidEl) && pidEl.TryGetInt32(out var pid))
+                pi.ProcessId = pid;
+
+            if (TryGetPropertyIgnoreCase(item, "processName", out var nameEl) && nameEl.ValueKind == JsonValueKind.String)
+                pi.ProcessName = nameEl.GetString() ?? string.Empty;
+
+            if (TryGetPropertyIgnoreCase(item, "threadCount", out var thEl) && thEl.TryGetInt32(out var th))
+                pi.ThreadCount = th;
+
+            if (TryGetPropertyIgnoreCase(item, "memoryUsageMB", out var memEl) && memEl.TryGetInt64(out var mem))
+                pi.MemoryUsageMB = mem;
+
+            if (TryGetPropertyIgnoreCase(item, "cpuUsage", out var cpuEl) && cpuEl.TryGetDouble(out var cpu))
+                pi.CpuUsage = cpu;
+
+            list.Add(pi);
         }
+
+        list.Sort((a, b) => a.ProcessId.CompareTo(b.ProcessId));
+        return list;
+    }
+
+    private static bool TryParseSystemInfoFromObject(JsonElement obj, out SystemInfo info)
+    {
+        info = new SystemInfo();
+
+        if (obj.ValueKind != JsonValueKind.Object)
+            return false;
+
+        bool foundAny = false;
+
+        if (TryGetPropertyIgnoreCase(obj, "cpuUsage", out var cpuEl) && cpuEl.TryGetDouble(out var cpu))
+        {
+            info.CpuUsage = cpu;
+            foundAny = true;
+        }
+
+        if (TryGetPropertyIgnoreCase(obj, "memoryUsage", out var memEl) && memEl.TryGetDouble(out var mem))
+        {
+            info.MemoryUsage = mem;
+            foundAny = true;
+        }
+
+        if (TryGetPropertyIgnoreCase(obj, "totalMemoryMB", out var totEl) && totEl.TryGetInt64(out var tot))
+        {
+            info.TotalMemoryMB = tot;
+            foundAny = true;
+        }
+
+        if (TryGetPropertyIgnoreCase(obj, "processCount", out var pcEl) && pcEl.TryGetInt32(out var pc))
+        {
+            info.ProcessCount = pc;
+            foundAny = true;
+        }
+
+        return foundAny;
     }
 
     public async ValueTask DisposeAsync()
