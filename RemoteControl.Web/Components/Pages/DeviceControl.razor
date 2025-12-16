@@ -1,689 +1,117 @@
 @page "/devices/{Id}"
-
-@using Microsoft.AspNetCore.SignalR.Client
-@using RemoteControl.Shared.Models
-@using RemoteControl.Shared.Constants
-@using System.Text.Json
-@using System.Linq
 @inject NavigationManager Nav
-
-@implements IAsyncDisposable
-
-<div class="flex flex-col gap-4 h-full">
-    <!-- Header: thông tin thiết bị + nút back nếu cần -->
-    <DeviceHeader DeviceId="@Id" />
-
-    <div class="grid grid-cols-1 xl:grid-cols-3 gap-4 h-full">
-        <!-- Cột trái: các action + log -->
-        <div class="xl:col-span-2 flex flex-col gap-4">
-            <!-- Card chứa các action điều khiển -->
-            <div class="rounded-xl border border-slate-200/80 bg-white/60 dark:bg-slate-900/40 dark:border-slate-700/80 shadow-sm p-4 flex flex-col gap-5">
-                <div class="flex items-center justify-between">
-                    <div class="flex items-center gap-2">
-                        <span class="font-semibold text-lg">Device Control</span>
-                        <span class="text-xs px-2 py-0.5 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-500">
-                            ID: @Id
-                        </span>
-                    </div>
-
-                    <div class="flex items-center gap-2">
-                        <span class="w-2 h-2 rounded-full @(IsConnected ? "bg-emerald-500" : "bg-red-500")"></span>
-                        <span class="text-xs text-slate-500">
-                            @(IsConnected ? "Connected" : "Disconnected")
-                        </span>
-
-                        <button class="text-xs px-2 py-1 rounded border border-slate-300 text-slate-600 hover:bg-slate-100"
-                                @onclick="GoBack">
-                            ← Back
-                        </button>
-                    </div>
-                </div>
-
-                @if (!string.IsNullOrEmpty(errorMessage))
-                {
-                    <div class="text-sm text-red-500 bg-red-50 dark:bg-red-950/40 border border-red-200 dark:border-red-900 px-3 py-2 rounded">
-                        @errorMessage
-                    </div>
-                }
-
-                <!-- Screenshot Actions -->
-                <section class="space-y-2">
-                    <h3 class="font-semibold text-sm text-slate-700 dark:text-slate-200">
-                        Screenshot Actions
-                    </h3>
-
-                    <div class="flex flex-wrap items-center gap-3">
-                        <button class="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-medium
-                                       bg-indigo-600 text-white hover:bg-indigo-700 disabled:opacity-60 disabled:cursor-not-allowed"
-                                disabled="@(!IsConnected || isScreenshotBusy)"
-                                @onclick="CaptureScreenshotAsync">
-                            <span>📸</span>
-                            <span>@(isScreenshotBusy ? "Capturing..." : "Capture Screenshot")</span>
-                        </button>
-
-                        <span class="text-xs text-slate-500">
-                            Gửi lệnh chụp màn hình đến Agent, kết quả sẽ hiển thị ở RemoteScreen.
-                        </span>
-                    </div>
-                </section>
-
-                <hr class="border-slate-200 dark:border-slate-700" />
-
-                <!-- Process Management UI -->
-                <section class="space-y-3">
-                    <h3 class="font-semibold text-sm text-slate-700 dark:text-slate-200">
-                        Process Management
-                    </h3>
-
-                    <div class="flex flex-wrap items-center gap-3">
-                        <button class="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-medium
-                                       bg-slate-800 text-white hover:bg-slate-900 disabled:opacity-60 disabled:cursor-not-allowed"
-                                disabled="@(!IsConnected || isProcessBusy)"
-                                @onclick="ListProcessesAsync">
-                            <span>📋</span>
-                            <span>@(isProcessBusy ? "Loading..." : "List Processes")</span>
-                        </button>
-
-                        <span class="text-xs text-slate-500">
-                            Lấy danh sách process hiện tại từ Agent.
-                        </span>
-                    </div>
-
-                    <!-- Input + button Start Process -->
-                    <div class="flex flex-wrap items-center gap-3">
-                        <input class="px-2 py-1 rounded border border-slate-300 text-sm w-48"
-                               placeholder="Process name (e.g. notepad.exe)"
-                               @bind="newProcessName" />
-
-                        <button class="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-medium
-                                       bg-emerald-600 text-white hover:bg-emerald-700 disabled:opacity-60 disabled:cursor-not-allowed"
-                                disabled="@(!IsConnected || isProcessBusy || string.IsNullOrWhiteSpace(newProcessName))"
-                                @onclick="StartProcessAsync">
-                            ▶ Start Process
-                        </button>
-                    </div>
-
-                    <!-- Input + button Kill Process (PID) -->
-                    <div class="flex flex-wrap items-center gap-3">
-                        <input class="px-2 py-1 rounded border border-slate-300 text-sm w-32"
-                               type="number"
-                               placeholder="PID"
-                               @bind="killProcessPidString" />
-
-                        <button class="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-medium
-                                       bg-red-600 text-white hover:bg-red-700 disabled:opacity-60 disabled:cursor-not-allowed"
-                                disabled="@(!IsConnected || isProcessBusy || string.IsNullOrWhiteSpace(killProcessPidString))"
-                                @onclick="KillProcessAsync">
-                            ✖ Kill Process
-                        </button>
-
-                        <span class="text-xs text-slate-500">
-                            (Bạn có thể Kill theo từng dòng ở bảng bên dưới)
-                        </span>
-                    </div>
-
-                    <!-- Process Table -->
-                    @if (processList.Count > 0)
-                    {
-                        <div class="mt-2 overflow-x-auto border border-slate-200 dark:border-slate-700 rounded-lg">
-                            <table class="min-w-full text-sm">
-                                <thead class="bg-slate-50 dark:bg-slate-900/60">
-                                    <tr class="text-left text-slate-600 dark:text-slate-200">
-                                        <th class="px-3 py-2">PID</th>
-                                        <th class="px-3 py-2">Name</th>
-                                        <th class="px-3 py-2">Memory (MB)</th>
-                                        <th class="px-3 py-2">CPU (%)</th>
-                                        <th class="px-3 py-2">Threads</th>
-                                        <th class="px-3 py-2">Action</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    @foreach (var p in processList)
-                                    {
-                                        <tr class="border-t border-slate-200 dark:border-slate-700">
-                                            <td class="px-3 py-2 text-slate-700 dark:text-slate-100">@p.ProcessId</td>
-                                            <td class="px-3 py-2 text-slate-700 dark:text-slate-100">@p.ProcessName</td>
-                                            <td class="px-3 py-2 text-slate-700 dark:text-slate-100">@p.MemoryUsageMB</td>
-                                            <td class="px-3 py-2 text-slate-700 dark:text-slate-100">@p.CpuUsage</td>
-                                            <td class="px-3 py-2 text-slate-700 dark:text-slate-100">@p.ThreadCount</td>
-                                            <td class="px-3 py-2">
-                                                <button class="inline-flex items-center gap-2 px-2 py-1 rounded text-xs font-medium
-                                                               bg-red-600 text-white hover:bg-red-700 disabled:opacity-60 disabled:cursor-not-allowed"
-                                                        disabled="@(!IsConnected || isProcessBusy)"
-                                                        @onclick="() => KillProcessRowAsync(p.ProcessId, p.ProcessName)">
-                                                    ✖ Kill
-                                                </button>
-                                            </td>
-                                        </tr>
-                                    }
-                                </tbody>
-                            </table>
-                        </div>
-                    }
-                    else
-                    {
-                        <div class="text-xs text-slate-400">
-                            Chưa có danh sách process – bấm "List Processes" để lấy.
-                        </div>
-                    }
-                </section>
-
-                <hr class="border-slate-200 dark:border-slate-700" />
-
-                <!-- System Info -->
-                <section class="space-y-3">
-                    <h3 class="font-semibold text-sm text-slate-700 dark:text-slate-200">
-                        System Info
-                    </h3>
-
-                    <div class="flex flex-wrap items-center gap-3">
-                        <button class="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-medium
-                                       bg-sky-600 text-white hover:bg-sky-700 disabled:opacity-60 disabled:cursor-not-allowed"
-                                disabled="@(!IsConnected || isSystemInfoBusy)"
-                                @onclick="RefreshSystemInfoAsync">
-                            🔄 Refresh Info
-                        </button>
-
-                        <span class="text-xs text-slate-500">
-                            Hiển thị CPU/RAM usage của Agent, tự động update khi nhận event <code>SystemInfoUpdated</code>.
-                        </span>
-                    </div>
-
-                    @if (latestSystemInfoJson is not null)
-                    {
-                        <pre class="mt-1 text-xs bg-slate-50 dark:bg-slate-900/60 border border-slate-200 dark:border-slate-700 rounded px-3 py-2 overflow-x-auto">
-@latestSystemInfoJson
-                        </pre>
-                    }
-                    else
-                    {
-                        <div class="text-xs text-slate-400">
-                            Chưa có system info nào – bấm "Refresh Info" để lấy lần đầu.
-                        </div>
-                    }
-                </section>
-
-                <!-- Loading state chung -->
-                @if (isScreenshotBusy || isProcessBusy || isSystemInfoBusy)
-                {
-                    <div class="pt-2 flex items-center gap-2 text-xs text-slate-500">
-                        <span class="inline-block w-3 h-3 rounded-full border-2 border-slate-300 border-t-slate-500 animate-spin"></span>
-                        <span>Đang chờ response...</span>
-                    </div>
-                }
-            </div>
-
-            <!-- Terminal Log -->
-            <TerminalLog DeviceId="@Id" />
-        </div>
-
-        <!-- Cột phải: Remote Screen hoặc các card khác -->
-        <div class="xl:col-span-1 flex flex-col gap-4">
-            <RemoteScreen DeviceId="@Id"
-                          ScreenshotBase64="@lastScreenshotBase64"
-                          IsLoading="@isScreenshotBusy" />
-        </div>
-    </div>
-</div>
+@using Components.Pages.DeviceFeatures 
 
 @code {
     [Parameter]
     public string Id { get; set; } = default!;
 
-    private HubConnection? hubConnection;
-    private bool IsConnected => hubConnection?.State == HubConnectionState.Connected;
+    enum TabType { RemoteScreen, TaskManager, Keylogger, Webcam, Power }
+    TabType activeTab = TabType.RemoteScreen;
 
-    // Loading states
-    private bool isScreenshotBusy;
-    private bool isProcessBusy;
-    private bool isSystemInfoBusy;
+    void GoBack() => Nav.NavigateTo("/devices");
 
-    // Error message
-    private string? errorMessage;
-
-    // Inputs
-    private string? newProcessName;
-    private string? killProcessPidString;
-
-    // System info (JSON)
-    private string? latestSystemInfoJson;
-
-    // Screenshot base64
-    private string? lastScreenshotBase64;
-
-    // Process list
-    private readonly List<ProcessInfo> processList = new();
-
-    // Pending commands: CommandId -> scope ("screenshot"/"process"/"system")
-    private readonly Dictionary<string, string> pendingCommands = new(StringComparer.OrdinalIgnoreCase);
-
-    private const string HubEvent_CommandFailed = "CommandFailed";
-
-    protected override async Task OnInitializedAsync()
+    // Hàm style cho Tab bo tròn đẹp (Rounded Tabs)
+    string GetTabClass(TabType tab)
     {
-        var hubUrl = Nav.ToAbsoluteUri("/remotehub").ToString();
-
-        hubConnection = new HubConnectionBuilder()
-            .WithUrl(hubUrl)
-            .WithAutomaticReconnect()
-            .Build();
-
-        // =========================
-        // CommandCompleted: xử lý Screenshot / Processes / SystemInfo
-        // + Clear loading theo CommandId (hoặc fallback theo scope nếu thiếu CommandId)
-        // =========================
-        hubConnection.On<JsonElement>(HubEvents.CommandCompleted, payload =>
+        // rounded-t-xl: Bo tròn góc trên
+        // mr-1: Tạo khe hở nhỏ giữa các tab
+        var common = "px-6 py-3 font-medium text-sm flex items-center gap-2 transition-all rounded-t-xl mr-1 border-t border-l border-r";
+        
+        if (activeTab == tab)
         {
-            try
-            {
-                if (!TryGetPropertyIgnoreCase(payload, "agentId", out var agentIdProp))
-                    return;
-
-                var agentId = agentIdProp.GetString();
-                if (!string.Equals(agentId, Id, StringComparison.OrdinalIgnoreCase))
-                    return;
-
-                string? commandId = null;
-                if (TryGetPropertyIgnoreCase(payload, "commandId", out var cmdIdProp))
-                    commandId = cmdIdProp.GetString();
-
-                bool? success = null;
-                if (TryGetPropertyIgnoreCase(payload, "success", out var successProp) &&
-                    (successProp.ValueKind == JsonValueKind.True || successProp.ValueKind == JsonValueKind.False))
-                    success = successProp.GetBoolean();
-
-                string? message = null;
-                if (TryGetPropertyIgnoreCase(payload, "message", out var msgProp))
-                    message = msgProp.GetString();
-
-                bool gotScreenshot = false;
-                bool gotProcesses = false;
-                bool gotSystemInfo = false;
-
-                if (!TryGetPropertyIgnoreCase(payload, "data", out var dataElement))
-                {
-                    if (!string.IsNullOrWhiteSpace(commandId)) CompletePending(commandId!);
-                    if (success == false && !string.IsNullOrWhiteSpace(message)) errorMessage = message;
-                    InvokeStateHasChangedSafe();
-                    return;
-                }
-
-                if (dataElement.ValueKind == JsonValueKind.Object)
-                {
-                    // 1) Screenshot
-                    if (TryGetPropertyIgnoreCase(dataElement, "imageBase64", out var imgProp) &&
-                        imgProp.ValueKind == JsonValueKind.String)
-                    {
-                        lastScreenshotBase64 = imgProp.GetString();
-                        gotScreenshot = true;
-                    }
-
-                    // 2) Processes[]
-                    if (TryGetPropertyIgnoreCase(dataElement, "processes", out var procsProp) &&
-                        procsProp.ValueKind == JsonValueKind.Array)
-                    {
-                        var newList = ParseProcessList(procsProp);
-                        processList.Clear();
-                        processList.AddRange(newList);
-                        gotProcesses = true;
-                    }
-
-                    // 3) SystemInfo (trong CommandCompleted)
-                    if (TryParseSystemInfoFromObject(dataElement, out var sysInfoFromCmd))
-                    {
-                        latestSystemInfoJson = JsonSerializer.Serialize(sysInfoFromCmd,
-                            new JsonSerializerOptions { WriteIndented = true });
-                        gotSystemInfo = true;
-                    }
-                }
-
-                // Clear busy đúng nghĩa “chờ response”
-                if (!string.IsNullOrWhiteSpace(commandId))
-                {
-                    CompletePending(commandId!);
-                }
-                else
-                {
-                    // Fallback: nếu payload không có commandId, nhưng đã nhận được data,
-                    // vẫn phải tắt busy đúng scope để khỏi kẹt "Capturing..."
-                    if (gotScreenshot) ClearPendingScope("screenshot");
-                    if (gotProcesses) ClearPendingScope("process");
-                    if (gotSystemInfo) ClearPendingScope("system");
-                }
-
-                if (success == false && !string.IsNullOrWhiteSpace(message))
-                    errorMessage = message;
-
-                InvokeStateHasChangedSafe();
-            }
-            catch (Exception ex)
-            {
-                Console.WriteLine($"[DeviceControl] Error handling CommandCompleted: {ex}");
-            }
-        });
-
-        // =========================
-        // CommandFailed: Agent offline / route fail
-        // Server gửi: (CommandRequest request, string message)
-        // =========================
-        hubConnection.On<CommandRequest, string>(HubEvent_CommandFailed, (request, message) =>
-        {
-            try
-            {
-                if (!string.Equals(request.AgentId, Id, StringComparison.OrdinalIgnoreCase))
-                    return;
-
-                errorMessage = message;
-
-                if (!string.IsNullOrWhiteSpace(request.CommandId))
-                    CompletePending(request.CommandId);
-                else
-                    RecomputeBusyFromPending();
-
-                InvokeStateHasChangedSafe();
-            }
-            catch (Exception ex)
-            {
-                Console.WriteLine($"[DeviceControl] Error handling CommandFailed: {ex}");
-            }
-        });
-
-        // =========================
-        // SystemInfoUpdated: chuẩn 2 params (agentId, systemInfo)
-        // =========================
-        hubConnection.On<string, SystemInfo>(HubEvents.SystemInfoUpdated, (agentId2, systemInfo) =>
-        {
-            try
-            {
-                if (!string.Equals(agentId2, Id, StringComparison.OrdinalIgnoreCase))
-                    return;
-
-                latestSystemInfoJson = JsonSerializer.Serialize(systemInfo,
-                    new JsonSerializerOptions { WriteIndented = true });
-
-                InvokeStateHasChangedSafe();
-            }
-            catch (Exception ex)
-            {
-                Console.WriteLine($"[DeviceControl] Error handling SystemInfoUpdated: {ex}");
-            }
-        });
-
-        try
-        {
-            await hubConnection.StartAsync();
+            // Active: Màu nền trùng với nội dung bên dưới (gray-800), viền sáng hơn chút
+            return $"{common} bg-gray-800 text-white border-gray-700 border-b-0 relative top-[1px] z-10";
         }
-        catch (Exception ex)
+        else
         {
-            errorMessage = $"Không thể kết nối tới Hub: {ex.Message}";
-        }
-    }
-
-    // Validate agent online trước khi gửi command
-    private async Task<bool> EnsureAgentOnlineAsync()
-    {
-        if (hubConnection is null || hubConnection.State != HubConnectionState.Connected)
-            return false;
-
-        try
-        {
-            var agents = await hubConnection.InvokeAsync<List<AgentInfo>>(HubEvents.GetAllAgents);
-            var found = agents.FirstOrDefault(a => string.Equals(a.AgentId, Id, StringComparison.OrdinalIgnoreCase));
-
-            if (found is null || found.Status != AgentStatus.Online)
-            {
-                errorMessage = $"Agent {Id} đang offline";
-                return false;
-            }
-
-            return true;
-        }
-        catch
-        {
-            // fallback: nếu lỗi call GetAllAgents, vẫn cho phép gửi.
-            // CommandFailed phía server sẽ trả nếu offline.
-            return true;
-        }
-    }
-
-    // Gửi command (giữ busy cho tới khi nhận CommandCompleted/CommandFailed)
-    private async Task SendCommandAsync(CommandRequest request, string scope)
-    {
-        if (hubConnection is null)
-        {
-            errorMessage = "Hub connection chưa được khởi tạo.";
-            return;
-        }
-
-        if (hubConnection.State != HubConnectionState.Connected)
-        {
-            errorMessage = "Không kết nối được tới Hub.";
-            return;
-        }
-
-        errorMessage = null;
-
-        if (!await EnsureAgentOnlineAsync())
-        {
-            InvokeStateHasChangedSafe();
-            return;
-        }
-
-        MarkPending(request.CommandId, scope);
-        InvokeStateHasChangedSafe();
-
-        try
-        {
-            await hubConnection.InvokeAsync(HubEvents.SendCommand, request);
-            // KHÔNG clear busy ở đây (đợi response)
-        }
-        catch (Exception ex)
-        {
-            errorMessage = ex.Message;
-            CompletePending(request.CommandId);
-            InvokeStateHasChangedSafe();
-        }
-    }
-
-    private void MarkPending(string commandId, string scope)
-    {
-        if (string.IsNullOrWhiteSpace(commandId)) return;
-        pendingCommands[commandId] = scope;
-        RecomputeBusyFromPending();
-    }
-
-    private void CompletePending(string commandId)
-    {
-        if (string.IsNullOrWhiteSpace(commandId)) return;
-        pendingCommands.Remove(commandId);
-        RecomputeBusyFromPending();
-    }
-
-    private void ClearPendingScope(string scope)
-    {
-        var toRemove = new List<string>();
-        foreach (var kv in pendingCommands)
-        {
-            if (string.Equals(kv.Value, scope, StringComparison.OrdinalIgnoreCase))
-                toRemove.Add(kv.Key);
-        }
-
-        foreach (var k in toRemove)
-            pendingCommands.Remove(k);
-
-        RecomputeBusyFromPending();
-    }
-
-    private void RecomputeBusyFromPending()
-    {
-        isScreenshotBusy = AnyPendingScope("screenshot");
-        isProcessBusy = AnyPendingScope("process");
-        isSystemInfoBusy = AnyPendingScope("system");
-    }
-
-    private bool AnyPendingScope(string scope)
-    {
-        foreach (var kv in pendingCommands)
-        {
-            if (string.Equals(kv.Value, scope, StringComparison.OrdinalIgnoreCase))
-                return true;
-        }
-        return false;
-    }
-
-    // === Button handlers ===
-
-    private async Task CaptureScreenshotAsync()
-    {
-        var req = CommandRequest.CreateCaptureScreen(Id);
-        await SendCommandAsync(req, "screenshot");
-    }
-
-    private async Task ListProcessesAsync()
-    {
-        var req = CommandRequest.CreateListProcesses(Id);
-        await SendCommandAsync(req, "process");
-    }
-
-    private async Task KillProcessAsync()
-    {
-        if (!int.TryParse(killProcessPidString, out var pid))
-            return;
-
-        var req = CommandRequest.CreateKillProcess(Id, pid);
-        await SendCommandAsync(req, "process");
-    }
-
-    private async Task KillProcessRowAsync(int pid, string processName)
-    {
-        var req = CommandRequest.CreateKillProcess(Id, pid);
-        req.ProcessName = processName; // thêm name theo base model
-        await SendCommandAsync(req, "process");
-    }
-
-    private async Task StartProcessAsync()
-    {
-        if (string.IsNullOrWhiteSpace(newProcessName))
-            return;
-
-        var req = CommandRequest.CreateStartProcess(Id, newProcessName);
-        await SendCommandAsync(req, "process");
-        newProcessName = string.Empty;
-    }
-
-    private async Task RefreshSystemInfoAsync()
-    {
-        var req = CommandRequest.CreateGetSystemInfo(Id);
-        await SendCommandAsync(req, "system");
-    }
-
-    private void GoBack()
-    {
-        Nav.NavigateTo("/devices");
-    }
-
-    private void InvokeStateHasChangedSafe()
-    {
-        try { InvokeAsync(StateHasChanged); }
-        catch { }
-    }
-
-    private static bool TryGetPropertyIgnoreCase(JsonElement obj, string name, out JsonElement value)
-    {
-        value = default;
-
-        if (obj.ValueKind != JsonValueKind.Object)
-            return false;
-
-        if (obj.TryGetProperty(name, out value))
-            return true;
-
-        foreach (var p in obj.EnumerateObject())
-        {
-            if (string.Equals(p.Name, name, StringComparison.OrdinalIgnoreCase))
-            {
-                value = p.Value;
-                return true;
-            }
-        }
-
-        return false;
-    }
-
-    private static List<ProcessInfo> ParseProcessList(JsonElement arr)
-    {
-        var list = new List<ProcessInfo>();
-
-        foreach (var item in arr.EnumerateArray())
-        {
-            if (item.ValueKind != JsonValueKind.Object)
-                continue;
-
-            var pi = new ProcessInfo();
-
-            if (TryGetPropertyIgnoreCase(item, "processId", out var pidEl) && pidEl.TryGetInt32(out var pid))
-                pi.ProcessId = pid;
-
-            if (TryGetPropertyIgnoreCase(item, "processName", out var nameEl) && nameEl.ValueKind == JsonValueKind.String)
-                pi.ProcessName = nameEl.GetString() ?? string.Empty;
-
-            if (TryGetPropertyIgnoreCase(item, "threadCount", out var thEl) && thEl.TryGetInt32(out var th))
-                pi.ThreadCount = th;
-
-            if (TryGetPropertyIgnoreCase(item, "memoryUsageMB", out var memEl) && memEl.TryGetInt64(out var mem))
-                pi.MemoryUsageMB = mem;
-
-            if (TryGetPropertyIgnoreCase(item, "cpuUsage", out var cpuEl) && cpuEl.TryGetDouble(out var cpu))
-                pi.CpuUsage = cpu;
-
-            list.Add(pi);
-        }
-
-        list.Sort((a, b) => a.ProcessId.CompareTo(b.ProcessId));
-        return list;
-    }
-
-    private static bool TryParseSystemInfoFromObject(JsonElement obj, out SystemInfo info)
-    {
-        info = new SystemInfo();
-
-        if (obj.ValueKind != JsonValueKind.Object)
-            return false;
-
-        bool foundAny = false;
-
-        if (TryGetPropertyIgnoreCase(obj, "cpuUsage", out var cpuEl) && cpuEl.TryGetDouble(out var cpu))
-        {
-            info.CpuUsage = cpu;
-            foundAny = true;
-        }
-
-        if (TryGetPropertyIgnoreCase(obj, "memoryUsage", out var memEl) && memEl.TryGetDouble(out var mem))
-        {
-            info.MemoryUsage = mem;
-            foundAny = true;
-        }
-
-        if (TryGetPropertyIgnoreCase(obj, "totalMemoryMB", out var totEl) && totEl.TryGetInt64(out var tot))
-        {
-            info.TotalMemoryMB = tot;
-            foundAny = true;
-        }
-
-        if (TryGetPropertyIgnoreCase(obj, "processCount", out var pcEl) && pcEl.TryGetInt32(out var pc))
-        {
-            info.ProcessCount = pc;
-            foundAny = true;
-        }
-
-        return foundAny;
-    }
-
-    public async ValueTask DisposeAsync()
-    {
-        if (hubConnection is not null)
-        {
-            await hubConnection.DisposeAsync();
+            // Inactive: Màu tối hơn, border trong suốt
+            return $"{common} bg-gray-900/40 text-gray-500 border-transparent hover:bg-gray-800/50 hover:text-gray-300";
         }
     }
 }
+
+<!-- Header: Title & Back Button -->
+<div class="flex justify-between items-center mb-6">
+    <div class="flex items-center gap-4">
+        <div class="w-14 h-14 bg-gradient-to-br from-gray-800 to-gray-900 rounded-2xl border border-gray-700/50 flex items-center justify-center text-gray-400 shadow-lg">
+             <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"></path></svg>
+        </div>
+        <div>
+            <h2 class="text-2xl font-bold text-white tracking-tight">@Id</h2>
+            <div class="flex items-center gap-2 text-sm mt-1">
+                <span class="flex h-2 w-2 relative">
+                    <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
+                    <span class="relative inline-flex rounded-full h-2 w-2 bg-green-500"></span>
+                </span>
+                <span class="text-green-400 font-medium">Online</span>
+                <span class="text-gray-600 mx-1">|</span>
+                <span class="text-gray-400 font-mono">192.168.1.104</span>
+            </div>
+        </div>
+    </div>
+    
+    <button @onclick="GoBack" class="group p-2 pr-4 bg-gray-800 hover:bg-gray-700 text-gray-400 hover:text-white rounded-xl transition-all border border-gray-700 hover:border-gray-600 flex items-center gap-2">
+        <div class="p-1 rounded-lg bg-gray-700 group-hover:bg-gray-600 transition-colors">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+        </div>
+        <span class="text-sm font-medium">Close Session</span>
+    </button>
+</div>
+
+<!-- Main Content Area with Rounded Tabs -->
+<div class="flex flex-col">
+    
+    <!-- Tab Navigation Bar -->
+    <!-- pl-4: Padding trái để tab đầu tiên không dính sát lề -->
+    <div class="flex border-b border-gray-700 px-4">
+        <button @onclick="() => activeTab = TabType.RemoteScreen" class="@GetTabClass(TabType.RemoteScreen)">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"></path></svg>
+            Remote Screen
+        </button>
+        <button @onclick="() => activeTab = TabType.TaskManager" class="@GetTabClass(TabType.TaskManager)">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 002 2h2a2 2 0 002-2z"></path></svg>
+            Task Manager
+        </button>
+        <button @onclick="() => activeTab = TabType.Keylogger" class="@GetTabClass(TabType.Keylogger)">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"></path></svg>
+            Keylogger
+        </button>
+        <button @onclick="() => activeTab = TabType.Webcam" class="@GetTabClass(TabType.Webcam)">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"></path></svg>
+            Webcam
+        </button>
+        <button @onclick="() => activeTab = TabType.Power" class="@GetTabClass(TabType.Power) hover:text-red-400">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path></svg>
+            Power
+        </button>
+    </div>
+
+    <!-- Content Pane (Bo tròn góc dưới để khớp với tổng thể) -->
+    <div class="bg-gray-800 border border-t-0 border-gray-700 rounded-b-xl shadow-xl min-h-[450px]">
+        @switch (activeTab)
+        {
+            case TabType.RemoteScreen: <RemoteScreenTab /> break;
+            case TabType.TaskManager:  <TaskManagerTab /> break;
+            case TabType.Keylogger:    <KeyloggerTab /> break;
+            case TabType.Webcam:       <WebcamTab /> break;
+            case TabType.Power:        <PowerTab /> break;
+        }
+    </div>
+</div>
+
+<!-- Terminal Log -->
+<div class="mt-8">
+    <div class="bg-black/80 backdrop-blur rounded-xl border border-gray-800 p-4 font-mono text-xs h-40 overflow-y-auto shadow-inner">
+        <div class="text-gray-500 mb-2 border-b border-gray-800 pb-2 flex justify-between sticky top-0 bg-black/80">
+            <span class="font-bold">>_ SYSTEM CONSOLE</span>
+            <span>Connected: 500ms</span>
+        </div>
+        <div class="space-y-1.5">
+            <p class="text-blue-400">[15:30:01] System initialized. SignalR hub connection established.</p>
+            <p class="text-green-400">[15:30:02] Service: AgentManagerService started successfully.</p>
+            <p class="text-gray-400">[15:46:50] User switched view to <span class="text-white font-bold">@activeTab</span></p>
+            <p class="text-gray-500 typing-effect">_</p>
+        </div>
+    </div>
+</div>
