@@ -15,9 +15,18 @@ public class SignalRClientService
     private readonly DiscoveryListener _discoveryListener;
     private bool _isConnected;
     private readonly string _agentId;
+    private string? _manualHubUrl;  // URL set manually via dialog
 
     public event Action<string>? OnStatusChanged;
     public event Action<string>? OnConnectionStateChanged;
+
+    /// <summary>
+    /// Set Hub URL manually (from connection dialog)
+    /// </summary>
+    public void SetHubUrl(string hubUrl)
+    {
+        _manualHubUrl = hubUrl;
+    }
 
     public SignalRClientService(CommandHandler commandHandler, Microsoft.Extensions.Configuration.IConfiguration configuration)
     {
@@ -76,11 +85,18 @@ public class SignalRClientService
     }
 
     /// <summary>
-    /// Try to get Hub URL: first from config, then auto-discover
+    /// Try to get Hub URL: first manual, then config, then auto-discover
     /// </summary>
     private async Task<string?> GetHubUrlAsync()
     {
-        // 1. Check if manual config exists and is not localhost
+        // 1. Use manual URL if set (from connection dialog)
+        if (!string.IsNullOrEmpty(_manualHubUrl))
+        {
+            UpdateStatus($"Using manual URL: {_manualHubUrl}");
+            return _manualHubUrl;
+        }
+
+        // 2. Check if config exists and is not localhost
         var configUrl = _configuration["SignalR:HubUrl"];
         
         if (!string.IsNullOrEmpty(configUrl) && !configUrl.Contains("localhost"))
@@ -89,7 +105,7 @@ public class SignalRClientService
             return configUrl;
         }
 
-        // 2. Try auto-discovery
+        // 3. Try auto-discovery
         UpdateStatus("Auto-discovering server on LAN...");
         var discoveredUrl = await _discoveryListener.DiscoverServerAsync();
         
@@ -98,14 +114,14 @@ public class SignalRClientService
             return discoveredUrl;
         }
 
-        // 3. Fallback to config (even if localhost)
+        // 4. Fallback to config (even if localhost)
         if (!string.IsNullOrEmpty(configUrl))
         {
             UpdateStatus($"Fallback to config: {configUrl}");
             return configUrl;
         }
 
-        // 4. Default localhost
+        // 5. Default localhost
         return "http://localhost:5048/remotehub";
     }
 
