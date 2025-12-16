@@ -1,45 +1,95 @@
+@using Microsoft.AspNetCore.Components
+
 <div class="rounded-xl overflow-hidden" style="background-color: var(--card-bg); border: 1px solid var(--card-border);">
     <div class="flex" style="border-bottom: 1px solid var(--card-border);">
-        <button class="px-6 py-4 font-medium text-sm flex items-center gap-2" style="color: var(--btn-primary-bg); border-bottom: 2px solid var(--btn-primary-bg); background-color: rgba(37, 99, 235, 0.1);">
+        <button class="px-6 py-4 font-medium text-sm flex items-center gap-2"
+                style="color: var(--btn-primary-bg); border-bottom: 2px solid var(--btn-primary-bg); background-color: rgba(37, 99, 235, 0.1);">
             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                      d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z">
-                </path>
+                      d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
             </svg>
             Remote Screen
         </button>
-        <button class="px-6 py-4 font-medium text-sm flex items-center gap-2 hover-theme" style="color: var(--text-tertiary);">
+
+        <button class="px-6 py-4 font-medium text-sm flex items-center gap-2 hover-theme"
+                style="color: var(--text-tertiary);">
             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                      d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 002 2h2a2 2 0 002-2z">
-                </path>
+                      d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 002 2h2a2 2 0 002-2z" />
             </svg>
             Task Manager
         </button>
-        <button class="px-6 py-4 font-medium text-sm flex items-center gap-2 hover-theme" style="color: var(--text-tertiary);">
+
+        <button class="px-6 py-4 font-medium text-sm flex items-center gap-2 hover-theme"
+                style="color: var(--text-tertiary);">
             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                      d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z">
-                </path>
+                      d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
             </svg>
             Keylogger
         </button>
     </div>
 
-    <div class="relative w-full aspect-video flex items-center justify-center group" style="background-color: #000000;">
-        <div class="text-center">
-            <div class="mb-2" style="color: var(--text-quaternary);">Live Stream Active</div>
-            <img src="https://picsum.photos/1200/675" alt="Remote Screen"
-                 class="opacity-50 max-w-full max-h-full rounded" />
-        </div>
+    <div class="relative w-full aspect-video flex items-center justify-center group"
+         style="background-color: #000000;">
+        @if (IsLoading)
+        {
+            <div class="flex flex-col items-center justify-center gap-2 text-center">
+                <div class="w-8 h-8 rounded-full border-2 border-t-transparent animate-spin"></div>
+                <div style="color: var(--text-quaternary);">
+                    Capturing screenshot...
+                </div>
+            </div>
+        }
+        else if (ScreenshotDataUrl is not null)
+        {
+            <div class="text-center">
+                <div class="mb-2" style="color: var(--text-quaternary);">
+                    Latest screenshot from @DeviceId
+                </div>
+                <img src="@ScreenshotDataUrl"
+                     alt="Remote Screen"
+                     class="max-w-full max-h-full rounded" />
+            </div>
 
-        <div class="absolute top-4 left-4 flex items-center gap-2 px-3 py-1 rounded-full backdrop-blur-sm" style="background-color: rgba(0, 0, 0, 0.6);">
-            <span class="w-2 h-2 rounded-full bg-red-500 animate-pulse"></span>
-            <span class="text-xs font-bold tracking-wider" style="color: var(--text-white);">LIVE STREAM</span>
-        </div>
+            <div class="absolute top-4 left-4 flex items-center gap-2 px-3 py-1 rounded-full backdrop-blur-sm"
+                 style="background-color: rgba(0, 0, 0, 0.6);">
+                <span class="w-2 h-2 rounded-full bg-red-500 animate-pulse"></span>
+                <span class="text-xs font-bold tracking-wider" style="color: var(--text-white);">
+                    SCREENSHOT
+                </span>
+            </div>
+        }
+        else
+        {
+            <div class="text-center">
+                <div class="mb-2" style="color: var(--text-quaternary);">
+                    No screenshot yet
+                </div>
+                <div class="text-xs" style="color: var(--text-quaternary); opacity: 0.8;">
+                    Click "Capture Screenshot" to see the remote screen here.
+                </div>
+            </div>
+        }
     </div>
 </div>
 
 @code {
+    // Nhận DeviceId từ trang DeviceControl (/devices/{id})
+    [Parameter]
+    public string DeviceId { get; set; } = string.Empty;
 
+    // Base64 screenshot (JPEG) nhận từ Hub, DeviceControl truyền xuống
+    [Parameter]
+    public string? ScreenshotBase64 { get; set; }
+
+    // Flag đang chụp screenshot (để hiển thị loading)
+    [Parameter]
+    public bool IsLoading { get; set; }
+
+    // Helper: Convert base64 -> data URL cho <img>
+    private string? ScreenshotDataUrl =>
+        string.IsNullOrWhiteSpace(ScreenshotBase64)
+            ? null
+            : $"data:image/jpeg;base64,{ScreenshotBase64}";
 }

@@ -7,36 +7,125 @@ namespace RemoteControl.Shared.Models;
 public class CommandRequest
 {
     /// <summary>
-    /// Unique identifier for this command request
+    /// Mã định danh duy nhất cho mỗi command
     /// </summary>
     public string CommandId { get; set; } = Guid.NewGuid().ToString();
 
     /// <summary>
-    /// Target agent ID
+    /// Id của agent (máy) nhận lệnh
+    /// NOTE: đây mới là field gốc, DeviceId bên dưới chỉ là alias.
     /// </summary>
     public string AgentId { get; set; } = string.Empty;
 
     /// <summary>
-    /// Type of command to execute
+    /// Loại lệnh cần thực thi (CaptureScreen, ListProcesses, ...)
     /// </summary>
     public CommandType Type { get; set; }
 
     /// <summary>
-    /// Additional parameters for the command (flexible key-value pairs)
+    /// Các tham số bổ sung dạng key–value (linh hoạt cho nhiều loại lệnh)
     /// </summary>
     public Dictionary<string, string> Parameters { get; set; } = new();
 
     /// <summary>
-    /// When the command was requested
+    /// Thời điểm tạo request
     /// </summary>
     public DateTime RequestedAt { get; set; } = DateTime.UtcNow;
+
+    #region Convenience properties cho FE (DeviceControl UI)
+
+    /// <summary>
+    /// Alias cho AgentId để FE dùng cho dễ hiểu.
+    /// DeviceId <=> AgentId
+    /// </summary>
+    public string DeviceId
+    {
+        get => AgentId;
+        set => AgentId = value;
+    }
+
+    /// <summary>
+    /// Pid của process, lưu/đọc từ Parameters["ProcessId"]
+    /// </summary>
+    public int? ProcessId
+    {
+        get
+        {
+            if (Parameters.TryGetValue("ProcessId", out var raw) &&
+                int.TryParse(raw, out var pid))
+            {
+                return pid;
+            }
+            return null;
+        }
+        set
+        {
+            if (value is null)
+                Parameters.Remove("ProcessId");
+            else
+                Parameters["ProcessId"] = value.Value.ToString();
+        }
+    }
+
+    /// <summary>
+    /// Tên process, lưu/đọc từ Parameters["ProcessName"]
+    /// </summary>
+    public string? ProcessName
+    {
+        get => Parameters.TryGetValue("ProcessName", out var v) ? v : null;
+        set
+        {
+            if (string.IsNullOrWhiteSpace(value))
+                Parameters.Remove("ProcessName");
+            else
+                Parameters["ProcessName"] = value;
+        }
+    }
+
+    #endregion
+
+    #region Factory helpers cho từng loại command
+
+    public static CommandRequest CreateCaptureScreen(string deviceId)
+        => new()
+        {
+            DeviceId = deviceId,
+            Type = CommandType.CaptureScreen
+        };
+
+    public static CommandRequest CreateListProcesses(string deviceId)
+        => new()
+        {
+            DeviceId = deviceId,
+            Type = CommandType.ListProcesses
+        };
+
+    public static CommandRequest CreateKillProcess(string deviceId, int pid)
+        => new()
+        {
+            DeviceId = deviceId,
+            Type = CommandType.KillProcess,
+            ProcessId = pid
+        };
+
+    public static CommandRequest CreateStartProcess(string deviceId, string processName)
+        => new()
+        {
+            DeviceId = deviceId,
+            Type = CommandType.StartProcess,
+            ProcessName = processName
+        };
+
+    public static CommandRequest CreateGetSystemInfo(string deviceId)
+        => new()
+        {
+            DeviceId = deviceId,
+            Type = CommandType.GetSystemInfo
+        };
+
+    #endregion
 }
 
-/// <summary>
-/// Command types based on socket protocol analysis
-/// Protocol commands: APPLICATION, SHUTDOWN, REGISTRY, TAKEPIC, PROCESS, KEYLOG
-/// Sub-commands: XEM, KILL, START, KILLID, STARTID, HOOK, UNHOOK, PRINT, TAKE
-/// </summary>
 public enum CommandType
 {
     // ===== Application Management (APPLICATION) =====

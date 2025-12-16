@@ -1,6 +1,6 @@
 using RemoteControl.Web.Components;
-using RemoteControl.Web.Hubs;            // dùng RemoteControlHub cho SignalR
-using RemoteControl.Web.Services;        // DiscoveryBroadcaster
+using RemoteControl.Web.Hubs;
+using RemoteControl.Web.Services;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -8,20 +8,23 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddRazorComponents()
     .AddInteractiveServerComponents();
 
-builder.Services.AddSignalR(); // Đăng ký dịch vụ SignalR cho web
+// SignalR với MaxMessageSize lớn cho Screenshot base64
+builder.Services.AddSignalR(o =>
+{
+    o.MaximumReceiveMessageSize = 20 * 1024 * 1024; // 20MB
+});
 
 // UDP Discovery Broadcaster - cho Agent tự động tìm Server
 builder.Services.AddHostedService<DiscoveryBroadcaster>();
 
 var app = builder.Build();
 
-// Configure the HTTP request pipeline.
 if (!app.Environment.IsDevelopment())
 {
     app.UseExceptionHandler("/Error", createScopeForErrors: true);
-    // The default HSTS value is 30 days. You may want to change this for production scenarios, see https://aka.ms/aspnetcore-hsts.
     app.UseHsts();
 }
+
 app.UseStatusCodePagesWithReExecute("/not-found", createScopeForStatusCodePages: true);
 app.UseHttpsRedirection();
 
@@ -30,8 +33,8 @@ app.UseAntiforgery();
 app.MapStaticAssets();
 app.MapRazorComponents<App>()
     .AddInteractiveServerRenderMode();
-// Map SignalR Hub cho remote control
-// Endpoint: /remotehub - Agent và Dashboard sẽ connect vào đây
+
+// Map SignalR Hub
 app.MapHub<RemoteControlHub>("/remotehub");
 
 app.Run();
