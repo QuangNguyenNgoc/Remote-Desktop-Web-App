@@ -86,6 +86,7 @@ public class DiscoveryBroadcaster : BackgroundService
 
     private string GetLocalIPAddress()
     {
+        // Try to get the first non-loopback IPv4 address
         try
         {
             foreach (var ni in NetworkInterface.GetAllNetworkInterfaces())
@@ -111,6 +112,7 @@ public class DiscoveryBroadcaster : BackgroundService
             // Fallback to DNS method
         }
 
+        // Fallback: use DNS
         var host = Dns.GetHostEntry(Dns.GetHostName());
         foreach (var ip in host.AddressList)
         {
@@ -125,9 +127,11 @@ public class DiscoveryBroadcaster : BackgroundService
 
     private int GetServerPort()
     {
+        // Try to read from config, otherwise default to 5048
         var urls = _configuration["ASPNETCORE_URLS"] ?? _configuration["urls"];
         if (!string.IsNullOrEmpty(urls))
         {
+            // Parse port from URL like "http://0.0.0.0:5048"
             var uri = new Uri(urls.Split(';').First());
             return uri.Port;
         }

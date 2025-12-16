@@ -21,7 +21,7 @@ public class SignalRClientService
 
     private bool _isConnected;
     private readonly string _agentId;
-    private string? _manualHubUrl;
+    private string? _manualHubUrl;  // URL set manually via dialog
     private int _sendingSystemInfo;
 
     public event Action<string>? OnStatusChanged;
@@ -46,10 +46,10 @@ public class SignalRClientService
         _discoveryListener = new DiscoveryListener();
         _agentId = Environment.MachineName;
 
-        _heartbeatTimer = new System.Timers.Timer(10000);
+        _heartbeatTimer = new System.Timers.Timer(10000); // 10s
         _heartbeatTimer.Elapsed += async (s, e) => await SendHeartbeat();
 
-        _systemInfoTimer = new System.Timers.Timer(10000);
+        _systemInfoTimer = new System.Timers.Timer(10000); // 10s
         _systemInfoTimer.Elapsed += async (s, e) => await SendSystemInfoAsync();
     }
 
@@ -57,6 +57,7 @@ public class SignalRClientService
     {
         try
         {
+            // Step 1: Get Hub URL (auto-discover or from config)
             var hubUrl = await GetHubUrlAsync();
             if (string.IsNullOrEmpty(hubUrl))
             {
@@ -67,6 +68,7 @@ public class SignalRClientService
 
             UpdateStatus($"Found server: {hubUrl}");
 
+            // Step 2: Build HubConnection
             _hubConnection = new HubConnectionBuilder()
                 .WithUrl(hubUrl)
                 .WithAutomaticReconnect()
@@ -78,6 +80,7 @@ public class SignalRClientService
 
             RegisterHandlers();
 
+            // Step 3: Connect
             UpdateStatus("Connecting to Hub...");
             await _hubConnection.StartAsync();
             _isConnected = true;
@@ -98,14 +101,19 @@ public class SignalRClientService
         }
     }
 
+    /// <summary>
+    /// Try to get Hub URL: first manual, then config, then auto-discover
+    /// </summary>
     private async Task<string?> GetHubUrlAsync()
     {
+        // 1. Use manual URL if set (from connection dialog)
         if (!string.IsNullOrEmpty(_manualHubUrl))
         {
             UpdateStatus($"Using manual URL: {_manualHubUrl}");
             return _manualHubUrl;
         }
 
+        // 2. Check if config exists and is not localhost
         var configUrl = _configuration["SignalR:HubUrl"];
         
         if (!string.IsNullOrEmpty(configUrl) && !configUrl.Contains("localhost"))
@@ -114,6 +122,7 @@ public class SignalRClientService
             return configUrl;
         }
 
+        // 3. Try auto-discovery
         UpdateStatus("Auto-discovering server on LAN...");
         var discoveredUrl = await _discoveryListener.DiscoverServerAsync();
         
@@ -122,12 +131,14 @@ public class SignalRClientService
             return discoveredUrl;
         }
 
+        // 4. Fallback to config (even if localhost)
         if (!string.IsNullOrEmpty(configUrl))
         {
             UpdateStatus($"Fallback to config: {configUrl}");
             return configUrl;
         }
 
+        // 5. Default localhost
         return "http://localhost:5048/remotehub";
     }
 
@@ -178,7 +189,10 @@ public class SignalRClientService
         {
             await _hubConnection.InvokeAsync("SendHeartbeat", _agentId);
         }
-        catch { }
+        catch
+        {
+            // Silent fail for heartbeat
+        }
     }
 
     private async Task SendSystemInfoAsync()
@@ -193,7 +207,10 @@ public class SignalRClientService
             var info = _systemInfoService.GetSystemInfo();
             await _hubConnection.InvokeAsync(HubEvents.UpdateSystemInfo, _agentId, info);
         }
-        catch { }
+        catch
+        {
+            // Silent fail
+        }
         finally
         {
             Interlocked.Exchange(ref _sendingSystemInfo, 0);

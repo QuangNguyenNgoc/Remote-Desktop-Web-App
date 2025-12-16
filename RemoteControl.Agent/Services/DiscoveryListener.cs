@@ -64,4 +64,57 @@ public class DiscoveryListener
         Console.WriteLine("[DiscoveryListener] No server found within timeout.");
         return null;
     }
+
+    /// <summary>
+    /// Discover all servers broadcasting on the network.
+    /// </summary>
+    /// <param name="listenDurationMs">How long to listen for servers</param>
+    /// <returns>List of discovered servers</returns>
+    public async Task<List<DiscoveryPacket>> DiscoverAllServersAsync(int listenDurationMs = 5000)
+    {
+        var servers = new Dictionary<string, DiscoveryPacket>();
+        
+        Console.WriteLine($"[DiscoveryListener] Scanning for all servers for {listenDurationMs}ms...");
+        
+        using var udpClient = new UdpClient(DiscoveryPacket.DefaultPort);
+        udpClient.EnableBroadcast = true;
+
+        try
+        {
+            using var cts = new CancellationTokenSource(listenDurationMs);
+            
+            while (!cts.Token.IsCancellationRequested)
+            {
+                try
+                {
+                    var result = await udpClient.ReceiveAsync(cts.Token);
+                    var json = Encoding.UTF8.GetString(result.Buffer);
+                    
+                    var packet = JsonSerializer.Deserialize<DiscoveryPacket>(json);
+                    
+                    if (packet != null && packet.Identifier == DiscoveryPacket.PacketIdentifier)
+                    {
+                        // Use HubUrl as key to avoid duplicates
+                        servers[packet.HubUrl] = packet;
+                        Console.WriteLine($"[DiscoveryListener] Found: {packet.ServerName} at {packet.HubUrl}");
+                    }
+                }
+                catch (OperationCanceledException)
+                {
+                    break;
+                }
+                catch (JsonException)
+                {
+                    // Invalid packet, continue
+                }
+            }
+        }
+        catch (OperationCanceledException)
+        {
+            // Expected timeout
+        }
+
+        Console.WriteLine($"[DiscoveryListener] Found {servers.Count} server(s).");
+        return servers.Values.ToList();
+    }
 }

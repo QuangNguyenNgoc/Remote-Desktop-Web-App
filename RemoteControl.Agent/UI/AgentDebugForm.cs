@@ -73,7 +73,7 @@ public class AgentDebugForm : Form
         this.StartPosition = FormStartPosition.CenterScreen;
         this.Font = new Font("Segoe UI", 9F);
         this.FormClosing += AgentDebugForm_FormClosing;
-        this.Load += async (s, e) => await _signalRService.ConnectAsync(); // Connect on Load
+        this.Load += AgentDebugForm_Load;
         this.AutoScaleMode = AutoScaleMode.Dpi;
         this.DoubleBuffered = true;
 
@@ -532,6 +532,35 @@ public class AgentDebugForm : Form
     }
 
     private void UpdateStatus(string msg) => _lblStatus.Text = $" {msg} [{DateTime.Now:HH:mm:ss}]";
+
+    private async void AgentDebugForm_Load(object? sender, EventArgs e)
+    {
+        // Get last used server from config
+        var lastServerIp = _configuration["SignalR:LastServerIp"];
+        var lastPort = 5048;
+        int.TryParse(_configuration["SignalR:LastServerPort"], out lastPort);
+        if (lastPort == 0) lastPort = 5048;
+
+        // Show connection dialog
+        using var dialog = new ServerConnectionDialog(lastServerIp, lastPort);
+        var result = dialog.ShowDialog(this);
+
+        if (result == DialogResult.OK)
+        {
+            // Set the hub URL from dialog
+            _signalRService.SetHubUrl(dialog.HubUrl);
+            UpdateStatus($"Connecting to {dialog.HubUrl}...");
+            
+            // Connect
+            await _signalRService.ConnectAsync();
+        }
+        else
+        {
+            // User cancelled - close app
+            UpdateStatus("Connection cancelled by user");
+            this.Close();
+        }
+    }
 
     private void AgentDebugForm_FormClosing(object? sender, FormClosingEventArgs e)
     {
