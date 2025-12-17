@@ -1,4 +1,9 @@
 @using RemoteControl.Shared.Models
+@using RemoteControl.Shared.Constants
+@using Microsoft.AspNetCore.SignalR.Client
+@inject IJSRuntime JSRuntime
+@inject NavigationManager Nav
+@implements IAsyncDisposable
 
 @* Remote Screen Tab Component - Displays live screen stream with capture controls *@
 
@@ -8,8 +13,22 @@
         <!-- Screen Container -->
         <div class="screen-container">
             <!-- Screen Display Area -->
-            <div class="screen-display">
-                <img src="https://picsum.photos/1920/1080" alt="Remote Desktop Screen" class="screen-image" />
+            <div id="screen-display" class="screen-display" style="transform: scale(@ZoomLevel); transform-origin: center center;">
+                @if (!string.IsNullOrEmpty(CurrentScreenshot.ImageBase64))
+                {
+                    <img src="data:image/@CurrentScreenshot.Format;base64,@CurrentScreenshot.ImageBase64" 
+                         alt="Remote Desktop Screen" class="screen-image" />
+                }
+                else
+                {
+                    <div class="no-capture-placeholder">
+                        <svg class="placeholder-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
+                                d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                        </svg>
+                        <p>Click "Capture Screen" to take a screenshot</p>
+                    </div>
+                }
             </div>
         </div>
 
@@ -17,14 +36,15 @@
         <div class="action-toolbar-container">
             <div class="action-toolbar">
                 <!-- Capture Screen -->
-                <button class="action-btn action-btn-blue" @onclick="CaptureScreen">
+                <button class="action-btn action-btn-blue @(IsCapturing ? "btn-loading" : "")" 
+                        @onclick="CaptureScreen" disabled="@IsCapturing">
                     <svg class="btn-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                             d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                             d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
                     </svg>
-                    <span>Capture Screen</span>
+                    <span>@(IsCapturing ? "Capturing..." : "Capture Screen")</span>
                 </button>
 
                 <!-- Save to Device -->
@@ -83,7 +103,15 @@
 </div>
 
 @code {
-    // Screenshot result from Shared model (mock data)
+    // CascadingParameter from DeviceControl
+    [CascadingParameter(Name = "AgentId")]
+    public string AgentId { get; set; } = string.Empty;
+
+    // SignalR
+    private HubConnection? _hubConnection;
+    private bool IsConnected => _hubConnection?.State == HubConnectionState.Connected;
+
+    // Screenshot result
     private ScreenshotResult CurrentScreenshot { get; set; } = new()
     {
         ImageBase64 = "", // Will be populated by SignalR
@@ -95,6 +123,7 @@
 
     private string CaptureStatus { get; set; } = "Ready";
     private bool IsCapturing { get; set; } = false;
+    private double ZoomLevel { get; set; } = 1.0; // 100%
 
     // Helper: Format resolution from model
     private string GetResolutionDisplay() => $"{CurrentScreenshot.Width}×{CurrentScreenshot.Height}";
@@ -126,48 +155,146 @@
         };
     }
 
-    // Action methods
-    private void CaptureScreen()
+    protected override async Task OnInitializedAsync()
     {
+        await InitializeSignalR();
+    }
+
+    private async Task InitializeSignalR()
+    {
+        _hubConnection = new HubConnectionBuilder()
+            .WithUrl(Nav.ToAbsoluteUri("/remotehub"))
+            .WithAutomaticReconnect()
+            .Build();
+
+        _hubConnection.On<CommandResult>(HubEvents.CommandCompleted, OnCommandCompleted);
+
+        try
+        {
+            await _hubConnection.StartAsync();
+            Console.WriteLine("[RemoteScreen] SignalR connected");
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[RemoteScreen] SignalR error: {ex.Message}");
+        }
+    }
+
+    private void OnCommandCompleted(CommandResult result)
+    {
+        if (result.AgentId != AgentId) return;
+        
+        if (!result.Success) 
+        {
+            CaptureStatus = "Error";
+            IsCapturing = false;
+            InvokeAsync(StateHasChanged);
+            return;
+        }
+
+        // ScreenshotResult is stored in CommandResult.Data
+        if (result.Data is System.Text.Json.JsonElement jsonElement)
+        {
+            try
+            {
+                var screenshotResult = System.Text.Json.JsonSerializer.Deserialize<ScreenshotResult>(
+                    jsonElement.GetRawText(),
+                    new System.Text.Json.JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+                
+                if (screenshotResult != null && !string.IsNullOrEmpty(screenshotResult.ImageBase64))
+                {
+                    CurrentScreenshot = screenshotResult;
+                    CaptureStatus = "Ready";
+                    IsCapturing = false;
+                    Console.WriteLine($"[RemoteScreen] Received screenshot: {screenshotResult.Width}x{screenshotResult.Height}");
+                    InvokeAsync(StateHasChanged);
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"[RemoteScreen] Parse error: {ex.Message}");
+                CaptureStatus = "Error";
+                IsCapturing = false;
+                InvokeAsync(StateHasChanged);
+            }
+        }
+    }
+
+    // Action methods
+    private async Task CaptureScreen()
+    {
+        if (_hubConnection == null || !IsConnected) 
+        {
+            Console.WriteLine("[RemoteScreen] Not connected to SignalR");
+            return;
+        }
+        if (string.IsNullOrEmpty(AgentId)) 
+        {
+            Console.WriteLine("[RemoteScreen] AgentId is empty");
+            return;
+        }
+
         CaptureStatus = "Capturing...";
         IsCapturing = true;
-        // TODO: Implement screen capture logic via SignalR
-        Console.WriteLine("[RemoteScreen] Capture screen requested");
+        StateHasChanged();
+
+        var request = CommandRequest.CreateCaptureScreen(AgentId);
+        await _hubConnection.InvokeAsync("SendCommand", request);
+        Console.WriteLine($"[RemoteScreen] Capture screen requested for {AgentId}");
+    }
+
+    private async Task SaveToDevice()
+    {
+        if (string.IsNullOrEmpty(CurrentScreenshot.ImageBase64))
+        {
+            Console.WriteLine("[RemoteScreen] No screenshot to save");
+            return;
+        }
+
+        var fileName = $"screenshot_{DateTime.Now:yyyyMMdd_HHmmss}.{CurrentScreenshot.Format}";
+        var dataUrl = $"data:image/{CurrentScreenshot.Format};base64,{CurrentScreenshot.ImageBase64}";
         
-        // Simulate capture complete (remove when implementing SignalR)
-        CurrentScreenshot.CapturedAt = DateTime.Now;
-        CaptureStatus = "Ready";
-        IsCapturing = false;
+        await JSRuntime.InvokeVoidAsync("downloadImage", fileName, dataUrl);
+        Console.WriteLine($"[RemoteScreen] Saved: {fileName}");
     }
 
-    private void SaveToDevice()
+    private async Task CopyImage()
     {
-        // TODO: Implement save to device logic
-        Console.WriteLine("[RemoteScreen] Save to device requested");
+        if (string.IsNullOrEmpty(CurrentScreenshot.ImageBase64))
+        {
+            Console.WriteLine("[RemoteScreen] No screenshot to copy");
+            return;
+        }
+
+        var dataUrl = $"data:image/{CurrentScreenshot.Format};base64,{CurrentScreenshot.ImageBase64}";
+        await JSRuntime.InvokeVoidAsync("copyImageToClipboard", dataUrl);
+        Console.WriteLine("[RemoteScreen] Image copied to clipboard");
     }
 
-    private void CopyImage()
+    private async Task ToggleFullscreen()
     {
-        // TODO: Implement copy to clipboard logic
-        Console.WriteLine("[RemoteScreen] Copy image requested");
-    }
-
-    private void ToggleFullscreen()
-    {
-        // TODO: Implement fullscreen toggle logic
-        Console.WriteLine("[RemoteScreen] Toggle fullscreen requested");
+        await JSRuntime.InvokeVoidAsync("toggleFullscreen", "screen-display");
+        Console.WriteLine("[RemoteScreen] Toggle fullscreen");
     }
 
     private void ZoomIn()
     {
-        // TODO: Implement zoom in logic
-        Console.WriteLine("[RemoteScreen] Zoom in requested");
+        ZoomLevel = Math.Min(ZoomLevel + 0.25, 3.0); // Max 300%
+        Console.WriteLine($"[RemoteScreen] Zoom: {ZoomLevel:P0}");
     }
 
     private void ZoomOut()
     {
-        // TODO: Implement zoom out logic
-        Console.WriteLine("[RemoteScreen] Zoom out requested");
+        ZoomLevel = Math.Max(ZoomLevel - 0.25, 0.25); // Min 25%
+        Console.WriteLine($"[RemoteScreen] Zoom: {ZoomLevel:P0}");
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        if (_hubConnection != null)
+        {
+            await _hubConnection.DisposeAsync();
+        }
     }
 }
 
@@ -197,6 +324,35 @@
         overflow: hidden;
         border: 2px solid var(--card-border);
         box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+    }
+
+    /* No Capture Placeholder */
+    .no-capture-placeholder {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        width: 100%;
+        height: 100%;
+        min-height: 400px;
+        color: var(--text-tertiary);
+    }
+
+    .placeholder-icon {
+        width: 4rem;
+        height: 4rem;
+        margin-bottom: 1rem;
+        opacity: 0.5;
+    }
+
+    .no-capture-placeholder p {
+        font-size: 0.875rem;
+        text-align: center;
+    }
+
+    .btn-loading {
+        opacity: 0.7;
+        cursor: wait;
     }
 
     /* Live Indicator */

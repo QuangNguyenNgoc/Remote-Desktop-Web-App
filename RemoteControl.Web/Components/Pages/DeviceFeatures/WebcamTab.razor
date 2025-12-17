@@ -1,16 +1,111 @@
-@* Webcam Tab Component *@
+@using RemoteControl.Shared.Models
+@using RemoteControl.Shared.Constants
+@using Microsoft.AspNetCore.SignalR.Client
+@inject NavigationManager Nav
+@implements IAsyncDisposable
+
+@code {
+    // CascadingParameter from DeviceControl
+    [CascadingParameter(Name = "AgentId")]
+    public string AgentId { get; set; } = string.Empty;
+
+    // SignalR
+    private HubConnection? _hubConnection;
+    private bool IsConnected => _hubConnection?.State == HubConnectionState.Connected;
+
+    private bool IsStreaming { get; set; } = false;
+    private string? CurrentFrame { get; set; }
+
+    protected override async Task OnInitializedAsync()
+    {
+        _hubConnection = new HubConnectionBuilder()
+            .WithUrl(Nav.ToAbsoluteUri("/remotehub"))
+            .WithAutomaticReconnect()
+            .Build();
+
+        // Subscribe to webcam frames
+        _hubConnection.On<string, string>("WebcamFrame", OnWebcamFrame);
+
+        try
+        {
+            await _hubConnection.StartAsync();
+            Console.WriteLine("[Webcam] SignalR connected");
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[Webcam] SignalR error: {ex.Message}");
+        }
+    }
+
+    private void OnWebcamFrame(string agentId, string base64Jpeg)
+    {
+        if (agentId != AgentId) return;
+        
+        CurrentFrame = $"data:image/jpeg;base64,{base64Jpeg}";
+        InvokeAsync(StateHasChanged);
+    }
+
+    private async Task StartStream()
+    {
+        if (_hubConnection == null || !IsConnected) return;
+        if (string.IsNullOrEmpty(AgentId)) return;
+
+        IsStreaming = true;
+        CurrentFrame = null;
+        StateHasChanged();
+
+        var request = new CommandRequest { AgentId = AgentId, Type = CommandType.WebcamOn };
+        await _hubConnection.InvokeAsync("SendCommand", request);
+        Console.WriteLine("[Webcam] Sent WebcamOn command");
+    }
+
+    private async Task StopStream()
+    {
+        if (_hubConnection == null || !IsConnected) return;
+
+        IsStreaming = false;
+        StateHasChanged();
+
+        var request = new CommandRequest { AgentId = AgentId, Type = CommandType.WebcamOff };
+        await _hubConnection.InvokeAsync("SendCommand", request);
+        Console.WriteLine("[Webcam] Sent WebcamOff command");
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        // Stop streaming when leaving tab
+        if (IsStreaming && _hubConnection != null && IsConnected)
+        {
+            var request = new CommandRequest { AgentId = AgentId, Type = CommandType.WebcamOff };
+            await _hubConnection.InvokeAsync("SendCommand", request);
+        }
+        
+        if (_hubConnection != null)
+        {
+            await _hubConnection.DisposeAsync();
+        }
+    }
+}
 <div class="webcam-container">
     <div class="webcam-feed-wrapper">
         <div class="webcam-feed">
-            <!-- Camera Feed Placeholder -->
-            <div class="webcam-placeholder">
-                <svg class="camera-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                        d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z">
-                    </path>
-                </svg>
-                <span class="placeholder-text">@(IsStreaming ? "Streaming..." : "Waiting for Camera Stream...")</span>
-            </div>
+            @if (!string.IsNullOrEmpty(CurrentFrame))
+            {
+                <!-- Live Camera Feed -->
+                <img src="@CurrentFrame" alt="Webcam stream" class="webcam-image" />
+            }
+            else
+            {
+                <!-- Placeholder when no frame -->
+                <div class="webcam-placeholder">
+                    <svg class="camera-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                            d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z">
+                        </path>
+                    </svg>
+                    <span class="placeholder-text">@(IsStreaming ? "Waiting for stream..." : "Press Start to begin")</span>
+                </div>
+            }
 
             <!-- Recording Indicator - Only show when streaming -->
             @if (IsStreaming)
@@ -50,23 +145,7 @@
     </div>
 </div>
 
-@code {
-    private bool IsStreaming { get; set; } = false;
 
-    private void StartStream()
-    {
-        IsStreaming = true;
-        // TODO: Implement via SignalR - CommandRequest.CreateWebcamOn
-        Console.WriteLine("[Webcam] Start stream requested");
-    }
-
-    private void StopStream()
-    {
-        IsStreaming = false;
-        // TODO: Implement via SignalR - CommandRequest.CreateWebcamOff
-        Console.WriteLine("[Webcam] Stop stream requested");
-    }
-}
 
 <style>
     .webcam-container {
@@ -97,6 +176,12 @@
         display: flex;
         align-items: center;
         justify-content: center;
+    }
+
+    .webcam-image {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
     }
 
     .webcam-placeholder {

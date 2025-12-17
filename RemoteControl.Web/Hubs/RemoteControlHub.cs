@@ -130,6 +130,21 @@ namespace RemoteControl.Web.Hubs
             await Clients.All.SendAsync(HubEvents.SystemInfoUpdated, agentId, systemInfo);
         }
 
+        // =========================
+        // (3) Webcam: Agent -> Hub -> Web client
+        // broadcast: WebcamFrame(agentId, base64Jpeg)
+        // =========================
+        public async Task SendWebcamFrame(string agentId, string base64Jpeg)
+        {
+            if (string.IsNullOrWhiteSpace(agentId) || string.IsNullOrWhiteSpace(base64Jpeg))
+            {
+                return; // Silent drop - don't log every frame
+            }
+
+            // Broadcast to all clients watching this agent
+            await Clients.All.SendAsync("WebcamFrame", agentId, base64Jpeg);
+        }
+
         public override Task OnConnectedAsync()
         {
             _logger.LogInformation("Client connected: {ConnectionId}", Context.ConnectionId);

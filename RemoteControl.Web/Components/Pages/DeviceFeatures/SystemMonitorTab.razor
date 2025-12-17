@@ -1,6 +1,149 @@
 @using RemoteControl.Shared.Models
+@using RemoteControl.Shared.Constants
+@using Microsoft.AspNetCore.SignalR.Client
+@inject NavigationManager Nav
+@implements IAsyncDisposable
 
-@* System Monitor Tab Component *@
+@code {
+    // CascadingParameter from DeviceControl
+    [CascadingParameter(Name = "AgentId")]
+    public string AgentId { get; set; } = string.Empty;
+
+    // SignalR
+    private HubConnection? _hubConnection;
+    private bool IsConnected => _hubConnection?.State == HubConnectionState.Connected;
+    private System.Timers.Timer? _refreshTimer;
+    private System.Timers.Timer? _uptimeTimer;
+    private DateTime _connectionTime;
+
+    // System metrics - from SystemInfo
+    private double CpuUsage { get; set; } = 0;
+    private double RamUsage { get; set; } = 0;
+    private string Uptime { get; set; } = "--";
+
+    // Top processes
+    private List<ProcessInfo> AllProcesses { get; set; } = new();
+    private IEnumerable<ProcessInfo> TopProcesses => 
+        AllProcesses.OrderByDescending(p => p.CpuUsage).Take(5);
+
+    protected override async Task OnInitializedAsync()
+    {
+        _hubConnection = new HubConnectionBuilder()
+            .WithUrl(Nav.ToAbsoluteUri("/remotehub"))
+            .WithAutomaticReconnect()
+            .Build();
+
+        _hubConnection.On<CommandResult>(HubEvents.CommandCompleted, OnCommandCompleted);
+
+        try
+        {
+            await _hubConnection.StartAsync();
+            _connectionTime = DateTime.Now;
+            Console.WriteLine("[SystemMonitor] SignalR connected");
+
+            // Auto-refresh every 3 seconds (sync with Task Manager)
+            _refreshTimer = new System.Timers.Timer(3000);
+            _refreshTimer.Elapsed += async (s, e) => await RequestSystemInfo();
+            _refreshTimer.Start();
+
+            // Uptime timer - update every second
+            _uptimeTimer = new System.Timers.Timer(1000);
+            _uptimeTimer.Elapsed += (s, e) => UpdateUptime();
+            _uptimeTimer.Start();
+
+            // Initial request
+            await RequestSystemInfo();
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[SystemMonitor] SignalR error: {ex.Message}");
+        }
+    }
+
+    private void UpdateUptime()
+    {
+        var elapsed = DateTime.Now - _connectionTime;
+        if (elapsed.TotalDays >= 1)
+            Uptime = $"{(int)elapsed.TotalDays}d {elapsed.Hours}h {elapsed.Minutes}m";
+        else if (elapsed.TotalHours >= 1)
+            Uptime = $"{elapsed.Hours}h {elapsed.Minutes}m {elapsed.Seconds}s";
+        else
+            Uptime = $"{elapsed.Minutes}m {elapsed.Seconds}s";
+        
+        InvokeAsync(StateHasChanged);
+    }
+
+    private async Task RequestSystemInfo()
+    {
+        if (_hubConnection == null || !IsConnected) return;
+        if (string.IsNullOrEmpty(AgentId)) return;
+
+        var sysInfoRequest = new CommandRequest { AgentId = AgentId, Type = CommandType.GetSystemInfo };
+        await _hubConnection.InvokeAsync("SendCommand", sysInfoRequest);
+
+        // Also request process list for Top 5
+        var processRequest = new CommandRequest { AgentId = AgentId, Type = CommandType.ListProcesses };
+        await _hubConnection.InvokeAsync("SendCommand", processRequest);
+    }
+
+    private void OnCommandCompleted(CommandResult result)
+    {
+        if (result.AgentId != AgentId) return;
+        if (!result.Success) return;
+
+        if (result.Data is System.Text.Json.JsonElement jsonElement)
+        {
+            var rawText = jsonElement.GetRawText();
+            var options = new System.Text.Json.JsonSerializerOptions { PropertyNameCaseInsensitive = true };
+
+            // Check ProcessListResult FIRST (has "processes" field) - more specific
+            // This is checked first because ProcessListResult JSON also contains "cpuUsage" in each process item
+            if (rawText.Contains("\"processes\"", StringComparison.OrdinalIgnoreCase))
+            {
+                try
+                {
+                    var processResult = System.Text.Json.JsonSerializer.Deserialize<ProcessListResult>(rawText, options);
+                    if (processResult?.Processes != null && processResult.Processes.Count > 0)
+                    {
+                        AllProcesses = processResult.Processes;
+                        InvokeAsync(StateHasChanged);
+                    }
+                }
+                catch { }
+                return; // Don't try SystemInfo if this is a ProcessListResult
+            }
+
+            // Check SystemInfo (has "memoryUsage" or "processCount" but NOT "processes")
+            if (rawText.Contains("\"memoryUsage\"", StringComparison.OrdinalIgnoreCase) ||
+                rawText.Contains("\"processCount\"", StringComparison.OrdinalIgnoreCase))
+            {
+                try
+                {
+                    var systemInfo = System.Text.Json.JsonSerializer.Deserialize<SystemInfo>(rawText, options);
+                    if (systemInfo != null)
+                    {
+                        CpuUsage = Math.Round(systemInfo.CpuUsage, 1);
+                        RamUsage = Math.Round(systemInfo.MemoryUsage, 1);
+                        InvokeAsync(StateHasChanged);
+                    }
+                }
+                catch { }
+            }
+        }
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        _refreshTimer?.Stop();
+        _refreshTimer?.Dispose();
+        _uptimeTimer?.Stop();
+        _uptimeTimer?.Dispose();
+        if (_hubConnection != null)
+        {
+            await _hubConnection.DisposeAsync();
+        }
+    }
+}
 <div class="system-monitor-container">
     @* Metrics Cards *@
     <div class="metrics-grid">
@@ -101,26 +244,7 @@
     </div>
 </div>
 
-@code {
-    // System metrics (mock - needs Agent's SystemInfo event)
-    private int CpuUsage { get; set; } = 45;
-    private int RamUsage { get; set; } = 68;
-    private string Uptime { get; set; } = "2d 14h 32m";
 
-    // Mock data using Shared ProcessInfo model
-    private List<ProcessInfo> AllProcesses { get; set; } = new()
-    {
-        new ProcessInfo { ProcessId = 1244, ProcessName = "chrome.exe", CpuUsage = 35.2, MemoryUsageMB = 1200 },
-        new ProcessInfo { ProcessId = 8844, ProcessName = "Code.exe", CpuUsage = 22.5, MemoryUsageMB = 856 },
-        new ProcessInfo { ProcessId = 4, ProcessName = "System", CpuUsage = 15.3, MemoryUsageMB = 234 },
-        new ProcessInfo { ProcessId = 5622, ProcessName = "explorer.exe", CpuUsage = 8.1, MemoryUsageMB = 189 },
-        new ProcessInfo { ProcessId = 2156, ProcessName = "Discord.exe", CpuUsage = 5.4, MemoryUsageMB = 456 }
-    };
-
-    // Top 5 processes sorted by CPU usage
-    private IEnumerable<ProcessInfo> TopProcesses => 
-        AllProcesses.OrderByDescending(p => p.CpuUsage).Take(5);
-}
 
 <style>
     .system-monitor-container {

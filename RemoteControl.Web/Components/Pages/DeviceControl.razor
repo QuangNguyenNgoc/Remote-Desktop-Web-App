@@ -21,8 +21,10 @@
 <!-- Info Bar & Actions -->
 <DeviceHeader DeviceId="@Id" />
 
-<!-- Tabs & Remote Screen -->
-<RemoteScreen />
+<!-- Tabs & Remote Screen - Pass AgentId via CascadingValue -->
+<CascadingValue Value="@Id" Name="AgentId">
+    <RemoteScreen />
+</CascadingValue>
 
 <!-- Terminal Log -->
 <TerminalLog DeviceId="@Id" />

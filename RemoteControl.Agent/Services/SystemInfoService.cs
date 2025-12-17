@@ -11,6 +11,12 @@ public class SystemInfoService
 {
     private readonly PerformanceCounter? _cpuCounter;
     private readonly PerformanceCounter? _memoryCounter;
+    
+    // Cache last known values
+    private double _lastCpuUsage = 0;
+    private double _lastMemoryUsage = 0;
+    private DateTime _lastSampleTime = DateTime.MinValue;
+    private readonly object _lock = new();
 
     // ====== Khởi tạo Counter ======
     public SystemInfoService()
@@ -25,14 +31,46 @@ public class SystemInfoService
                 // Memory: % Committed Bytes In Use
                 _memoryCounter = new PerformanceCounter("Memory", "% Committed Bytes In Use");
 
-                // Lần gọi đầu tiên thường trả về 0 nên gọi trước 1 lần
+                // Lần gọi đầu tiên để initialize
                 _cpuCounter.NextValue();
                 _memoryCounter.NextValue();
+                
+                // Background task để sample liên tục
+                Task.Run(async () =>
+                {
+                    while (true)
+                    {
+                        await Task.Delay(1000); // Sample every 1 second
+                        UpdateSamples();
+                    }
+                });
             }
             catch (Exception ex) 
             {
                 Console.WriteLine($"[SystemInfoService] Error initializing counters: {ex.Message}");
             }
+        }
+    }
+
+    private void UpdateSamples()
+    {
+        lock (_lock)
+        {
+            try
+            {
+                if (_cpuCounter != null)
+                {
+                    var cpuValue = _cpuCounter.NextValue();
+                    if (cpuValue > 0) _lastCpuUsage = Math.Round(cpuValue, 2);
+                }
+                if (_memoryCounter != null)
+                {
+                    var memValue = _memoryCounter.NextValue();
+                    if (memValue > 0) _lastMemoryUsage = Math.Round(memValue, 2);
+                }
+                _lastSampleTime = DateTime.Now;
+            }
+            catch { }
         }
     }
 
@@ -48,32 +86,21 @@ public class SystemInfoService
         };
     }
 
-    // ====== Lấy CPU Usage ======
+    // ====== Lấy CPU Usage (cached) ======
     public double GetCpuUsage()
     {
-        if (_cpuCounter == null) return 0;
-        try
+        lock (_lock)
         {
-            return Math.Round((double)_cpuCounter.NextValue(), 2);
-        }
-        catch
-        {
-            return 0;
+            return _lastCpuUsage;
         }
     }
 
-    // ====== Lấy RAM Usage (%) ======
+    // ====== Lấy RAM Usage (cached) ======
     public double GetMemoryUsage()
     {
-        // Trả về % Committed Bytes In Use
-        if (_memoryCounter == null) return 0;
-        try
+        lock (_lock)
         {
-            return Math.Round((double)_memoryCounter.NextValue(), 2);
-        }
-        catch
-        {
-            return 0;
+            return _lastMemoryUsage;
         }
     }
 
