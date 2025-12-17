@@ -57,6 +57,7 @@ public class AgentDebugForm : Form
 
         // Init SignalR (ctor mới)
         _signalRService = new SignalRClientService(_commandHandler, _systemInfoService, _configuration);
+        _signalRService.SetWebCamService(_webCamService); // Wire webcam for streaming
         _signalRService.OnStatusChanged += (msg) => this.Invoke(() => UpdateStatus(msg));
         _signalRService.OnConnectionStateChanged += (state) => this.Invoke(() =>
         {

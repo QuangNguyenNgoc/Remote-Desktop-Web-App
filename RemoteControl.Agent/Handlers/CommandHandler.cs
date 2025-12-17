@@ -16,6 +16,16 @@ public class CommandHandler
     private readonly WebCamService _webCamService;
     private readonly PowerService _powerService;
 
+    // ====== Webcam Streaming Callbacks (set by SignalRClientService) ======
+    private Action? _onStartWebcam;
+    private Action? _onStopWebcam;
+
+    public void SetWebcamCallbacks(Action onStart, Action onStop)
+    {
+        _onStartWebcam = onStart;
+        _onStopWebcam = onStop;
+    }
+
     public CommandHandler()
     {
         _screenshotService = new ScreenshotService();
@@ -141,12 +151,13 @@ public class CommandHandler
     // ====== Webcam Handlers ======
     private CommandResult HandleWebcamOn(CommandRequest request)
     {
-        return CreateSuccessResult(request, "Webcam ready (use streaming endpoint)");
+        _onStartWebcam?.Invoke();
+        return CreateSuccessResult(request, "Webcam streaming started");
     }
 
     private CommandResult HandleWebcamOff(CommandRequest request)
     {
-        _webCamService.Stop();
+        _onStopWebcam?.Invoke();
         return CreateSuccessResult(request, "Webcam stopped");
     }
 

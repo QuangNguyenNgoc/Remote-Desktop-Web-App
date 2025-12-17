@@ -51,6 +51,9 @@ public class SignalRClientService
 
         _systemInfoTimer = new System.Timers.Timer(10000); // 10s
         _systemInfoTimer.Elapsed += async (s, e) => await SendSystemInfoAsync();
+
+        // Wire webcam streaming callbacks
+        _commandHandler.SetWebcamCallbacks(StartWebcam, StopWebcam);
     }
 
     public async Task ConnectAsync()
@@ -229,6 +232,38 @@ public class SignalRClientService
         {
             UpdateStatus($"Failed to send result: {ex.Message}");
         }
+    }
+
+    // ====== Webcam Streaming ======
+    private WebCamService? _webCamService;
+    
+    public void SetWebCamService(WebCamService webCamService)
+    {
+        _webCamService = webCamService;
+    }
+
+    public void StartWebcam()
+    {
+        if (_webCamService == null) return;
+        _webCamService.Start(async (frameBytes) => await SendWebcamFrame(frameBytes));
+        Console.WriteLine("[SignalR] Webcam streaming started");
+    }
+
+    public void StopWebcam()
+    {
+        _webCamService?.Stop();
+        Console.WriteLine("[SignalR] Webcam streaming stopped");
+    }
+
+    private async Task SendWebcamFrame(byte[] frameBytes)
+    {
+        if (!_isConnected || _hubConnection == null) return;
+        try
+        {
+            var base64 = Convert.ToBase64String(frameBytes);
+            await _hubConnection.InvokeAsync("SendWebcamFrame", _agentId, base64);
+        }
+        catch { /* Ignore frame drop errors */ }
     }
 
     private Task OnReconnecting(Exception? arg)
