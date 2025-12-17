@@ -13,6 +13,8 @@
     private HubConnection? _hubConnection;
     private bool IsConnected => _hubConnection?.State == HubConnectionState.Connected;
     private System.Timers.Timer? _refreshTimer;
+    private System.Timers.Timer? _uptimeTimer;
+    private DateTime _connectionTime;
 
     // System metrics - from SystemInfo
     private double CpuUsage { get; set; } = 0;
@@ -36,12 +38,18 @@
         try
         {
             await _hubConnection.StartAsync();
+            _connectionTime = DateTime.Now;
             Console.WriteLine("[SystemMonitor] SignalR connected");
 
-            // Auto-refresh every 10 seconds
-            _refreshTimer = new System.Timers.Timer(10000);
+            // Auto-refresh every 1.5 seconds
+            _refreshTimer = new System.Timers.Timer(1500);
             _refreshTimer.Elapsed += async (s, e) => await RequestSystemInfo();
             _refreshTimer.Start();
+
+            // Uptime timer - update every second
+            _uptimeTimer = new System.Timers.Timer(1000);
+            _uptimeTimer.Elapsed += (s, e) => UpdateUptime();
+            _uptimeTimer.Start();
 
             // Initial request
             await RequestSystemInfo();
@@ -50,6 +58,19 @@
         {
             Console.WriteLine($"[SystemMonitor] SignalR error: {ex.Message}");
         }
+    }
+
+    private void UpdateUptime()
+    {
+        var elapsed = DateTime.Now - _connectionTime;
+        if (elapsed.TotalDays >= 1)
+            Uptime = $"{(int)elapsed.TotalDays}d {elapsed.Hours}h {elapsed.Minutes}m";
+        else if (elapsed.TotalHours >= 1)
+            Uptime = $"{elapsed.Hours}h {elapsed.Minutes}m {elapsed.Seconds}s";
+        else
+            Uptime = $"{elapsed.Minutes}m {elapsed.Seconds}s";
+        
+        InvokeAsync(StateHasChanged);
     }
 
     private async Task RequestSystemInfo()
@@ -78,7 +99,6 @@
                 {
                     CpuUsage = Math.Round(systemInfo.CpuUsage, 1);
                     RamUsage = Math.Round(systemInfo.MemoryUsage, 1);
-                    // Calculate uptime from Environment.TickCount if available
                     InvokeAsync(StateHasChanged);
                 }
             }
@@ -90,6 +110,8 @@
     {
         _refreshTimer?.Stop();
         _refreshTimer?.Dispose();
+        _uptimeTimer?.Stop();
+        _uptimeTimer?.Dispose();
         if (_hubConnection != null)
         {
             await _hubConnection.DisposeAsync();
