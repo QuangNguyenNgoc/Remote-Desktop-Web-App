@@ -1,6 +1,101 @@
 @using RemoteControl.Shared.Models
+@using RemoteControl.Shared.Constants
+@using Microsoft.AspNetCore.SignalR.Client
+@inject NavigationManager Nav
+@implements IAsyncDisposable
 
-@* System Monitor Tab Component *@
+@code {
+    // CascadingParameter from DeviceControl
+    [CascadingParameter(Name = "AgentId")]
+    public string AgentId { get; set; } = string.Empty;
+
+    // SignalR
+    private HubConnection? _hubConnection;
+    private bool IsConnected => _hubConnection?.State == HubConnectionState.Connected;
+    private System.Timers.Timer? _refreshTimer;
+
+    // System metrics - from SystemInfo
+    private double CpuUsage { get; set; } = 0;
+    private double RamUsage { get; set; } = 0;
+    private string Uptime { get; set; } = "--";
+
+    // Top processes
+    private List<ProcessInfo> AllProcesses { get; set; } = new();
+    private IEnumerable<ProcessInfo> TopProcesses => 
+        AllProcesses.OrderByDescending(p => p.CpuUsage).Take(5);
+
+    protected override async Task OnInitializedAsync()
+    {
+        _hubConnection = new HubConnectionBuilder()
+            .WithUrl(Nav.ToAbsoluteUri("/remotehub"))
+            .WithAutomaticReconnect()
+            .Build();
+
+        _hubConnection.On<CommandResult>(HubEvents.CommandCompleted, OnCommandCompleted);
+
+        try
+        {
+            await _hubConnection.StartAsync();
+            Console.WriteLine("[SystemMonitor] SignalR connected");
+
+            // Auto-refresh every 10 seconds
+            _refreshTimer = new System.Timers.Timer(10000);
+            _refreshTimer.Elapsed += async (s, e) => await RequestSystemInfo();
+            _refreshTimer.Start();
+
+            // Initial request
+            await RequestSystemInfo();
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[SystemMonitor] SignalR error: {ex.Message}");
+        }
+    }
+
+    private async Task RequestSystemInfo()
+    {
+        if (_hubConnection == null || !IsConnected) return;
+        if (string.IsNullOrEmpty(AgentId)) return;
+
+        var request = new CommandRequest { AgentId = AgentId, Type = CommandType.GetSystemInfo };
+        await _hubConnection.InvokeAsync("SendCommand", request);
+    }
+
+    private void OnCommandCompleted(CommandResult result)
+    {
+        if (result.AgentId != AgentId) return;
+        if (!result.Success) return;
+
+        if (result.Data is System.Text.Json.JsonElement jsonElement)
+        {
+            try
+            {
+                var systemInfo = System.Text.Json.JsonSerializer.Deserialize<SystemInfo>(
+                    jsonElement.GetRawText(),
+                    new System.Text.Json.JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+                
+                if (systemInfo != null)
+                {
+                    CpuUsage = Math.Round(systemInfo.CpuUsage, 1);
+                    RamUsage = Math.Round(systemInfo.MemoryUsage, 1);
+                    // Calculate uptime from Environment.TickCount if available
+                    InvokeAsync(StateHasChanged);
+                }
+            }
+            catch { }
+        }
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        _refreshTimer?.Stop();
+        _refreshTimer?.Dispose();
+        if (_hubConnection != null)
+        {
+            await _hubConnection.DisposeAsync();
+        }
+    }
+}
 <div class="system-monitor-container">
     @* Metrics Cards *@
     <div class="metrics-grid">
@@ -101,26 +196,7 @@
     </div>
 </div>
 
-@code {
-    // System metrics (mock - needs Agent's SystemInfo event)
-    private int CpuUsage { get; set; } = 45;
-    private int RamUsage { get; set; } = 68;
-    private string Uptime { get; set; } = "2d 14h 32m";
 
-    // Mock data using Shared ProcessInfo model
-    private List<ProcessInfo> AllProcesses { get; set; } = new()
-    {
-        new ProcessInfo { ProcessId = 1244, ProcessName = "chrome.exe", CpuUsage = 35.2, MemoryUsageMB = 1200 },
-        new ProcessInfo { ProcessId = 8844, ProcessName = "Code.exe", CpuUsage = 22.5, MemoryUsageMB = 856 },
-        new ProcessInfo { ProcessId = 4, ProcessName = "System", CpuUsage = 15.3, MemoryUsageMB = 234 },
-        new ProcessInfo { ProcessId = 5622, ProcessName = "explorer.exe", CpuUsage = 8.1, MemoryUsageMB = 189 },
-        new ProcessInfo { ProcessId = 2156, ProcessName = "Discord.exe", CpuUsage = 5.4, MemoryUsageMB = 456 }
-    };
-
-    // Top 5 processes sorted by CPU usage
-    private IEnumerable<ProcessInfo> TopProcesses => 
-        AllProcesses.OrderByDescending(p => p.CpuUsage).Take(5);
-}
 
 <style>
     .system-monitor-container {
