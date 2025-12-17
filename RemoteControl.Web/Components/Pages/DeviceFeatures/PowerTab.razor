@@ -91,11 +91,44 @@
     }
 </div>
 
+@using RemoteControl.Shared.Models
+@using RemoteControl.Shared.Constants
+@using Microsoft.AspNetCore.SignalR.Client
+@inject NavigationManager Nav
+@implements IAsyncDisposable
+
 @code {
+    // CascadingParameter from DeviceControl
+    [CascadingParameter(Name = "AgentId")]
+    public string AgentId { get; set; } = string.Empty;
+
+    // SignalR
+    private HubConnection? _hubConnection;
+    private bool IsConnected => _hubConnection?.State == HubConnectionState.Connected;
+
+    // UI State
     private bool ShowDialog { get; set; } = false;
     private PowerAction PendingAction { get; set; }
 
     private enum PowerAction { Lock, Sleep, Restart, Shutdown }
+
+    protected override async Task OnInitializedAsync()
+    {
+        _hubConnection = new HubConnectionBuilder()
+            .WithUrl(Nav.ToAbsoluteUri("/remotehub"))
+            .WithAutomaticReconnect()
+            .Build();
+
+        try
+        {
+            await _hubConnection.StartAsync();
+            Console.WriteLine("[Power] SignalR connected");
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[Power] SignalR error: {ex.Message}");
+        }
+    }
 
     private void ShowConfirmation(PowerAction action)
     {
@@ -108,13 +141,27 @@
         ShowDialog = false;
     }
 
-    private void ConfirmAction()
+    private async Task ConfirmAction()
     {
         ShowDialog = false;
         
-        // TODO: Send SignalR command based on PendingAction
-        Console.WriteLine($"[Power] Executing: {PendingAction}");
+        if (_hubConnection == null || !IsConnected) return;
+        if (string.IsNullOrEmpty(AgentId)) return;
+
+        var commandType = GetCommandType(PendingAction);
+        var request = new CommandRequest { AgentId = AgentId, Type = commandType };
+        await _hubConnection.InvokeAsync("SendCommand", request);
+        Console.WriteLine($"[Power] Sent: {PendingAction} to {AgentId}");
     }
+
+    private CommandType GetCommandType(PowerAction action) => action switch
+    {
+        PowerAction.Lock => CommandType.Lock,
+        PowerAction.Sleep => CommandType.Sleep,
+        PowerAction.Restart => CommandType.Restart,
+        PowerAction.Shutdown => CommandType.Shutdown,
+        _ => throw new ArgumentException($"Unknown action: {action}")
+    };
 
     private string GetActionName() => PendingAction switch
     {
@@ -142,6 +189,14 @@
         PowerAction.Shutdown => "confirm-red",
         _ => ""
     };
+
+    public async ValueTask DisposeAsync()
+    {
+        if (_hubConnection != null)
+        {
+            await _hubConnection.DisposeAsync();
+        }
+    }
 }
 
 <style>
