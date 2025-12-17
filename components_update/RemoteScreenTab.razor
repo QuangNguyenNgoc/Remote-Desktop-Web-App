@@ -5,9 +5,22 @@
     <div class="screen-container-wrapper">
         <!-- Screen Container -->
         <div class="screen-container">
+            <!-- Live Indicator -->
+            <div class="live-indicator">
+                <span class="live-dot"></span>
+                <span class="live-text">LIVE STREAM</span>
+            </div>
+
+            <!-- Status Text -->
+            <div class="status-indicator">
+                <span class="status-text">Live Stream Active</span>
+            </div>
+
             <!-- Screen Display Area -->
             <div class="screen-display">
-                <img src="https://picsum.photos/1920/1080" alt="Remote Desktop Screen" class="screen-image" />
+                <img src="/computer-desktop-screenshot-with-applications.jpg" 
+                     alt="Remote Desktop Screen" 
+                     class="screen-image" />
             </div>
         </div>
 
@@ -17,10 +30,10 @@
                 <!-- Capture Screen -->
                 <button class="action-btn action-btn-blue" @onclick="CaptureScreen">
                     <svg class="btn-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                            d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                            d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" 
+                              d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"/>
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" 
+                              d="M15 13a3 3 0 11-6 0 3 3 0 016 0z"/>
                     </svg>
                     <span>Capture Screen</span>
                 </button>
@@ -28,8 +41,8 @@
                 <!-- Save to Device -->
                 <button class="action-btn action-btn-green" @onclick="SaveToDevice">
                     <svg class="btn-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                            d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" 
+                              d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/>
                     </svg>
                     <span>Save to Device</span>
                 </button>
@@ -37,8 +50,8 @@
                 <!-- Copy to Clipboard -->
                 <button class="action-btn action-btn-purple" @onclick="CopyImage">
                     <svg class="btn-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                            d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" 
+                              d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"/>
                     </svg>
                     <span>Copy Image</span>
                 </button>
@@ -46,8 +59,8 @@
                 <!-- Refresh Stream -->
                 <button class="action-btn action-btn-orange" @onclick="RefreshStream">
                     <svg class="btn-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                            d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" 
+                              d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
                     </svg>
                     <span>Refresh</span>
                 </button>
@@ -58,22 +71,22 @@
                 <!-- Icon-only buttons -->
                 <button class="icon-btn" title="Fullscreen" @onclick="ToggleFullscreen">
                     <svg class="btn-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                            d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4" />
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" 
+                              d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4"/>
                     </svg>
                 </button>
 
                 <button class="icon-btn" title="Zoom In" @onclick="ZoomIn">
                     <svg class="btn-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                            d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0zM10 7v6m3-3H7" />
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" 
+                              d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0zM10 7v6m3-3H7"/>
                     </svg>
                 </button>
 
                 <button class="icon-btn" title="Zoom Out" @onclick="ZoomOut">
                     <svg class="btn-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                            d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0zM13 10H7" />
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" 
+                              d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0zM13 10H7"/>
                     </svg>
                 </button>
             </div>
@@ -81,60 +94,26 @@
             <!-- Info Bar -->
             <div class="info-bar">
                 <span>Resolution: @Resolution</span>
-                <span>Format: @ImageFormat</span>
-                <span>Last capture: @GetLastCaptureDisplay()</span>
-                <span class="@GetStatusClass()">Status: @CaptureStatus</span>
+                <span>FPS: @Fps</span>
+                <span>Latency: @Latency</span>
+                <span>Connected: @ConnectedTime</span>
             </div>
         </div>
     </div>
 </div>
 
 @code {
-    // Screenshot information properties (mock data for now)
-    private string Resolution { get; set; } = "1920×1080";
-    private string ImageFormat { get; set; } = "JPEG";
-    private DateTime? LastCaptureTime { get; set; } = DateTime.Now.AddMinutes(-2); // Mock: 2 min ago
-    private string CaptureStatus { get; set; } = "Ready";
-    private bool IsCapturing { get; set; } = false;
-
-    // Helper: Format last capture time in friendly way
-    private string GetLastCaptureDisplay()
-    {
-        if (LastCaptureTime == null) return "Never";
-        
-        var elapsed = DateTime.Now - LastCaptureTime.Value;
-        
-        if (elapsed.TotalSeconds < 30) return "Just now";
-        if (elapsed.TotalMinutes < 1) return "Less than 1 min ago";
-        if (elapsed.TotalMinutes < 60) return $"{(int)elapsed.TotalMinutes} min ago";
-        if (elapsed.TotalHours < 24) return $"{(int)elapsed.TotalHours} hr ago";
-        return LastCaptureTime.Value.ToString("MMM dd, HH:mm");
-    }
-
-    // Helper: Status color class
-    private string GetStatusClass()
-    {
-        return CaptureStatus switch
-        {
-            "Ready" => "status-ready",
-            "Capturing..." => "status-capturing",
-            "Error" => "status-error",
-            _ => ""
-        };
-    }
+    // Screen information properties
+    private string Resolution { get; set; } = "1920x1080";
+    private int Fps { get; set; } = 30;
+    private string Latency { get; set; } = "45ms";
+    private string ConnectedTime { get; set; } = "00:15:32";
 
     // Action methods
     private void CaptureScreen()
     {
-        CaptureStatus = "Capturing...";
-        IsCapturing = true;
-        // TODO: Implement screen capture logic via SignalR
+        // TODO: Implement screen capture logic
         Console.WriteLine("[RemoteScreen] Capture screen requested");
-        
-        // Simulate capture complete (remove when implementing SignalR)
-        LastCaptureTime = DateTime.Now;
-        CaptureStatus = "Ready";
-        IsCapturing = false;
     }
 
     private void SaveToDevice()
@@ -178,8 +157,7 @@
     .remote-screen-tab {
         padding: 1.5rem;
         min-height: 500px;
-        background-color: var(--card-bg);
-        border-radius: 0 0 0.75rem 0.75rem;
+        background-color: var(--card);
     }
 
     .screen-container-wrapper {
@@ -193,12 +171,11 @@
     .screen-container {
         position: relative;
         width: 100%;
-        max-width: 56rem;
-        /* max-w-4xl */
+        max-width: 56rem; /* max-w-4xl */
         background-color: #000;
         border-radius: 0.5rem;
         overflow: hidden;
-        border: 2px solid var(--card-border);
+        border: 2px solid var(--border);
         box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
     }
 
@@ -282,9 +259,10 @@
         justify-content: center;
         gap: 0.75rem;
         padding: 1rem;
-        background-color: var(--table-bg);
+        background-color: var(--muted);
+        opacity: 0.5;
         border-radius: 0.5rem;
-        border: 1px solid var(--card-border);
+        border: 1px solid var(--border);
     }
 
     /* Action Buttons */
@@ -352,23 +330,23 @@
     .toolbar-divider {
         height: 2rem;
         width: 1px;
-        background-color: var(--card-border);
+        background-color: var(--border);
         margin: 0 0.5rem;
     }
 
     /* Icon-only buttons */
     .icon-btn {
         padding: 0.625rem;
-        background-color: var(--card-bg);
-        border: 1px solid var(--card-border);
+        background-color: var(--card);
+        border: 1px solid var(--border);
         border-radius: 0.5rem;
         transition: all 0.2s;
         cursor: pointer;
-        color: var(--text-primary);
+        color: var(--foreground);
     }
 
     .icon-btn:hover {
-        background-color: var(--table-row-hover);
+        background-color: var(--muted);
         transform: scale(1.1);
     }
 
@@ -383,29 +361,14 @@
         align-items: center;
         justify-content: space-between;
         font-size: 0.75rem;
-        color: var(--text-tertiary);
+        color: var(--muted-foreground);
         padding: 0 0.5rem;
     }
 
-    .status-ready {
-        color: #22c55e;
-    }
-
-    .status-capturing {
-        color: #eab308;
-    }
-
-    .status-error {
-        color: #ef4444;
-    }
-
-    @@keyframes pulse {
-
-        0%,
-        100% {
+    @keyframes pulse {
+        0%, 100% {
             opacity: 1;
         }
-
         50% {
             opacity: 0.5;
         }
