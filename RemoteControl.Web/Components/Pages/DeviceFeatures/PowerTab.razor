@@ -14,7 +14,7 @@
 
     <div class="power-actions-grid">
         <!-- Lock Workstation Card -->
-        <button class="power-card lock-card">
+        <button class="power-card lock-card" @onclick="() => ShowConfirmation(PowerAction.Lock)">
             <div class="power-icon-wrapper lock-icon">
                 <svg class="power-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
@@ -27,7 +27,7 @@
         </button>
 
         <!-- Sleep / Suspend Card -->
-        <button class="power-card sleep-card">
+        <button class="power-card sleep-card" @onclick="() => ShowConfirmation(PowerAction.Sleep)">
             <div class="power-icon-wrapper sleep-icon">
                 <svg class="power-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
@@ -40,7 +40,7 @@
         </button>
 
         <!-- Restart Device Card -->
-        <button class="power-card restart-card">
+        <button class="power-card restart-card" @onclick="() => ShowConfirmation(PowerAction.Restart)">
             <div class="power-icon-wrapper restart-icon">
                 <svg class="power-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
@@ -53,7 +53,7 @@
         </button>
 
         <!-- Shutdown Card -->
-        <button class="power-card shutdown-card">
+        <button class="power-card shutdown-card" @onclick="() => ShowConfirmation(PowerAction.Shutdown)">
             <div class="power-icon-wrapper shutdown-icon">
                 <svg class="power-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
@@ -64,7 +64,85 @@
             <span class="power-card-description">Power off the remote system immediately.</span>
         </button>
     </div>
+
+    <!-- Confirmation Dialog Overlay -->
+    @if (ShowDialog)
+    {
+        <div class="dialog-overlay" @onclick="CancelAction">
+            <div class="dialog-box" @onclick:stopPropagation="true">
+                <div class="dialog-icon @GetDialogIconClass()">
+                    <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                            d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z">
+                        </path>
+                    </svg>
+                </div>
+                <h4 class="dialog-title">Confirm Action</h4>
+                <p class="dialog-message">You will <strong>@GetActionName()</strong> the remote computer.</p>
+                <p class="dialog-question">Are you sure you want to continue?</p>
+                <div class="dialog-actions">
+                    <button class="dialog-btn dialog-cancel" @onclick="CancelAction">Cancel</button>
+                    <button class="dialog-btn dialog-confirm @GetConfirmButtonClass()" @onclick="ConfirmAction">
+                        Yes, @GetActionName()
+                    </button>
+                </div>
+            </div>
+        </div>
+    }
 </div>
+
+@code {
+    private bool ShowDialog { get; set; } = false;
+    private PowerAction PendingAction { get; set; }
+
+    private enum PowerAction { Lock, Sleep, Restart, Shutdown }
+
+    private void ShowConfirmation(PowerAction action)
+    {
+        PendingAction = action;
+        ShowDialog = true;
+    }
+
+    private void CancelAction()
+    {
+        ShowDialog = false;
+    }
+
+    private void ConfirmAction()
+    {
+        ShowDialog = false;
+        
+        // TODO: Send SignalR command based on PendingAction
+        Console.WriteLine($"[Power] Executing: {PendingAction}");
+    }
+
+    private string GetActionName() => PendingAction switch
+    {
+        PowerAction.Lock => "LOCK",
+        PowerAction.Sleep => "SLEEP",
+        PowerAction.Restart => "RESTART",
+        PowerAction.Shutdown => "SHUTDOWN",
+        _ => "UNKNOWN"
+    };
+
+    private string GetDialogIconClass() => PendingAction switch
+    {
+        PowerAction.Lock => "icon-orange",
+        PowerAction.Sleep => "icon-purple",
+        PowerAction.Restart => "icon-blue",
+        PowerAction.Shutdown => "icon-red",
+        _ => ""
+    };
+
+    private string GetConfirmButtonClass() => PendingAction switch
+    {
+        PowerAction.Lock => "confirm-orange",
+        PowerAction.Sleep => "confirm-purple",
+        PowerAction.Restart => "confirm-blue",
+        PowerAction.Shutdown => "confirm-red",
+        _ => ""
+    };
+}
 
 <style>
     .power-container {
@@ -247,5 +325,159 @@
             flex-direction: column;
             text-align: center;
         }
+    }
+
+    /* Confirmation Dialog Overlay */
+    .dialog-overlay {
+        position: fixed;
+        inset: 0;
+        background-color: rgba(0, 0, 0, 0.7);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        z-index: 1000;
+        backdrop-filter: blur(4px);
+    }
+
+    .dialog-box {
+        background-color: var(--card-bg);
+        border: 1px solid var(--card-border);
+        border-radius: 1rem;
+        padding: 2rem;
+        max-width: 400px;
+        width: 90%;
+        text-align: center;
+        box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+        animation: dialogAppear 0.2s ease-out;
+    }
+
+    @@keyframes dialogAppear {
+        from {
+            opacity: 0;
+            transform: scale(0.95);
+        }
+        to {
+            opacity: 1;
+            transform: scale(1);
+        }
+    }
+
+    .dialog-icon {
+        width: 4rem;
+        height: 4rem;
+        margin: 0 auto 1rem;
+        padding: 1rem;
+        border-radius: 50%;
+    }
+
+    .dialog-icon svg {
+        width: 100%;
+        height: 100%;
+    }
+
+    .icon-orange {
+        background-color: rgba(249, 115, 22, 0.2);
+        color: #f97316;
+    }
+
+    .icon-purple {
+        background-color: rgba(139, 92, 246, 0.2);
+        color: #8b5cf6;
+    }
+
+    .icon-blue {
+        background-color: rgba(59, 130, 246, 0.2);
+        color: #3b82f6;
+    }
+
+    .icon-red {
+        background-color: rgba(239, 68, 68, 0.2);
+        color: #ef4444;
+    }
+
+    .dialog-title {
+        font-size: 1.25rem;
+        font-weight: 700;
+        color: var(--text-primary);
+        margin-bottom: 0.75rem;
+    }
+
+    .dialog-message {
+        color: var(--text-secondary);
+        font-size: 0.875rem;
+        margin-bottom: 0.25rem;
+    }
+
+    .dialog-message strong {
+        color: var(--text-primary);
+        font-weight: 700;
+    }
+
+    .dialog-question {
+        color: var(--text-tertiary);
+        font-size: 0.75rem;
+        margin-bottom: 1.5rem;
+    }
+
+    .dialog-actions {
+        display: flex;
+        gap: 0.75rem;
+        justify-content: center;
+    }
+
+    .dialog-btn {
+        padding: 0.625rem 1.5rem;
+        font-size: 0.875rem;
+        font-weight: 600;
+        border-radius: 0.5rem;
+        border: none;
+        cursor: pointer;
+        transition: all 0.2s;
+    }
+
+    .dialog-cancel {
+        background-color: var(--table-bg);
+        color: var(--text-secondary);
+        border: 1px solid var(--card-border);
+    }
+
+    .dialog-cancel:hover {
+        background-color: var(--table-row-hover);
+    }
+
+    .dialog-confirm {
+        color: white;
+    }
+
+    .confirm-orange {
+        background-color: #f97316;
+    }
+
+    .confirm-orange:hover {
+        background-color: #ea580c;
+    }
+
+    .confirm-purple {
+        background-color: #8b5cf6;
+    }
+
+    .confirm-purple:hover {
+        background-color: #7c3aed;
+    }
+
+    .confirm-blue {
+        background-color: #3b82f6;
+    }
+
+    .confirm-blue:hover {
+        background-color: #2563eb;
+    }
+
+    .confirm-red {
+        background-color: #ef4444;
+    }
+
+    .confirm-red:hover {
+        background-color: #dc2626;
     }
 </style>
