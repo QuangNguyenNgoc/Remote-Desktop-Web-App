@@ -1,4 +1,5 @@
 @using RemoteControl.Shared.Models
+@inject IJSRuntime JSRuntime
 
 @* Remote Screen Tab Component - Displays live screen stream with capture controls *@
 
@@ -8,7 +9,7 @@
         <!-- Screen Container -->
         <div class="screen-container">
             <!-- Screen Display Area -->
-            <div class="screen-display">
+            <div id="screen-display" class="screen-display" style="transform: scale(@ZoomLevel); transform-origin: center center;">
                 <img src="https://picsum.photos/1920/1080" alt="Remote Desktop Screen" class="screen-image" />
             </div>
         </div>
@@ -95,6 +96,7 @@
 
     private string CaptureStatus { get; set; } = "Ready";
     private bool IsCapturing { get; set; } = false;
+    private double ZoomLevel { get; set; } = 1.0; // 100%
 
     // Helper: Format resolution from model
     private string GetResolutionDisplay() => $"{CurrentScreenshot.Width}×{CurrentScreenshot.Height}";
@@ -140,34 +142,50 @@
         IsCapturing = false;
     }
 
-    private void SaveToDevice()
+    private async Task SaveToDevice()
     {
-        // TODO: Implement save to device logic
-        Console.WriteLine("[RemoteScreen] Save to device requested");
+        if (string.IsNullOrEmpty(CurrentScreenshot.ImageBase64))
+        {
+            Console.WriteLine("[RemoteScreen] No screenshot to save");
+            return;
+        }
+
+        var fileName = $"screenshot_{DateTime.Now:yyyyMMdd_HHmmss}.{CurrentScreenshot.Format}";
+        var dataUrl = $"data:image/{CurrentScreenshot.Format};base64,{CurrentScreenshot.ImageBase64}";
+        
+        await JSRuntime.InvokeVoidAsync("downloadImage", fileName, dataUrl);
+        Console.WriteLine($"[RemoteScreen] Saved: {fileName}");
     }
 
-    private void CopyImage()
+    private async Task CopyImage()
     {
-        // TODO: Implement copy to clipboard logic
-        Console.WriteLine("[RemoteScreen] Copy image requested");
+        if (string.IsNullOrEmpty(CurrentScreenshot.ImageBase64))
+        {
+            Console.WriteLine("[RemoteScreen] No screenshot to copy");
+            return;
+        }
+
+        var dataUrl = $"data:image/{CurrentScreenshot.Format};base64,{CurrentScreenshot.ImageBase64}";
+        await JSRuntime.InvokeVoidAsync("copyImageToClipboard", dataUrl);
+        Console.WriteLine("[RemoteScreen] Image copied to clipboard");
     }
 
-    private void ToggleFullscreen()
+    private async Task ToggleFullscreen()
     {
-        // TODO: Implement fullscreen toggle logic
-        Console.WriteLine("[RemoteScreen] Toggle fullscreen requested");
+        await JSRuntime.InvokeVoidAsync("toggleFullscreen", "screen-display");
+        Console.WriteLine("[RemoteScreen] Toggle fullscreen");
     }
 
     private void ZoomIn()
     {
-        // TODO: Implement zoom in logic
-        Console.WriteLine("[RemoteScreen] Zoom in requested");
+        ZoomLevel = Math.Min(ZoomLevel + 0.25, 3.0); // Max 300%
+        Console.WriteLine($"[RemoteScreen] Zoom: {ZoomLevel:P0}");
     }
 
     private void ZoomOut()
     {
-        // TODO: Implement zoom out logic
-        Console.WriteLine("[RemoteScreen] Zoom out requested");
+        ZoomLevel = Math.Max(ZoomLevel - 0.25, 0.25); // Min 25%
+        Console.WriteLine($"[RemoteScreen] Zoom: {ZoomLevel:P0}");
     }
 }
 
