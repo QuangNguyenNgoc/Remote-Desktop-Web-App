@@ -1,0 +1,82 @@
+@* Keylogger Tab Component *@
+<div class="keylogger-container">
+    <div class="terminal-window">
+        <div class="terminal-content">
+            <p class="log-entry"><span class="log-timestamp">[2023-11-18 10:00:01]</span> <span class="log-app">[Chrome]:</span> facebook.com</p>
+            <p class="log-entry"><span class="log-timestamp">[2023-11-18 10:00:05]</span> <span class="log-app">[Chrome]:</span> user_login</p>
+            <p class="log-entry"><span class="log-timestamp">[2023-11-18 10:00:10]</span> <span class="log-app">[Chrome]:</span> *********</p>
+            <p class="log-separator">--- User switched to Notepad ---</p>
+            <p class="log-entry"><span class="log-timestamp">[2023-11-18 10:05:22]</span> <span class="log-app">[Notepad]:</span> Hello world, this is a test log from the agent.</p>
+            <span class="cursor-blink">_</span>
+        </div>
+    </div>
+</div>
+
+<style>
+    .keylogger-container {
+        padding: 1rem;
+        background-color: var(--card-bg);
+        border-radius: 0 0 0.75rem 0.75rem;
+        min-height: 400px;
+    }
+    
+    .terminal-window {
+        background-color: var(--terminal-bg);
+        padding: 1rem;
+        border-radius: 0.5rem;
+        font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+        font-size: 0.875rem;
+        color: var(--terminal-text);
+        height: 380px;
+        overflow-y: auto;
+        border: 1px solid var(--terminal-border);
+    }
+    
+    .terminal-content {
+        line-height: 1.6;
+    }
+    
+    .log-entry {
+        margin-bottom: 0.25rem;
+        color: #10b981;
+    }
+    
+    .log-timestamp {
+        color: #10b981;
+        font-weight: 500;
+    }
+    
+    .log-app {
+        color: #10b981;
+        font-weight: 600;
+    }
+    
+    .log-separator {
+        color: var(--terminal-text-secondary);
+        margin: 0.5rem 0;
+        font-style: italic;
+    }
+    
+    .cursor-blink {
+        color: #10b981;
+        animation: blink 1s infinite;
+    }
+    
+    @@keyframes blink {
+        0%, 49% { opacity: 1; }
+        50%, 100% { opacity: 0; }
+    }
+    
+    .terminal-window::-webkit-scrollbar {
+        width: 8px;
+    }
+    
+    .terminal-window::-webkit-scrollbar-track {
+        background: var(--terminal-bg);
+    }
+    
+    .terminal-window::-webkit-scrollbar-thumb {
+        background: var(--terminal-border);
+        border-radius: 4px;
+    }
+</style>

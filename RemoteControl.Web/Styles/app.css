@@ -36,6 +36,10 @@
   --btn-secondary-text: #374151;
   --btn-disabled-bg: #f3f4f6;
   --btn-disabled-text: #9ca3af;
+  --btn-start-bg: #4caf50;
+  --btn-start-hover: #45a049;
+  --btn-stop-bg: #ef4444;
+  --btn-stop-hover: #dc2626;
 
   /* Tables */
   --table-bg: #ffffff;
