@@ -8,7 +8,7 @@
                     <th>PID</th>
                     <th>CPU %</th>
                     <th>MEMORY</th>
-                    <th class="text-right">ACTION</th>
+                    <th class="text-center">ACTION</th>
                 </tr>
             </thead>
             <tbody>
@@ -17,8 +17,17 @@
                     <td>1244</td>
                     <td>12%</td>
                     <td>450 MB</td>
-                    <td class="text-right">
-                        <button class="action-button kill-button">Kill</button>
+                    <td class="cell-center"><button
+                            class="px-4 py-2 rounded-lg text-sm font-medium flex items-center gap-2"
+                            style="background-color: rgba(239, 68, 68, 0.1); color: #ef4444; border: 1px solid rgba(239, 68, 68, 0.2);"
+                            onmouseover="this.style.backgroundColor='rgba(239, 68, 68, 0.2)';"
+                            onmouseout="this.style.backgroundColor='rgba(239, 68, 68, 0.1)';">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                    d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                            </svg>
+                            Kill
+                        </button>
                     </td>
                 </tr>
                 <tr>
@@ -26,15 +35,35 @@
                     <td>4</td>
                     <td>2%</td>
                     <td>120 MB</td>
-                    <td class="text-right"></td>
+                    <td class="cell-center"><button
+                            class="px-4 py-2 rounded-lg text-sm font-medium flex items-center gap-2"
+                            style="background-color: rgba(239, 68, 68, 0.1); color: #ef4444; border: 1px solid rgba(239, 68, 68, 0.2);"
+                            onmouseover="this.style.backgroundColor='rgba(239, 68, 68, 0.2)';"
+                            onmouseout="this.style.backgroundColor='rgba(239, 68, 68, 0.1)';">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                    d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                            </svg>
+                            Kill
+                        </button>
+                    </td>
                 </tr>
                 <tr>
                     <td class="font-semibold process-name">Explorer.exe</td>
                     <td>5622</td>
                     <td>1%</td>
                     <td>80 MB</td>
-                    <td class="text-right">
-                        <button class="action-button kill-button">Kill</button>
+                    <td class="cell-center"><button
+                            class="px-4 py-2 rounded-lg text-sm font-medium flex items-center gap-2"
+                            style="background-color: rgba(239, 68, 68, 0.1); color: #ef4444; border: 1px solid rgba(239, 68, 68, 0.2);"
+                            onmouseover="this.style.backgroundColor='rgba(239, 68, 68, 0.2)';"
+                            onmouseout="this.style.backgroundColor='rgba(239, 68, 68, 0.1)';">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                    d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                            </svg>
+                            Kill
+                        </button>
                     </td>
                 </tr>
             </tbody>
@@ -49,17 +78,17 @@
         border-radius: 0 0 0.75rem 0.75rem;
         overflow: hidden;
     }
-    
+
     .task-manager-table-wrapper {
         overflow-x: auto;
     }
-    
+
     .task-table {
         width: 100%;
         text-align: left;
         font-size: 0.875rem;
     }
-    
+
     .task-table thead {
         background-color: var(--table-header-bg);
         color: var(--table-header-text);
@@ -68,52 +97,62 @@
         font-weight: 600;
         letter-spacing: 0.05em;
     }
-    
+
     .task-table th {
         padding: 0.75rem 1.5rem;
         font-weight: 600;
     }
-    
+
     .task-table tbody {
         color: var(--table-text);
     }
-    
+
     .task-table tbody tr {
         border-bottom: 1px solid var(--table-border);
         transition: background-color 0.15s ease;
     }
-    
+
     .task-table tbody tr:hover {
         background-color: var(--table-row-hover);
     }
-    
+
     .task-table td {
         padding: 1rem 1.5rem;
     }
-    
+
     .process-name {
         color: var(--table-text-primary);
     }
-    
+
     .action-button {
         font-size: 0.875rem;
         font-weight: 500;
         transition: all 0.2s ease;
     }
-    
+
     .kill-button {
         color: #ef4444;
     }
-    
+
     .kill-button:hover {
         color: #dc2626;
         text-decoration: underline;
     }
-    
+
     .text-right {
         text-align: right;
     }
-    
+
+    .text-center {
+        text-align: center;
+    }
+
+    .cell-center {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+    }
+
     .font-semibold {
         font-weight: 600;
     }
