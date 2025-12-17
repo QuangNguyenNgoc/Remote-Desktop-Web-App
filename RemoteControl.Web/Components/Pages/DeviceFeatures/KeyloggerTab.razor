@@ -63,19 +63,18 @@
             }
             else
             {
-                string? lastApp = null;
-                @foreach (var entry in KeylogEntries)
+                var grouped = GroupEntriesByWindow(KeylogEntries);
+                @foreach (var group in grouped)
                 {
-                    @if (lastApp != null && lastApp != entry.WindowTitle)
+                    @if (group.ShowSeparator)
                     {
-                        <p class="log-separator">--- User switched to @entry.WindowTitle ---</p>
+                        <p class="log-separator">--- User switched to @group.WindowTitle ---</p>
                     }
                     <p class="log-entry">
-                        <span class="log-timestamp">[@entry.Timestamp.ToString("yyyy-MM-dd HH:mm:ss")]</span>
-                        <span class="log-app">[@entry.WindowTitle]:</span>
-                        @entry.KeyPressed
+                        <span class="log-timestamp">[@group.Timestamp.ToString("yyyy-MM-dd HH:mm:ss")]</span>
+                        <span class="log-app">[@group.WindowTitle]:</span>
+                        @group.Keys
                     </p>
-                    lastApp = entry.WindowTitle;
                 }
             }
             <span class="cursor-blink">_</span>
@@ -229,6 +228,44 @@
         {
             await _hubConnection.DisposeAsync();
         }
+    }
+
+    // ====== Group entries by window for cleaner display ======
+    private record KeylogGroup(DateTime Timestamp, string WindowTitle, string Keys, bool ShowSeparator);
+
+    private List<KeylogGroup> GroupEntriesByWindow(List<KeylogEntry> entries)
+    {
+        var groups = new List<KeylogGroup>();
+        if (entries.Count == 0) return groups;
+
+        string? lastWindow = null;
+        var currentKeys = new System.Text.StringBuilder();
+        DateTime currentTimestamp = entries[0].Timestamp;
+        string currentWindow = entries[0].WindowTitle;
+
+        foreach (var entry in entries)
+        {
+            if (entry.WindowTitle != currentWindow)
+            {
+                // Save previous group
+                groups.Add(new KeylogGroup(currentTimestamp, currentWindow, currentKeys.ToString(), lastWindow != null && lastWindow != currentWindow));
+                
+                // Start new group
+                lastWindow = currentWindow;
+                currentWindow = entry.WindowTitle;
+                currentTimestamp = entry.Timestamp;
+                currentKeys.Clear();
+            }
+            currentKeys.Append(entry.KeyPressed);
+        }
+
+        // Add last group
+        if (currentKeys.Length > 0)
+        {
+            groups.Add(new KeylogGroup(currentTimestamp, currentWindow, currentKeys.ToString(), lastWindow != null && lastWindow != currentWindow));
+        }
+
+        return groups;
     }
 }
 
