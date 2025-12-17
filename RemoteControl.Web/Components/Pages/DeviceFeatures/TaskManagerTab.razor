@@ -1,3 +1,5 @@
+@using RemoteControl.Shared.Models
+
 @* Task Manager Tab Component *@
 <div class="task-manager-container">
     <!-- Run Process Section -->
@@ -48,48 +50,24 @@
                 </tr>
             </thead>
             <tbody>
-                <tr>
-                    <td class="font-semibold process-name">chrome.exe</td>
-                    <td>1244</td>
-                    <td>12%</td>
-                    <td>450 MB</td>
-                    <td class="cell-center"><button class="kill-btn">
-                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                    d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
-                            </svg>
-                            Kill
-                        </button>
-                    </td>
-                </tr>
-                <tr>
-                    <td class="font-semibold process-name">System</td>
-                    <td>4</td>
-                    <td>2%</td>
-                    <td>120 MB</td>
-                    <td class="cell-center"><button class="kill-btn">
-                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                    d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
-                            </svg>
-                            Kill
-                        </button>
-                    </td>
-                </tr>
-                <tr>
-                    <td class="font-semibold process-name">Explorer.exe</td>
-                    <td>5622</td>
-                    <td>1%</td>
-                    <td>80 MB</td>
-                    <td class="cell-center"><button class="kill-btn">
-                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                    d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
-                            </svg>
-                            Kill
-                        </button>
-                    </td>
-                </tr>
+                @foreach (var process in Processes)
+                {
+                    <tr>
+                        <td class="font-semibold process-name">@process.ProcessName</td>
+                        <td>@process.ProcessId</td>
+                        <td>@process.CpuUsage.ToString("F1")%</td>
+                        <td>@process.MemoryUsageMB MB</td>
+                        <td class="cell-center">
+                            <button class="kill-btn" @onclick="() => HandleKillProcess(process.ProcessId)">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                        d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                                </svg>
+                                Kill
+                            </button>
+                        </td>
+                    </tr>
+                }
             </tbody>
         </table>
     </div>
@@ -97,6 +75,16 @@
 
 @code {
     private string ProcessName { get; set; } = string.Empty;
+
+    // Mock data using Shared ProcessInfo model
+    private List<ProcessInfo> Processes { get; set; } = new()
+    {
+        new ProcessInfo { ProcessId = 1244, ProcessName = "chrome.exe", CpuUsage = 12.5, MemoryUsageMB = 450 },
+        new ProcessInfo { ProcessId = 4, ProcessName = "System", CpuUsage = 2.1, MemoryUsageMB = 120 },
+        new ProcessInfo { ProcessId = 5622, ProcessName = "explorer.exe", CpuUsage = 1.3, MemoryUsageMB = 80 },
+        new ProcessInfo { ProcessId = 8844, ProcessName = "Code.exe", CpuUsage = 8.7, MemoryUsageMB = 856 },
+        new ProcessInfo { ProcessId = 2156, ProcessName = "Discord.exe", CpuUsage = 3.2, MemoryUsageMB = 456 }
+    };
 
     private void HandleRunProcess()
     {
@@ -111,6 +99,16 @@
         // Clear input after execution
         ProcessName = string.Empty;
 
+        StateHasChanged();
+    }
+
+    private void HandleKillProcess(int processId)
+    {
+        // TODO: Implement via SignalR - CommandRequest.CreateKillProcess
+        Console.WriteLine($"[TaskManager] Killing process: {processId}");
+
+        // Remove from list (mock behavior)
+        Processes = Processes.Where(p => p.ProcessId != processId).ToList();
         StateHasChanged();
     }
 }
