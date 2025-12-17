@@ -1,5 +1,8 @@
 @using RemoteControl.Shared.Models
-@implements IDisposable
+@using RemoteControl.Shared.Constants
+@using Microsoft.AspNetCore.SignalR.Client
+@implements IAsyncDisposable
+@inject NavigationManager Nav
 
 @* Task Manager Tab Component *@
 <div class="task-manager-container">
@@ -109,25 +112,92 @@
 </div>
 
 @code {
+    // CascadingParameter from DeviceControl
+    [CascadingParameter(Name = "AgentId")]
+    public string AgentId { get; set; } = string.Empty;
+
+    // SignalR
+    private HubConnection? _hubConnection;
+    private bool IsConnected => _hubConnection?.State == HubConnectionState.Connected;
+
+    // UI State
     private string ProcessName { get; set; } = string.Empty;
     private bool AutoRefreshEnabled { get; set; } = true;
     private DateTime LastRefreshTime { get; set; } = DateTime.Now;
     private System.Timers.Timer? _refreshTimer;
-    private Random _random = new();
 
-    // Mock data using Shared ProcessInfo model
-    private List<ProcessInfo> Processes { get; set; } = new()
-    {
-        new ProcessInfo { ProcessId = 1244, ProcessName = "chrome.exe", CpuUsage = 12.5, MemoryUsageMB = 450 },
-        new ProcessInfo { ProcessId = 4, ProcessName = "System", CpuUsage = 2.1, MemoryUsageMB = 120 },
-        new ProcessInfo { ProcessId = 5622, ProcessName = "explorer.exe", CpuUsage = 1.3, MemoryUsageMB = 80 },
-        new ProcessInfo { ProcessId = 8844, ProcessName = "Code.exe", CpuUsage = 8.7, MemoryUsageMB = 856 },
-        new ProcessInfo { ProcessId = 2156, ProcessName = "Discord.exe", CpuUsage = 3.2, MemoryUsageMB = 456 }
-    };
+    // Process data
+    private List<ProcessInfo> Processes { get; set; } = new();
 
-    protected override void OnInitialized()
+    protected override async Task OnInitializedAsync()
     {
+        await InitializeSignalR();
         StartAutoRefresh();
+        
+        // Request initial process list
+        if (IsConnected && !string.IsNullOrEmpty(AgentId))
+        {
+            await RequestProcessList();
+        }
+    }
+
+    private async Task InitializeSignalR()
+    {
+        _hubConnection = new HubConnectionBuilder()
+            .WithUrl(Nav.ToAbsoluteUri("/remotehub"))
+            .WithAutomaticReconnect()
+            .Build();
+
+        // Listen for command results
+        _hubConnection.On<CommandResult>(HubEvents.CommandCompleted, OnCommandCompleted);
+
+        try
+        {
+            await _hubConnection.StartAsync();
+            Console.WriteLine("[TaskManager] SignalR connected");
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[TaskManager] SignalR error: {ex.Message}");
+        }
+    }
+
+    private void OnCommandCompleted(CommandResult result)
+    {
+        if (result.AgentId != AgentId) return;
+        if (!result.Success) return;
+
+        // ProcessListResult is stored in CommandResult.Data
+        if (result.Data is System.Text.Json.JsonElement jsonElement)
+        {
+            try
+            {
+                var processResult = System.Text.Json.JsonSerializer.Deserialize<ProcessListResult>(
+                    jsonElement.GetRawText(),
+                    new System.Text.Json.JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+                
+                if (processResult?.Processes != null)
+                {
+                    Processes = processResult.Processes;
+                    LastRefreshTime = DateTime.Now;
+                    InvokeAsync(StateHasChanged);
+                    Console.WriteLine($"[TaskManager] Received {Processes.Count} processes");
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"[TaskManager] Parse error: {ex.Message}");
+            }
+        }
+    }
+
+    private async Task RequestProcessList()
+    {
+        if (_hubConnection == null || !IsConnected) return;
+        
+        var request = CommandRequest.CreateListProcesses(AgentId);
+        await _hubConnection.InvokeAsync("SendCommand", request);
+        Console.WriteLine($"[TaskManager] Requested process list for {AgentId}");
     }
 
     private void StartAutoRefresh()
@@ -145,19 +215,8 @@
     {
         if (!AutoRefreshEnabled) return;
 
-        // Simulate CPU/Memory changes (mock behavior)
-        foreach (var process in Processes)
-        {
-            process.CpuUsage = Math.Round(process.CpuUsage + (_random.NextDouble() - 0.5) * 5, 1);
-            process.CpuUsage = Math.Max(0, Math.Min(100, process.CpuUsage)); // Clamp 0-100
-            process.MemoryUsageMB += _random.Next(-20, 21);
-            process.MemoryUsageMB = Math.Max(10, process.MemoryUsageMB); // Min 10MB
-        }
-
-        LastRefreshTime = DateTime.Now;
-
-        // TODO: Implement via SignalR - request new process list from Agent
-        await InvokeAsync(StateHasChanged);
+        // Request updated process list via SignalR
+        await RequestProcessList();
     }
 
     private void ToggleAutoRefresh()
@@ -173,36 +232,42 @@
         }
     }
 
-    private void HandleRunProcess()
+    private async Task HandleRunProcess()
     {
-        if (string.IsNullOrWhiteSpace(ProcessName))
-        {
-            return;
-        }
+        if (string.IsNullOrWhiteSpace(ProcessName)) return;
+        if (_hubConnection == null || !IsConnected) return;
 
-        // TODO: Implement via SignalR - CommandRequest.CreateStartProcess
+        var request = CommandRequest.CreateStartProcess(AgentId, ProcessName);
+        await _hubConnection.InvokeAsync("SendCommand", request);
         Console.WriteLine($"[TaskManager] Running process: {ProcessName}");
 
         // Clear input after execution
         ProcessName = string.Empty;
-
         StateHasChanged();
     }
 
-    private void HandleKillProcess(int processId)
+    private async Task HandleKillProcess(int processId)
     {
-        // TODO: Implement via SignalR - CommandRequest.CreateKillProcess
+        if (_hubConnection == null || !IsConnected) return;
+
+        var request = CommandRequest.CreateKillProcess(AgentId, processId);
+        await _hubConnection.InvokeAsync("SendCommand", request);
         Console.WriteLine($"[TaskManager] Killing process: {processId}");
 
-        // Remove from list (mock behavior)
+        // Optimistically remove from UI
         Processes = Processes.Where(p => p.ProcessId != processId).ToList();
         StateHasChanged();
     }
 
-    public void Dispose()
+    public async ValueTask DisposeAsync()
     {
         _refreshTimer?.Stop();
         _refreshTimer?.Dispose();
+        
+        if (_hubConnection != null)
+        {
+            await _hubConnection.DisposeAsync();
+        }
     }
 }
 
