@@ -45,15 +45,6 @@
                     <span>Copy Image</span>
                 </button>
 
-                <!-- Refresh Stream -->
-                <button class="action-btn action-btn-orange" @onclick="RefreshStream">
-                    <svg class="btn-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                            d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                    </svg>
-                    <span>Refresh</span>
-                </button>
-
                 <!-- Divider -->
                 <div class="toolbar-divider"></div>
 
@@ -159,12 +150,6 @@
     {
         // TODO: Implement copy to clipboard logic
         Console.WriteLine("[RemoteScreen] Copy image requested");
-    }
-
-    private void RefreshStream()
-    {
-        // TODO: Implement stream refresh logic
-        Console.WriteLine("[RemoteScreen] Refresh stream requested");
     }
 
     private void ToggleFullscreen()
