@@ -1,3 +1,5 @@
+@using RemoteControl.Shared.Models
+
 @* System Monitor Tab Component *@
 <div class="system-monitor-container">
     @* Metrics Cards *@
@@ -69,7 +71,7 @@
     <div class="processes-section">
         <h3 class="section-title">Top Processes</h3>
         <div class="processes-list">
-            @foreach (var (process, index) in Processes.Select((p, i) => (p, i)))
+            @foreach (var (process, index) in TopProcesses.Select((p, i) => (p, i)))
             {
                 <div class="process-item">
                     <div class="process-rank">
@@ -82,15 +84,15 @@
                             <span class="rank-number">@(index + 1)</span>
                         }
                     </div>
-                    <div class="process-name">@process.Name</div>
+                    <div class="process-name">@process.ProcessName</div>
                     <div class="process-stats">
                         <span class="stat-item">
                             <span class="stat-label">CPU:</span>
-                            <span class="stat-value">@process.CpuUsage%</span>
+                            <span class="stat-value">@process.CpuUsage.ToString("F1")%</span>
                         </span>
                         <span class="stat-item">
                             <span class="stat-label">Memory:</span>
-                            <span class="stat-value">@process.Memory</span>
+                            <span class="stat-value">@process.MemoryUsageMB MB</span>
                         </span>
                     </div>
                 </div>
@@ -98,6 +100,27 @@
         </div>
     </div>
 </div>
+
+@code {
+    // System metrics (mock - needs Agent's SystemInfo event)
+    private int CpuUsage { get; set; } = 45;
+    private int RamUsage { get; set; } = 68;
+    private string Uptime { get; set; } = "2d 14h 32m";
+
+    // Mock data using Shared ProcessInfo model
+    private List<ProcessInfo> AllProcesses { get; set; } = new()
+    {
+        new ProcessInfo { ProcessId = 1244, ProcessName = "chrome.exe", CpuUsage = 35.2, MemoryUsageMB = 1200 },
+        new ProcessInfo { ProcessId = 8844, ProcessName = "Code.exe", CpuUsage = 22.5, MemoryUsageMB = 856 },
+        new ProcessInfo { ProcessId = 4, ProcessName = "System", CpuUsage = 15.3, MemoryUsageMB = 234 },
+        new ProcessInfo { ProcessId = 5622, ProcessName = "explorer.exe", CpuUsage = 8.1, MemoryUsageMB = 189 },
+        new ProcessInfo { ProcessId = 2156, ProcessName = "Discord.exe", CpuUsage = 5.4, MemoryUsageMB = 456 }
+    };
+
+    // Top 5 processes sorted by CPU usage
+    private IEnumerable<ProcessInfo> TopProcesses => 
+        AllProcesses.OrderByDescending(p => p.CpuUsage).Take(5);
+}
 
 <style>
     .system-monitor-container {
@@ -321,33 +344,3 @@
         }
     }
 </style>
-
-@code {
-    // Sample data - replace with actual data from your service
-    private int CpuUsage { get; set; } = 45;
-    private int RamUsage { get; set; } = 68;
-    private string Uptime { get; set; } = "2d 14h 32m";
-
-    private List<ProcessInfoItem> Processes { get; set; } = new()
-    {
-        new ProcessInfoItem { Name = "chrome.exe", CpuUsage = 35, Memory = "1.2 GB" },
-        new ProcessInfoItem { Name = "Code.exe", CpuUsage = 22, Memory = "856 MB" },
-        new ProcessInfoItem { Name = "System", CpuUsage = 15, Memory = "234 MB" },
-        new ProcessInfoItem { Name = "explorer.exe", CpuUsage = 8, Memory = "189 MB" },
-        new ProcessInfoItem { Name = "Discord.exe", CpuUsage = 5, Memory = "456 MB" }
-    };
-
-    protected override async Task OnInitializedAsync()
-    {
-        // Initialize component
-        // TODO: Connect to your backend service to get real-time data
-        await Task.CompletedTask;
-    }
-
-    public class ProcessInfoItem
-    {
-        public string Name { get; set; } = string.Empty;
-        public int CpuUsage { get; set; }
-        public string Memory { get; set; } = string.Empty;
-    }
-}
