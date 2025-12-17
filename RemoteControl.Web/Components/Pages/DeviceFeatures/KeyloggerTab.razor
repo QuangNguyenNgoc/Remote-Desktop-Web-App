@@ -1,16 +1,132 @@
+@using RemoteControl.Shared.Models
+@inject IJSRuntime JSRuntime
+
 @* Keylogger Tab Component *@
 <div class="keylogger-container">
+    <!-- Control Buttons -->
+    <div class="keylog-controls">
+        <button class="control-btn start-btn @(IsRecording ? "btn-disabled" : "")" 
+                @onclick="StartRecording" 
+                disabled="@IsRecording">
+            <svg class="btn-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                    d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z"></path>
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                    d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+            </svg>
+            Start
+        </button>
+        <button class="control-btn stop-btn @(!IsRecording ? "btn-disabled" : "")" 
+                @onclick="StopRecording" 
+                disabled="@(!IsRecording)">
+            <svg class="btn-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                    d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                    d="M9 10a1 1 0 011-1h4a1 1 0 011 1v4a1 1 0 01-1 1h-4a1 1 0 01-1-1v-4z"></path>
+            </svg>
+            Stop
+        </button>
+        <div class="controls-divider"></div>
+        <button class="control-btn reset-btn" @onclick="ResetLogs">
+            <svg class="btn-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                    d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
+            </svg>
+            Reset
+        </button>
+        <button class="control-btn save-btn" @onclick="SaveLogs">
+            <svg class="btn-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                    d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path>
+            </svg>
+            Save
+        </button>
+        @if (IsRecording)
+        {
+            <span class="recording-indicator">
+                <span class="rec-dot"></span>
+                REC
+            </span>
+        }
+    </div>
+
     <div class="terminal-window">
         <div class="terminal-content">
-            <p class="log-entry"><span class="log-timestamp">[2023-11-18 10:00:01]</span> <span class="log-app">[Chrome]:</span> facebook.com</p>
-            <p class="log-entry"><span class="log-timestamp">[2023-11-18 10:00:05]</span> <span class="log-app">[Chrome]:</span> user_login</p>
-            <p class="log-entry"><span class="log-timestamp">[2023-11-18 10:00:10]</span> <span class="log-app">[Chrome]:</span> *********</p>
-            <p class="log-separator">--- User switched to Notepad ---</p>
-            <p class="log-entry"><span class="log-timestamp">[2023-11-18 10:05:22]</span> <span class="log-app">[Notepad]:</span> Hello world, this is a test log from the agent.</p>
+            @if (KeylogEntries.Count == 0)
+            {
+                <p class="log-empty">No keylog data. Press Start to begin recording.</p>
+            }
+            else
+            {
+                string? lastApp = null;
+                @foreach (var entry in KeylogEntries)
+                {
+                    @if (lastApp != null && lastApp != entry.WindowTitle)
+                    {
+                        <p class="log-separator">--- User switched to @entry.WindowTitle ---</p>
+                    }
+                    <p class="log-entry">
+                        <span class="log-timestamp">[@entry.Timestamp.ToString("yyyy-MM-dd HH:mm:ss")]</span>
+                        <span class="log-app">[@entry.WindowTitle]:</span>
+                        @entry.KeyPressed
+                    </p>
+                    lastApp = entry.WindowTitle;
+                }
+            }
             <span class="cursor-blink">_</span>
         </div>
     </div>
 </div>
+
+@code {
+    private bool IsRecording { get; set; } = false;
+
+    // Mock data using Shared KeylogEntry model
+    private List<KeylogEntry> KeylogEntries { get; set; } = new()
+    {
+        new KeylogEntry { Timestamp = DateTime.Now.AddMinutes(-10), WindowTitle = "Chrome", KeyPressed = "facebook.com" },
+        new KeylogEntry { Timestamp = DateTime.Now.AddMinutes(-9), WindowTitle = "Chrome", KeyPressed = "user_login" },
+        new KeylogEntry { Timestamp = DateTime.Now.AddMinutes(-8), WindowTitle = "Chrome", KeyPressed = "*********" },
+        new KeylogEntry { Timestamp = DateTime.Now.AddMinutes(-5), WindowTitle = "Notepad", KeyPressed = "Hello world, this is a test." },
+        new KeylogEntry { Timestamp = DateTime.Now.AddMinutes(-3), WindowTitle = "Notepad", KeyPressed = "Testing keylogger feature." },
+        new KeylogEntry { Timestamp = DateTime.Now.AddMinutes(-1), WindowTitle = "VS Code", KeyPressed = "Console.WriteLine()" }
+    };
+
+    private void StartRecording()
+    {
+        IsRecording = true;
+        // TODO: Implement via SignalR - CommandRequest.CreateKeyloggerOn
+        Console.WriteLine("[Keylogger] Start recording requested");
+    }
+
+    private void StopRecording()
+    {
+        IsRecording = false;
+        // TODO: Implement via SignalR - CommandRequest.CreateKeyloggerOff
+        Console.WriteLine("[Keylogger] Stop recording requested");
+    }
+
+    private void ResetLogs()
+    {
+        KeylogEntries.Clear();
+        Console.WriteLine("[Keylogger] Logs cleared");
+    }
+
+    private async Task SaveLogs()
+    {
+        if (KeylogEntries.Count == 0) return;
+
+        var content = string.Join("\n", KeylogEntries.Select(e => 
+            $"[{e.Timestamp:yyyy-MM-dd HH:mm:ss}] [{e.WindowTitle}]: {e.KeyPressed}"));
+        
+        var fileName = $"keylog_{DateTime.Now:yyyyMMdd_HHmmss}.txt";
+        
+        // Download via JS interop
+        await JSRuntime.InvokeVoidAsync("downloadFile", fileName, content);
+        Console.WriteLine($"[Keylogger] Saved to {fileName}");
+    }
+}
 
 <style>
     .keylogger-container {
@@ -19,7 +135,110 @@
         border-radius: 0 0 0.75rem 0.75rem;
         min-height: 400px;
     }
-    
+
+    /* Control Buttons */
+    .keylog-controls {
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+        margin-bottom: 1rem;
+        padding: 0.75rem;
+        background-color: var(--table-bg);
+        border-radius: 0.5rem;
+        border: 1px solid var(--card-border);
+    }
+
+    .control-btn {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        padding: 0.5rem 1rem;
+        font-size: 0.875rem;
+        font-weight: 500;
+        border-radius: 0.5rem;
+        border: none;
+        cursor: pointer;
+        transition: all 0.2s;
+        color: white;
+    }
+
+    .btn-icon {
+        width: 1rem;
+        height: 1rem;
+    }
+
+    .start-btn {
+        background-color: #16a34a;
+    }
+
+    .start-btn:hover:not(.btn-disabled) {
+        background-color: #15803d;
+    }
+
+    .stop-btn {
+        background-color: #ef4444;
+    }
+
+    .stop-btn:hover:not(.btn-disabled) {
+        background-color: #dc2626;
+    }
+
+    .reset-btn {
+        background-color: #f97316;
+    }
+
+    .reset-btn:hover {
+        background-color: #ea580c;
+    }
+
+    .save-btn {
+        background-color: #3b82f6;
+    }
+
+    .save-btn:hover {
+        background-color: #2563eb;
+    }
+
+    .btn-disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+    }
+
+    .controls-divider {
+        width: 1px;
+        height: 1.5rem;
+        background-color: var(--card-border);
+    }
+
+    .recording-indicator {
+        display: flex;
+        align-items: center;
+        gap: 0.375rem;
+        margin-left: auto;
+        padding: 0.375rem 0.75rem;
+        background-color: rgba(239, 68, 68, 0.1);
+        border: 1px solid rgba(239, 68, 68, 0.3);
+        border-radius: 9999px;
+        color: #ef4444;
+        font-size: 0.75rem;
+        font-weight: 700;
+    }
+
+    .rec-dot {
+        width: 0.5rem;
+        height: 0.5rem;
+        background-color: #ef4444;
+        border-radius: 50%;
+        animation: pulse 1.5s infinite;
+    }
+
+    .log-empty {
+        color: var(--text-tertiary);
+        font-style: italic;
+        text-align: center;
+        padding: 2rem;
+    }
+
     .terminal-window {
         background-color: var(--terminal-bg);
         padding: 1rem;
@@ -31,50 +250,50 @@
         overflow-y: auto;
         border: 1px solid var(--terminal-border);
     }
-    
+
     .terminal-content {
         line-height: 1.6;
     }
-    
+
     .log-entry {
         margin-bottom: 0.25rem;
         color: #10b981;
     }
-    
+
     .log-timestamp {
         color: #10b981;
         font-weight: 500;
     }
-    
+
     .log-app {
-        color: #10b981;
+        color: #60a5fa;
         font-weight: 600;
     }
-    
+
     .log-separator {
         color: var(--terminal-text-secondary);
         margin: 0.5rem 0;
         font-style: italic;
     }
-    
+
     .cursor-blink {
         color: #10b981;
         animation: blink 1s infinite;
     }
-    
+
     @@keyframes blink {
         0%, 49% { opacity: 1; }
         50%, 100% { opacity: 0; }
     }
-    
+
     .terminal-window::-webkit-scrollbar {
         width: 8px;
     }
-    
+
     .terminal-window::-webkit-scrollbar-track {
         background: var(--terminal-bg);
     }
-    
+
     .terminal-window::-webkit-scrollbar-thumb {
         background: var(--terminal-border);
         border-radius: 4px;

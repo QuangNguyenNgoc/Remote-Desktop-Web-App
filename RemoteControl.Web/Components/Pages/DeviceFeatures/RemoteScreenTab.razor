@@ -1,3 +1,5 @@
+@using RemoteControl.Shared.Models
+
 @* Remote Screen Tab Component - Displays live screen stream with capture controls *@
 
 <div class="remote-screen-tab">
@@ -43,15 +45,6 @@
                     <span>Copy Image</span>
                 </button>
 
-                <!-- Refresh Stream -->
-                <button class="action-btn action-btn-orange" @onclick="RefreshStream">
-                    <svg class="btn-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                            d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                    </svg>
-                    <span>Refresh</span>
-                </button>
-
                 <!-- Divider -->
                 <div class="toolbar-divider"></div>
 
@@ -80,8 +73,8 @@
 
             <!-- Info Bar -->
             <div class="info-bar">
-                <span>Resolution: @Resolution</span>
-                <span>Format: @ImageFormat</span>
+                <span>Resolution: @GetResolutionDisplay()</span>
+                <span>Format: @CurrentScreenshot.Format.ToUpper()</span>
                 <span>Last capture: @GetLastCaptureDisplay()</span>
                 <span class="@GetStatusClass()">Status: @CaptureStatus</span>
             </div>
@@ -90,25 +83,35 @@
 </div>
 
 @code {
-    // Screenshot information properties (mock data for now)
-    private string Resolution { get; set; } = "1920×1080";
-    private string ImageFormat { get; set; } = "JPEG";
-    private DateTime? LastCaptureTime { get; set; } = DateTime.Now.AddMinutes(-2); // Mock: 2 min ago
+    // Screenshot result from Shared model (mock data)
+    private ScreenshotResult CurrentScreenshot { get; set; } = new()
+    {
+        ImageBase64 = "", // Will be populated by SignalR
+        Width = 1920,
+        Height = 1080,
+        Format = "jpeg",
+        CapturedAt = DateTime.Now.AddMinutes(-2)
+    };
+
     private string CaptureStatus { get; set; } = "Ready";
     private bool IsCapturing { get; set; } = false;
+
+    // Helper: Format resolution from model
+    private string GetResolutionDisplay() => $"{CurrentScreenshot.Width}×{CurrentScreenshot.Height}";
 
     // Helper: Format last capture time in friendly way
     private string GetLastCaptureDisplay()
     {
-        if (LastCaptureTime == null) return "Never";
+        var captureTime = CurrentScreenshot.CapturedAt;
+        if (captureTime == default) return "Never";
         
-        var elapsed = DateTime.Now - LastCaptureTime.Value;
+        var elapsed = DateTime.Now - captureTime;
         
         if (elapsed.TotalSeconds < 30) return "Just now";
         if (elapsed.TotalMinutes < 1) return "Less than 1 min ago";
         if (elapsed.TotalMinutes < 60) return $"{(int)elapsed.TotalMinutes} min ago";
         if (elapsed.TotalHours < 24) return $"{(int)elapsed.TotalHours} hr ago";
-        return LastCaptureTime.Value.ToString("MMM dd, HH:mm");
+        return captureTime.ToString("MMM dd, HH:mm");
     }
 
     // Helper: Status color class
@@ -132,7 +135,7 @@
         Console.WriteLine("[RemoteScreen] Capture screen requested");
         
         // Simulate capture complete (remove when implementing SignalR)
-        LastCaptureTime = DateTime.Now;
+        CurrentScreenshot.CapturedAt = DateTime.Now;
         CaptureStatus = "Ready";
         IsCapturing = false;
     }
@@ -147,12 +150,6 @@
     {
         // TODO: Implement copy to clipboard logic
         Console.WriteLine("[RemoteScreen] Copy image requested");
-    }
-
-    private void RefreshStream()
-    {
-        // TODO: Implement stream refresh logic
-        Console.WriteLine("[RemoteScreen] Refresh stream requested");
     }
 
     private void ToggleFullscreen()
