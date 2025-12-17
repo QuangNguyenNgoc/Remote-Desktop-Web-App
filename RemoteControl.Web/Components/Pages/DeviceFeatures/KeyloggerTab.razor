@@ -1,16 +1,42 @@
+@using RemoteControl.Shared.Models
+
 @* Keylogger Tab Component *@
 <div class="keylogger-container">
     <div class="terminal-window">
         <div class="terminal-content">
-            <p class="log-entry"><span class="log-timestamp">[2023-11-18 10:00:01]</span> <span class="log-app">[Chrome]:</span> facebook.com</p>
-            <p class="log-entry"><span class="log-timestamp">[2023-11-18 10:00:05]</span> <span class="log-app">[Chrome]:</span> user_login</p>
-            <p class="log-entry"><span class="log-timestamp">[2023-11-18 10:00:10]</span> <span class="log-app">[Chrome]:</span> *********</p>
-            <p class="log-separator">--- User switched to Notepad ---</p>
-            <p class="log-entry"><span class="log-timestamp">[2023-11-18 10:05:22]</span> <span class="log-app">[Notepad]:</span> Hello world, this is a test log from the agent.</p>
+            @{
+                string? lastApp = null;
+            }
+            @foreach (var entry in KeylogEntries)
+            {
+                @if (lastApp != null && lastApp != entry.WindowTitle)
+                {
+                    <p class="log-separator">--- User switched to @entry.WindowTitle ---</p>
+                }
+                <p class="log-entry">
+                    <span class="log-timestamp">[@entry.Timestamp.ToString("yyyy-MM-dd HH:mm:ss")]</span>
+                    <span class="log-app">[@entry.WindowTitle]:</span>
+                    @entry.KeyPressed
+                </p>
+                lastApp = entry.WindowTitle;
+            }
             <span class="cursor-blink">_</span>
         </div>
     </div>
 </div>
+
+@code {
+    // Mock data using Shared KeylogEntry model
+    private List<KeylogEntry> KeylogEntries { get; set; } = new()
+    {
+        new KeylogEntry { Timestamp = DateTime.Now.AddMinutes(-10), WindowTitle = "Chrome", KeyPressed = "facebook.com" },
+        new KeylogEntry { Timestamp = DateTime.Now.AddMinutes(-9), WindowTitle = "Chrome", KeyPressed = "user_login" },
+        new KeylogEntry { Timestamp = DateTime.Now.AddMinutes(-8), WindowTitle = "Chrome", KeyPressed = "*********" },
+        new KeylogEntry { Timestamp = DateTime.Now.AddMinutes(-5), WindowTitle = "Notepad", KeyPressed = "Hello world, this is a test." },
+        new KeylogEntry { Timestamp = DateTime.Now.AddMinutes(-3), WindowTitle = "Notepad", KeyPressed = "Testing keylogger feature." },
+        new KeylogEntry { Timestamp = DateTime.Now.AddMinutes(-1), WindowTitle = "VS Code", KeyPressed = "Console.WriteLine()" }
+    };
+}
 
 <style>
     .keylogger-container {
@@ -19,7 +45,7 @@
         border-radius: 0 0 0.75rem 0.75rem;
         min-height: 400px;
     }
-    
+
     .terminal-window {
         background-color: var(--terminal-bg);
         padding: 1rem;
@@ -31,50 +57,50 @@
         overflow-y: auto;
         border: 1px solid var(--terminal-border);
     }
-    
+
     .terminal-content {
         line-height: 1.6;
     }
-    
+
     .log-entry {
         margin-bottom: 0.25rem;
         color: #10b981;
     }
-    
+
     .log-timestamp {
         color: #10b981;
         font-weight: 500;
     }
-    
+
     .log-app {
-        color: #10b981;
+        color: #60a5fa;
         font-weight: 600;
     }
-    
+
     .log-separator {
         color: var(--terminal-text-secondary);
         margin: 0.5rem 0;
         font-style: italic;
     }
-    
+
     .cursor-blink {
         color: #10b981;
         animation: blink 1s infinite;
     }
-    
+
     @@keyframes blink {
         0%, 49% { opacity: 1; }
         50%, 100% { opacity: 0; }
     }
-    
+
     .terminal-window::-webkit-scrollbar {
         width: 8px;
     }
-    
+
     .terminal-window::-webkit-scrollbar-track {
         background: var(--terminal-bg);
     }
-    
+
     .terminal-window::-webkit-scrollbar-thumb {
         background: var(--terminal-border);
         border-radius: 4px;
