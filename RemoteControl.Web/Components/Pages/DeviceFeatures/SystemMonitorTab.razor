@@ -41,8 +41,8 @@
             _connectionTime = DateTime.Now;
             Console.WriteLine("[SystemMonitor] SignalR connected");
 
-            // Auto-refresh every 1.5 seconds
-            _refreshTimer = new System.Timers.Timer(1500);
+            // Auto-refresh every 3 seconds (sync with Task Manager)
+            _refreshTimer = new System.Timers.Timer(3000);
             _refreshTimer.Elapsed += async (s, e) => await RequestSystemInfo();
             _refreshTimer.Start();
 
@@ -78,8 +78,12 @@
         if (_hubConnection == null || !IsConnected) return;
         if (string.IsNullOrEmpty(AgentId)) return;
 
-        var request = new CommandRequest { AgentId = AgentId, Type = CommandType.GetSystemInfo };
-        await _hubConnection.InvokeAsync("SendCommand", request);
+        var sysInfoRequest = new CommandRequest { AgentId = AgentId, Type = CommandType.GetSystemInfo };
+        await _hubConnection.InvokeAsync("SendCommand", sysInfoRequest);
+
+        // Also request process list for Top 5
+        var processRequest = new CommandRequest { AgentId = AgentId, Type = CommandType.ListProcesses };
+        await _hubConnection.InvokeAsync("SendCommand", processRequest);
     }
 
     private void OnCommandCompleted(CommandResult result)
@@ -89,20 +93,42 @@
 
         if (result.Data is System.Text.Json.JsonElement jsonElement)
         {
-            try
+            var rawText = jsonElement.GetRawText();
+            var options = new System.Text.Json.JsonSerializerOptions { PropertyNameCaseInsensitive = true };
+
+            // Check ProcessListResult FIRST (has "processes" field) - more specific
+            // This is checked first because ProcessListResult JSON also contains "cpuUsage" in each process item
+            if (rawText.Contains("\"processes\"", StringComparison.OrdinalIgnoreCase))
             {
-                var systemInfo = System.Text.Json.JsonSerializer.Deserialize<SystemInfo>(
-                    jsonElement.GetRawText(),
-                    new System.Text.Json.JsonSerializerOptions { PropertyNameCaseInsensitive = true });
-                
-                if (systemInfo != null)
+                try
                 {
-                    CpuUsage = Math.Round(systemInfo.CpuUsage, 1);
-                    RamUsage = Math.Round(systemInfo.MemoryUsage, 1);
-                    InvokeAsync(StateHasChanged);
+                    var processResult = System.Text.Json.JsonSerializer.Deserialize<ProcessListResult>(rawText, options);
+                    if (processResult?.Processes != null && processResult.Processes.Count > 0)
+                    {
+                        AllProcesses = processResult.Processes;
+                        InvokeAsync(StateHasChanged);
+                    }
                 }
+                catch { }
+                return; // Don't try SystemInfo if this is a ProcessListResult
             }
-            catch { }
+
+            // Check SystemInfo (has "memoryUsage" or "processCount" but NOT "processes")
+            if (rawText.Contains("\"memoryUsage\"", StringComparison.OrdinalIgnoreCase) ||
+                rawText.Contains("\"processCount\"", StringComparison.OrdinalIgnoreCase))
+            {
+                try
+                {
+                    var systemInfo = System.Text.Json.JsonSerializer.Deserialize<SystemInfo>(rawText, options);
+                    if (systemInfo != null)
+                    {
+                        CpuUsage = Math.Round(systemInfo.CpuUsage, 1);
+                        RamUsage = Math.Round(systemInfo.MemoryUsage, 1);
+                        InvokeAsync(StateHasChanged);
+                    }
+                }
+                catch { }
+            }
         }
     }
 
