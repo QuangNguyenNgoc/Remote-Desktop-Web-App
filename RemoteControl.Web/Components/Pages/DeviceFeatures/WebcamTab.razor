@@ -1,4 +1,71 @@
-@* Webcam Tab Component *@
+@using RemoteControl.Shared.Models
+@using RemoteControl.Shared.Constants
+@using Microsoft.AspNetCore.SignalR.Client
+@inject NavigationManager Nav
+@implements IAsyncDisposable
+
+@code {
+    // CascadingParameter from DeviceControl
+    [CascadingParameter(Name = "AgentId")]
+    public string AgentId { get; set; } = string.Empty;
+
+    // SignalR
+    private HubConnection? _hubConnection;
+    private bool IsConnected => _hubConnection?.State == HubConnectionState.Connected;
+
+    private bool IsStreaming { get; set; } = false;
+
+    protected override async Task OnInitializedAsync()
+    {
+        _hubConnection = new HubConnectionBuilder()
+            .WithUrl(Nav.ToAbsoluteUri("/remotehub"))
+            .WithAutomaticReconnect()
+            .Build();
+
+        try
+        {
+            await _hubConnection.StartAsync();
+            Console.WriteLine("[Webcam] SignalR connected");
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[Webcam] SignalR error: {ex.Message}");
+        }
+    }
+
+    private async Task StartStream()
+    {
+        if (_hubConnection == null || !IsConnected) return;
+        if (string.IsNullOrEmpty(AgentId)) return;
+
+        IsStreaming = true;
+        StateHasChanged();
+
+        var request = new CommandRequest { AgentId = AgentId, Type = CommandType.WebcamOn };
+        await _hubConnection.InvokeAsync("SendCommand", request);
+        Console.WriteLine("[Webcam] Sent WebcamOn command");
+    }
+
+    private async Task StopStream()
+    {
+        if (_hubConnection == null || !IsConnected) return;
+
+        IsStreaming = false;
+        StateHasChanged();
+
+        var request = new CommandRequest { AgentId = AgentId, Type = CommandType.WebcamOff };
+        await _hubConnection.InvokeAsync("SendCommand", request);
+        Console.WriteLine("[Webcam] Sent WebcamOff command");
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        if (_hubConnection != null)
+        {
+            await _hubConnection.DisposeAsync();
+        }
+    }
+}
 <div class="webcam-container">
     <div class="webcam-feed-wrapper">
         <div class="webcam-feed">
@@ -50,23 +117,7 @@
     </div>
 </div>
 
-@code {
-    private bool IsStreaming { get; set; } = false;
 
-    private void StartStream()
-    {
-        IsStreaming = true;
-        // TODO: Implement via SignalR - CommandRequest.CreateWebcamOn
-        Console.WriteLine("[Webcam] Start stream requested");
-    }
-
-    private void StopStream()
-    {
-        IsStreaming = false;
-        // TODO: Implement via SignalR - CommandRequest.CreateWebcamOff
-        Console.WriteLine("[Webcam] Stop stream requested");
-    }
-}
 
 <style>
     .webcam-container {
