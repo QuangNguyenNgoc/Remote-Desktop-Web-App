@@ -8,6 +8,9 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddRazorComponents()
     .AddInteractiveServerComponents();
 
+// Add Controllers for API endpoints
+builder.Services.AddControllers();
+
 // SignalR với MaxMessageSize lớn cho Screenshot base64
 builder.Services.AddSignalR(o =>
 {
@@ -36,5 +39,8 @@ app.MapRazorComponents<App>()
 
 // Map SignalR Hub
 app.MapHub<RemoteControlHub>("/remotehub");
+
+// Map Controllers for API
+app.MapControllers();
 
 app.Run();

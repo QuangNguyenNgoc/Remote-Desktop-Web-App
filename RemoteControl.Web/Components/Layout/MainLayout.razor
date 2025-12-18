@@ -1,18 +1,65 @@
 ﻿@inherits LayoutComponentBase
+@inject IJSRuntime JS
+@inject NavigationManager Nav
 
-<div class="flex h-screen overflow-hidden font-sans" style="background-color: var(--sidebar-bg); color: var(--text-primary);">
-    <Sidebar />
-
-    <main class="flex-1 flex flex-col min-w-0 overflow-hidden">
-        <TopBar PageTitle="@PageTitle" />
-
-        <div class="flex-1 overflow-auto p-6" style="background-color: var(--body-bg);">
-            @Body
+@if (_isChecking)
+{
+    <div class="flex h-screen items-center justify-center" style="background-color: var(--body-bg);">
+        <div class="text-center">
+            <div class="loading-spinner" style="width: 2rem; height: 2rem; border: 3px solid var(--card-border); border-top-color: #3b82f6; border-radius: 50%; animation: spin 0.8s linear infinite; margin: 0 auto 1rem;"></div>
+            <p style="color: var(--text-tertiary);">Loading...</p>
         </div>
-    </main>
-</div>
+    </div>
+}
+else
+{
+    <div class="flex h-screen overflow-hidden font-sans" style="background-color: var(--sidebar-bg); color: var(--text-primary);">
+        <Sidebar />
+
+        <main class="flex-1 flex flex-col min-w-0 overflow-hidden">
+            <TopBar PageTitle="@PageTitle" />
+
+            <div class="flex-1 overflow-auto p-6" style="background-color: var(--body-bg);">
+                @Body
+            </div>
+        </main>
+    </div>
+}
+
+<style>
+    @@keyframes spin {
+        to { transform: rotate(360deg); }
+    }
+</style>
 
 @code {
-    // Biến static để các trang con có thể set title (cách đơn giản)
     public static string PageTitle { get; set; } = "Dashboard";
+    
+    private bool _isChecking = true;
+    private bool _initialized = false;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender || _initialized) return;
+        _initialized = true;
+
+        try
+        {
+            var isLoggedIn = await JS.InvokeAsync<bool>("passkeyAuth.isLoggedIn");
+            
+            if (!isLoggedIn)
+            {
+                Nav.NavigateTo("/login", forceLoad: true);
+                return;
+            }
+
+            _isChecking = false;
+            StateHasChanged();
+        }
+        catch
+        {
+            // If JS fails, redirect to login
+            Nav.NavigateTo("/login", forceLoad: true);
+        }
+    }
 }

@@ -75,3 +75,44 @@ window.toggleFullscreen = function (elementId) {
         document.exitFullscreen();
     }
 };
+
+// Passkey Authentication
+window.passkeyAuth = {
+    // Verify passkey against backend API
+    verify: async function (passkey) {
+        try {
+            const response = await fetch('/auth/verify', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ passkey: passkey })
+            });
+            
+            if (!response.ok) return false;
+            
+            const data = await response.json();
+            return data.success === true;
+        } catch (err) {
+            console.error('Passkey verify error:', err);
+            return false;
+        }
+    },
+    
+    // Set login state in localStorage
+    setLoggedIn: function (value) {
+        if (value) {
+            localStorage.setItem('passkey-auth', 'true');
+        } else {
+            localStorage.removeItem('passkey-auth');
+        }
+    },
+    
+    // Check if logged in
+    isLoggedIn: function () {
+        return localStorage.getItem('passkey-auth') === 'true';
+    },
+    
+    // Logout
+    logout: function () {
+        localStorage.removeItem('passkey-auth');
+    }
+};
