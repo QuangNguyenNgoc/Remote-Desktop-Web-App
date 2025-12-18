@@ -3,9 +3,10 @@
 @inject NavigationManager Nav
 @inject IJSRuntime JS
 
-@* Passkey Login Box - Inside normal layout with Sidebar *@
+@* Passkey Login Box - Centered in page *@
 
-<div class="passkey-login-box">
+<div class="login-page-wrapper">
+    <div class="passkey-login-box">
     <div class="passkey-header">
         <div class="passkey-icon">
             <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -64,6 +65,7 @@
         </div>
     </div>
 </div>
+</div>
 
 @code {
     private string _passkey = "";
@@ -120,6 +122,14 @@
 }
 
 <style>
+    .login-page-wrapper {
+        display: flex;
+        justify-content: center;
+        align-items: flex-start;
+        padding-top: 4rem;
+        min-height: 100%;
+    }
+
     .passkey-login-box {
         width: 100%;
         max-width: 24rem;
