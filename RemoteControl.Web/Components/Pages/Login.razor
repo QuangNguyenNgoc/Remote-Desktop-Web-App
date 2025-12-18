@@ -23,16 +23,31 @@
             <div class="input-wrapper">
                 <input 
                     id="passkey-input" 
-                    type="password" 
+                    type="@(_showPassword ? "text" : "password")" 
                     @bind="_passkey" 
                     @onkeypress="HandleKeyPress"
-                    placeholder="••••••••"
+                    placeholder="enter here"
                     class="passkey-input" />
-                <svg class="input-icon" xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                    <path d="m15.5 7.5 2.3 2.3a1 1 0 0 0 1.4 0l2.1-2.1a1 1 0 0 0 0-1.4L19 4"/>
-                    <path d="m21 2-9.6 9.6"/>
-                    <circle cx="7.5" cy="15.5" r="5.5"/>
-                </svg>
+                <button type="button" class="toggle-password-btn" @onclick="TogglePassword" title="@(_showPassword ? "Hide" : "Show") password">
+                    @if (_showPassword)
+                    {
+                        <!-- Eye Off Icon -->
+                        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M9.88 9.88a3 3 0 1 0 4.24 4.24"/>
+                            <path d="M10.73 5.08A10.43 10.43 0 0 1 12 5c7 0 10 7 10 7a13.16 13.16 0 0 1-1.67 2.68"/>
+                            <path d="M6.61 6.61A13.526 13.526 0 0 0 2 12s3 7 10 7a9.74 9.74 0 0 0 5.39-1.61"/>
+                            <line x1="2" x2="22" y1="2" y2="22"/>
+                        </svg>
+                    }
+                    else
+                    {
+                        <!-- Eye Icon -->
+                        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"/>
+                            <circle cx="12" cy="12" r="3"/>
+                        </svg>
+                    }
+                </button>
             </div>
         </div>
 
@@ -72,6 +87,9 @@
     private string _error = "";
     private string _returnUrl = "/devices";
     private bool _isLoading = false;
+    private bool _showPassword = false;
+
+    private void TogglePassword() => _showPassword = !_showPassword;
 
     protected override void OnInitialized()
     {
@@ -208,15 +226,29 @@
         color: var(--text-quaternary);
     }
 
-    .input-icon {
+    .toggle-password-btn {
         position: absolute;
         right: 0.75rem;
         top: 50%;
         transform: translateY(-50%);
+        background: none;
+        border: none;
+        padding: 0.25rem;
+        cursor: pointer;
+        color: var(--text-quaternary);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        transition: color 0.2s;
+    }
+
+    .toggle-password-btn:hover {
+        color: var(--text-secondary);
+    }
+
+    .toggle-password-btn svg {
         width: 1.25rem;
         height: 1.25rem;
-        color: var(--text-quaternary);
-        pointer-events: none;
     }
 
     .error-message {
