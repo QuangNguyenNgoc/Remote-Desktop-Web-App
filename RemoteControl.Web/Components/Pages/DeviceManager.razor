@@ -4,6 +4,7 @@
 @using RemoteControl.Shared.Constants
 @implements IAsyncDisposable
 @inject NavigationManager Nav
+@inject IJSRuntime JS
 
 <SearchInput />
 
@@ -18,7 +19,7 @@ else if (_agents.Count == 0)
 {
     <div class="text-center py-12 rounded-xl" style="background-color: var(--card-bg); border: 1px solid var(--card-border);">
         <svg class="w-16 h-16 mx-auto mb-4" style="color: var(--text-quaternary);" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" 
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
                   d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
         </svg>
         <h3 class="text-lg font-semibold mb-2" style="color: var(--text-primary);">Chưa có Agent nào kết nối</h3>
@@ -42,18 +43,36 @@ else
     </div>
 }
 
-
-
 @code {
     private HubConnection? _hubConnection;
     private List<AgentInfo> _agents = new();
     private bool _isLoading = true;
-    private bool IsConnected => _hubConnection?.State == HubConnectionState.Connected;
 
-    protected override async Task OnInitializedAsync()
+    private bool _initialized;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
     {
+        if (!firstRender || _initialized) return;
+        _initialized = true;
+
+        // ✅ JS interop chỉ gọi sau render (tránh lỗi prerender)
+        var authed = await JS.InvokeAsync<bool>("passkeyAuth.me");
+        if (!authed)
+        {
+            var returnUrl = new Uri(Nav.Uri).PathAndQuery;
+            Nav.NavigateTo($"/login?returnUrl={Uri.EscapeDataString(returnUrl)}", forceLoad: true);
+            return;
+        }
+
+        // ✅ Quan trọng: HubConnection ở Web chạy server-side -> phải tự gắn header X-Passkey
+        var passkey = await JS.InvokeAsync<string>("passkeyAuth.getPasskey");
+
         _hubConnection = new HubConnectionBuilder()
-            .WithUrl(Nav.ToAbsoluteUri("/remotehub"))
+            .WithUrl(Nav.ToAbsoluteUri("/remotehub"), options =>
+            {
+                if (!string.IsNullOrWhiteSpace(passkey))
+                    options.Headers["X-Passkey"] = passkey;
+            })
             .WithAutomaticReconnect()
             .Build();
 
@@ -72,6 +91,7 @@ else
         finally
         {
             _isLoading = false;
+            await InvokeAsync(StateHasChanged);
         }
     }
 

@@ -72,10 +72,19 @@ public class SignalRClientService
             UpdateStatus($"Found server: {hubUrl}");
 
             // Step 2: Build HubConnection
-            _hubConnection = new HubConnectionBuilder()
-                .WithUrl(hubUrl)
-                .WithAutomaticReconnect()
-                .Build();
+          var passkey = _configuration["Passkey:Value"] ?? "";
+
+_hubConnection = new HubConnectionBuilder()
+    .WithUrl(hubUrl, options =>
+    {
+        if (!string.IsNullOrWhiteSpace(passkey))
+        {
+            options.Headers["X-Passkey"] = passkey;
+        }
+    })
+    .WithAutomaticReconnect()
+    .Build();
+
 
             _hubConnection.Reconnecting += OnReconnecting;
             _hubConnection.Reconnected += OnReconnected;

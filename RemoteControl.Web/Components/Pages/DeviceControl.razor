@@ -1,17 +1,27 @@
 @page "/devices/{Id}"
 @inject NavigationManager Nav
+@inject IJSRuntime JS
 
 @code {
-    // Fix CS8618: Thêm "= default!" để báo với C# rằng: "Yên tâm, cái này Blazor tự điền, không null đâu"
     [Parameter]
     public string Id { get; set; } = default!;
 
-    protected override void OnInitialized()
+    private bool _checked;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
     {
-        // Logic khởi tạo nếu cần
+        if (!firstRender || _checked) return;
+        _checked = true;
+
+        var authed = await JS.InvokeAsync<bool>("passkeyAuth.me");
+        if (!authed)
+        {
+            var returnUrl = new Uri(Nav.Uri).PathAndQuery;
+            Nav.NavigateTo($"/login?returnUrl={Uri.EscapeDataString(returnUrl)}", forceLoad: true);
+            return;
+        }
     }
 
-    // Hàm quay lại danh sách thiết bị
     void GoBack()
     {
         Nav.NavigateTo("/devices");
