@@ -7,35 +7,17 @@ Chống brute-force attack bằng cách block IP sau nhiều lần nhập sai pa
 ### ✅ Checklist
 
 **Backend:**
-- [ ] Tạo `RateLimitService` hoặc sử dụng `MemoryCache`
-- [ ] Track failed login attempts per IP
+- [ ] Track failed login attempts per IP (dùng `MemoryCache`)
 - [ ] Block IP sau 5 failed attempts trong 15 phút
 - [ ] Trả về HTTP 429 Too Many Requests khi bị block
 
-**Frontend:**
+**Frontend (optional):**
 - [ ] Hiển thị thông báo "Too many attempts. Try again later."
-- [ ] Countdown timer (optional)
 
-### 📝 Implementation Notes
+### 📝 Notes
 
-```csharp
-// Trong AuthController hoặc PasskeyMiddleware
-private static readonly ConcurrentDictionary<string, (int Count, DateTime BlockedUntil)> _attempts = new();
-
-// Khi login failed:
-var ip = context.Connection.RemoteIpAddress?.ToString();
-if (_attempts.TryGetValue(ip, out var record))
-{
-    if (DateTime.UtcNow < record.BlockedUntil)
-    {
-        // Return 429
-    }
-    if (record.Count >= 5)
-    {
-        // Block for 15 minutes
-    }
-}
-```
+- Scope hiện tại (`/devices`, `/remotehub`) đã hợp lý
+- Dashboard, Activity logs chỉ view-only nên không cần bảo vệ thêm
 
 ### 🔗 Dependencies
 
