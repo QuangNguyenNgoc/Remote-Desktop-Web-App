@@ -10,6 +10,7 @@
 
 @* Lấy base URL để build endpoint cho Hub *@
 @inject NavigationManager NavigationManager
+@inject IJSRuntime JS
 
 @* --- Stat Cards --- *@
 <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
@@ -125,62 +126,70 @@
     // ============================
     // 1) State cho UI hiện tại
     // ============================
-
-    // Danh sách activity dùng để bind vào bảng Recent Agent Activity
     private List<AgentActivityModel> RecentActivities { get; set; } = new();
-
-    // Lưu lại kết quả command mới nhất (nếu cần hiển thị thêm sau này)
     private CommandResult? _lastCommandResult;
 
     // ============================
     // 2) SignalR connection
     // ============================
-
-    // Field HubConnection theo checklist
     private HubConnection? _hubConnection;
 
-    // Thuộc tính tiện để biết có đang connect hay không (nếu muốn disable/enable nút UI)
     private bool IsConnected =>
         _hubConnection?.State == HubConnectionState.Connected;
 
-    // ============================
-    // 3) Khởi tạo component + tạo SignalR connection
-    // ============================
+    private bool _initialized;
 
-    // Thay vì OnInitialized(), ta dùng OnInitializedAsync()
-    // để vừa seed dữ liệu giả, vừa khởi tạo connection SignalR.
-    protected override async Task OnInitializedAsync()
+    // Seed mock data (không gọi JS ở đây)
+    protected override Task OnInitializedAsync()
     {
-        // 3.1 Seed dữ liệu mock như code cũ (cho UI có sẵn vài dòng mẫu)
         SeedMockRecentActivities();
+        return Task.CompletedTask;
+    }
 
-        // 3.2 Tạo HubConnection tới RemoteControlHub
-        // Endpoint "/remotehub" phải trùng với MapHub<RemoteControlHub> trong Program.cs
+    // Connect hub sau render để:
+    // - JS interop hợp lệ
+    // - Gắn header X-Passkey để tránh 401
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender || _initialized) return;
+        _initialized = true;
+
+        await InitHubAsync();
+    }
+
+    private async Task InitHubAsync()
+    {
+        // Nếu chưa login thì không connect hub (tránh spam 401)
+        var authed = await JS.InvokeAsync<bool>("passkeyAuth.me");
+        if (!authed) return;
+
+        // Lấy passkey từ localStorage để gắn header
+        var passkey = await JS.InvokeAsync<string>("passkeyAuth.getPasskey");
+
         _hubConnection = new HubConnectionBuilder()
-            .WithUrl(NavigationManager.ToAbsoluteUri("/remotehub"))
-            .WithAutomaticReconnect()                // cho phép tự reconnect khi mất kết nối
+            .WithUrl(NavigationManager.ToAbsoluteUri("/remotehub"), options =>
+            {
+                if (!string.IsNullOrWhiteSpace(passkey))
+                    options.Headers["X-Passkey"] = passkey;
+            })
+            .WithAutomaticReconnect()
             .Build();
-
-        // 3.3 Đăng ký (subscribe) các event từ server
 
         // Khi server gửi event AgentConnected -> có agent mới connect
         _hubConnection.On<AgentInfo>(HubEvents.AgentConnected, agent =>
         {
             Console.WriteLine($"[Home] AgentRegistered: {agent.AgentId}");
 
-            // Thêm 1 activity mới lên đầu danh sách để UI cập nhật
             RecentActivities.Insert(0, new AgentActivityModel
             {
                 AgentId = agent.AgentId,
-                EventType = "Network",                       // tùy ý đặt nhãn
+                EventType = "Network",
                 BadgeTextColor = "#2563eb",
                 BadgeBgColor = "rgba(37, 99, 235, 0.1)",
                 Details = "Connected to Hub",
                 TimeAgo = "Just now"
             });
 
-            // Vì callback SignalR chạy trên background thread,
-            // cần InvokeAsync(StateHasChanged) để Blazor re-render UI.
             InvokeAsync(StateHasChanged);
         });
 
@@ -191,7 +200,6 @@
 
             _lastCommandResult = result;
 
-            // Thêm activity hiển thị kết quả command
             RecentActivities.Insert(0, new AgentActivityModel
             {
                 AgentId = result.AgentId,
@@ -207,7 +215,6 @@
             InvokeAsync(StateHasChanged);
         });
 
-        // 3.4 Bắt đầu kết nối tới Hub
         try
         {
             await _hubConnection.StartAsync();
@@ -217,9 +224,10 @@
         {
             Console.WriteLine($"[Home] Cannot start hub connection: {ex.Message}");
         }
+
+        await InvokeAsync(StateHasChanged);
     }
 
-    // Hàm private giữ lại logic seed dữ liệu cũ để code gọn gàng hơn
     private void SeedMockRecentActivities()
     {
         RecentActivities = new()
@@ -254,10 +262,6 @@
         };
     }
 
-    // ============================
-    // 4) Dọn dẹp connection khi rời trang
-    // ============================
-
     public async ValueTask DisposeAsync()
     {
         if (_hubConnection is not null)
@@ -265,10 +269,6 @@
             await _hubConnection.DisposeAsync();
         }
     }
-
-    // ============================
-    // 5) Model dùng cho bảng activity
-    // ============================
 
     public record AgentActivityModel
     {

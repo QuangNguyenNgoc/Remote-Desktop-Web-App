@@ -1,0 +1,57 @@
+@page "/login"
+@using Microsoft.AspNetCore.WebUtilities
+@inject NavigationManager Nav
+@inject IJSRuntime JS
+
+<h2 class="text-xl font-semibold mb-4" style="color: var(--text-primary);">Passkey Login</h2>
+
+<div class="max-w-md rounded-xl p-5" style="background-color: var(--card-bg); border: 1px solid var(--card-border);">
+    <label class="block text-sm mb-2" style="color: var(--text-secondary);">Enter passkey</label>
+    <input class="w-full p-2 rounded-md mb-3"
+           style="background-color: var(--body-bg); border: 1px solid var(--card-border); color: var(--text-primary);"
+           @bind="_passkey" />
+
+    @if (!string.IsNullOrWhiteSpace(_error))
+    {
+        <div class="text-sm mb-3" style="color: #ef4444;">@_error</div>
+    }
+
+    <button class="px-4 py-2 rounded-md"
+            style="background-color: var(--btn-primary-bg); color: var(--btn-primary-text);"
+            @onclick="LoginAsync">
+        Login
+    </button>
+</div>
+
+@code {
+    private string _passkey = "";
+    private string _error = "";
+    private string _returnUrl = "/devices";
+
+    protected override void OnInitialized()
+    {
+        var uri = Nav.ToAbsoluteUri(Nav.Uri);
+        var q = QueryHelpers.ParseQuery(uri.Query);
+
+        if (q.TryGetValue("returnUrl", out var v))
+        {
+            var s = v.ToString();
+            if (!string.IsNullOrWhiteSpace(s))
+                _returnUrl = s;
+        }
+    }
+
+    private async Task LoginAsync()
+    {
+        _error = "";
+
+        var ok = await JS.InvokeAsync<bool>("passkeyAuth.login", _passkey);
+        if (!ok)
+        {
+            _error = "Invalid passkey.";
+            return;
+        }
+
+        Nav.NavigateTo(_returnUrl, forceLoad: true);
+    }
+}

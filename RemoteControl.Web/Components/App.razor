@@ -5,7 +5,6 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <base href="/" />
-    <!-- Fix: Thêm InteractiveServer cho HeadOutlet để có thể thay đổi Title động -->
     <HeadOutlet @rendermode="RenderMode.InteractiveServer" />
     <link rel="stylesheet" href="css/app.css" />
     <link rel="stylesheet" href="RemoteControl.Web.styles.css" />
@@ -14,11 +13,10 @@
 </head>
 
 <body>
-    <!-- Fix: QUAN TRỌNG NHẤT - Kích hoạt chế độ tương tác (InteractiveServer) cho toàn bộ Routes -->
-    <!-- Nếu không có dòng này, các nút bấm @onclick sẽ không hoạt động -->
     <Routes @rendermode="RenderMode.InteractiveServer" />
 
     <script src="js/app.js"></script>
+    <script src="js/passkeyAuth.js"></script>
     <script src="_framework/blazor.web.js"></script>
 </body>
 

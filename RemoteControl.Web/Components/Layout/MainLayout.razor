@@ -1,10 +1,20 @@
 ﻿@inherits LayoutComponentBase
+@inject NavigationManager Nav
+@inject IJSRuntime JS
 
 <div class="flex h-screen overflow-hidden font-sans" style="background-color: var(--sidebar-bg); color: var(--text-primary);">
     <Sidebar />
 
     <main class="flex-1 flex flex-col min-w-0 overflow-hidden">
-        <TopBar PageTitle="@PageTitle" />
+        <div class="flex items-center justify-between">
+            <TopBar PageTitle="@PageTitle" />
+
+            <button class="mr-4 px-3 py-2 rounded-md"
+                    style="background-color: var(--btn-primary-bg); color: var(--btn-primary-text);"
+                    @onclick="LogoutAsync">
+                Logout
+            </button>
+        </div>
 
         <div class="flex-1 overflow-auto p-6" style="background-color: var(--body-bg);">
             @Body
@@ -13,6 +23,11 @@
 </div>
 
 @code {
-    // Biến static để các trang con có thể set title (cách đơn giản)
     public static string PageTitle { get; set; } = "Dashboard";
+
+    private async Task LogoutAsync()
+    {
+        await JS.InvokeVoidAsync("passkeyAuth.logout");
+        Nav.NavigateTo("/login", forceLoad: true);
+    }
 }
