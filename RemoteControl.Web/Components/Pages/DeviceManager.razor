@@ -5,7 +5,7 @@
 @implements IAsyncDisposable
 @inject NavigationManager Nav
 
-<SearchInput />
+<SearchInput @bind-Value="_searchQuery" />
 
 @if (_isLoading)
 {
@@ -27,10 +27,23 @@ else if (_agents.Count == 0)
         </p>
     </div>
 }
+else if (FilteredAgents.Count == 0)
+{
+    <div class="text-center py-12 rounded-xl" style="background-color: var(--card-bg); border: 1px solid var(--card-border);">
+        <svg class="w-12 h-12 mx-auto mb-4" style="color: var(--text-quaternary);" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" 
+                  d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+        </svg>
+        <h3 class="text-lg font-semibold mb-2" style="color: var(--text-primary);">Không tìm thấy kết quả</h3>
+        <p class="text-sm" style="color: var(--text-secondary);">
+            Không có agent nào khớp với "@_searchQuery"
+        </p>
+    </div>
+}
 else
 {
     <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
-        @foreach (var agent in _agents)
+        @foreach (var agent in FilteredAgents)
         {
             <DeviceCard Name="@agent.MachineName"
                         Ip="@agent.IpAddress"
@@ -49,6 +62,15 @@ else
     private List<AgentInfo> _agents = new();
     private bool _isLoading = true;
     private bool IsConnected => _hubConnection?.State == HubConnectionState.Connected;
+    private string _searchQuery = "";
+
+    // Filter agents by hostname or IP
+    private List<AgentInfo> FilteredAgents => string.IsNullOrWhiteSpace(_searchQuery)
+        ? _agents
+        : _agents.Where(a => 
+            (a.MachineName?.Contains(_searchQuery, StringComparison.OrdinalIgnoreCase) ?? false) ||
+            (a.IpAddress?.Contains(_searchQuery, StringComparison.OrdinalIgnoreCase) ?? false)
+        ).ToList();
 
     protected override async Task OnInitializedAsync()
     {

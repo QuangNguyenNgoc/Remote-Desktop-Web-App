@@ -1,8 +1,8 @@
 @using RemoteControl.Web.Components.Pages.DeviceFeatures
 
 <div class="rounded-xl overflow-hidden" style="background-color: var(--card-bg); border: 1px solid var(--card-border);">
-    <!-- Tab Header -->
-    <div class="flex" style="border-bottom: 1px solid var(--card-border);">
+    <!-- Tab Header - Horizontal scrollable on small screens -->
+    <div class="flex overflow-x-auto tab-scroll-container" style="border-bottom: 1px solid var(--card-border);">
         <!-- Remote Screen Tab -->
         <button @onclick="() => activeTab = TabType.RemoteScreen" 
                 class="px-6 py-4 font-medium text-sm flex items-center gap-2 @(activeTab == TabType.RemoteScreen ? "" : "hover-theme")" 
@@ -118,3 +118,28 @@
         return "color: var(--text-tertiary);";
     }
 }
+
+<style>
+    /* Custom scrollbar for tab header */
+    .tab-scroll-container {
+        scrollbar-width: thin;
+        scrollbar-color: rgba(100, 116, 139, 0.5) transparent;
+    }
+
+    .tab-scroll-container::-webkit-scrollbar {
+        height: 6px;
+    }
+
+    .tab-scroll-container::-webkit-scrollbar-track {
+        background: transparent;
+    }
+
+    .tab-scroll-container::-webkit-scrollbar-thumb {
+        background: rgba(100, 116, 139, 0.5);
+        border-radius: 3px;
+    }
+
+    .tab-scroll-container::-webkit-scrollbar-thumb:hover {
+        background: rgba(100, 116, 139, 0.7);
+    }
+</style>

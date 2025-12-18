@@ -12,8 +12,8 @@
     <div class="screen-container-wrapper">
         <!-- Screen Container -->
         <div class="screen-container">
-            <!-- Screen Display Area -->
-            <div id="screen-display" class="screen-display" style="transform: scale(@ZoomLevel); transform-origin: center center;">
+            <!-- Screen Display Area - Click to open lightbox -->
+            <div class="screen-display" @onclick="OpenLightbox" style="cursor: pointer;" title="Click to view fullscreen">
                 @if (!string.IsNullOrEmpty(CurrentScreenshot.ImageBase64))
                 {
                     <img src="data:image/@CurrentScreenshot.Format;base64,@CurrentScreenshot.ImageBase64" 
@@ -64,31 +64,6 @@
                     </svg>
                     <span>Copy Image</span>
                 </button>
-
-                <!-- Divider -->
-                <div class="toolbar-divider"></div>
-
-                <!-- Icon-only buttons -->
-                <button class="icon-btn" title="Fullscreen" @onclick="ToggleFullscreen">
-                    <svg class="btn-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                            d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4" />
-                    </svg>
-                </button>
-
-                <button class="icon-btn" title="Zoom In" @onclick="ZoomIn">
-                    <svg class="btn-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                            d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0zM10 7v6m3-3H7" />
-                    </svg>
-                </button>
-
-                <button class="icon-btn" title="Zoom Out" @onclick="ZoomOut">
-                    <svg class="btn-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                            d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0zM13 10H7" />
-                    </svg>
-                </button>
             </div>
 
             <!-- Info Bar -->
@@ -102,6 +77,56 @@
     </div>
 </div>
 
+@* Lightbox Modal - Image Viewer *@
+@if (IsLightboxOpen && !string.IsNullOrEmpty(CurrentScreenshot.ImageBase64))
+{
+    <div class="lightbox-overlay" @onclick="CloseLightbox">
+        <div class="lightbox-container" @onclick:stopPropagation="true">
+            <!-- Close Button -->
+            <button class="lightbox-close" @onclick="CloseLightbox" title="Close (ESC)">
+                <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                </svg>
+            </button>
+
+            <!-- Image -->
+            <div class="lightbox-image-wrapper">
+                <img src="data:image/@CurrentScreenshot.Format;base64,@CurrentScreenshot.ImageBase64"
+                     alt="Screenshot Preview"
+                     class="lightbox-image"
+                     style="transform: scale(@LightboxZoom.ToString("F2", System.Globalization.CultureInfo.InvariantCulture)) rotate(@(LightboxRotate)deg);" />
+            </div>
+
+            <!-- Toolbar -->
+            <div class="lightbox-toolbar">
+                <button class="lightbox-btn" @onclick="LightboxZoomIn" title="Zoom In">
+                    <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v12m6-6H6" />
+                    </svg>
+                </button>
+                <button class="lightbox-btn" @onclick="LightboxZoomOut" title="Zoom Out">
+                    <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18 12H6" />
+                    </svg>
+                </button>
+                <div class="lightbox-divider"></div>
+                <button class="lightbox-btn" @onclick="LightboxRotateLeft" title="Rotate Left">
+                    <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6" />
+                    </svg>
+                </button>
+                <button class="lightbox-btn" @onclick="LightboxRotateRight" title="Rotate Right">
+                    <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 10h-10a8 8 0 00-8 8v2M21 10l-6 6m6-6l-6-6" />
+                    </svg>
+                </button>
+                <div class="lightbox-divider"></div>
+                <span class="lightbox-zoom-label">@((LightboxZoom * 100).ToString("F0"))%</span>
+            </div>
+        </div>
+    </div>
+}
+
 @code {
     // CascadingParameter from DeviceControl
     [CascadingParameter(Name = "AgentId")]
@@ -110,6 +135,9 @@
     // SignalR
     private HubConnection? _hubConnection;
     private bool IsConnected => _hubConnection?.State == HubConnectionState.Connected;
+
+    // Timer to refresh info bar (for "Last capture" display)
+    private System.Timers.Timer? _infoRefreshTimer;
 
     // Screenshot result
     private ScreenshotResult CurrentScreenshot { get; set; } = new()
@@ -123,7 +151,11 @@
 
     private string CaptureStatus { get; set; } = "Ready";
     private bool IsCapturing { get; set; } = false;
-    private double ZoomLevel { get; set; } = 1.0; // 100%
+
+    // Lightbox state
+    private bool IsLightboxOpen { get; set; } = false;
+    private double LightboxZoom { get; set; } = 1.0;
+    private int LightboxRotate { get; set; } = 0;
 
     // Helper: Format resolution from model
     private string GetResolutionDisplay() => $"{CurrentScreenshot.Width}×{CurrentScreenshot.Height}";
@@ -134,13 +166,14 @@
         var captureTime = CurrentScreenshot.CapturedAt;
         if (captureTime == default) return "Never";
         
-        var elapsed = DateTime.Now - captureTime;
+        // Use UtcNow because CapturedAt is stored in UTC
+        var elapsed = DateTime.UtcNow - captureTime;
         
         if (elapsed.TotalSeconds < 30) return "Just now";
         if (elapsed.TotalMinutes < 1) return "Less than 1 min ago";
         if (elapsed.TotalMinutes < 60) return $"{(int)elapsed.TotalMinutes} min ago";
         if (elapsed.TotalHours < 24) return $"{(int)elapsed.TotalHours} hr ago";
-        return captureTime.ToString("MMM dd, HH:mm");
+        return captureTime.ToLocalTime().ToString("MMM dd, HH:mm");
     }
 
     // Helper: Status color class
@@ -158,6 +191,11 @@
     protected override async Task OnInitializedAsync()
     {
         await InitializeSignalR();
+
+        // Auto-refresh info bar every 30 seconds to update "Last capture" display
+        _infoRefreshTimer = new System.Timers.Timer(30000);
+        _infoRefreshTimer.Elapsed += (s, e) => InvokeAsync(StateHasChanged);
+        _infoRefreshTimer.Start();
     }
 
     private async Task InitializeSignalR()
@@ -271,26 +309,45 @@
         Console.WriteLine("[RemoteScreen] Image copied to clipboard");
     }
 
-    private async Task ToggleFullscreen()
+    // Lightbox methods
+    private void OpenLightbox()
     {
-        await JSRuntime.InvokeVoidAsync("toggleFullscreen", "screen-display");
-        Console.WriteLine("[RemoteScreen] Toggle fullscreen");
+        if (string.IsNullOrEmpty(CurrentScreenshot.ImageBase64)) return;
+        IsLightboxOpen = true;
+        LightboxZoom = 1.0;
+        LightboxRotate = 0;
     }
 
-    private void ZoomIn()
+    private void CloseLightbox()
     {
-        ZoomLevel = Math.Min(ZoomLevel + 0.25, 3.0); // Max 300%
-        Console.WriteLine($"[RemoteScreen] Zoom: {ZoomLevel:P0}");
+        IsLightboxOpen = false;
     }
 
-    private void ZoomOut()
+    private void LightboxZoomIn()
     {
-        ZoomLevel = Math.Max(ZoomLevel - 0.25, 0.25); // Min 25%
-        Console.WriteLine($"[RemoteScreen] Zoom: {ZoomLevel:P0}");
+        LightboxZoom = Math.Min(LightboxZoom + 0.25, 4.0); // Max 400%
+    }
+
+    private void LightboxZoomOut()
+    {
+        LightboxZoom = Math.Max(LightboxZoom - 0.25, 0.25); // Min 25%
+    }
+
+    private void LightboxRotateLeft()
+    {
+        LightboxRotate = (LightboxRotate - 90) % 360;
+    }
+
+    private void LightboxRotateRight()
+    {
+        LightboxRotate = (LightboxRotate + 90) % 360;
     }
 
     public async ValueTask DisposeAsync()
     {
+        _infoRefreshTimer?.Stop();
+        _infoRefreshTimer?.Dispose();
+
         if (_hubConnection != null)
         {
             await _hubConnection.DisposeAsync();
@@ -574,5 +631,137 @@
             flex-direction: column;
             gap: 0.25rem;
         }
+    }
+
+    /* ====== Lightbox Modal Styles ====== */
+    .lightbox-overlay {
+        position: fixed;
+        inset: 0;
+        z-index: 9999;
+        background-color: rgba(0, 0, 0, 0.9);
+        backdrop-filter: blur(8px);
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        animation: fadeIn 0.2s ease-out;
+    }
+
+    .lightbox-container {
+        position: relative;
+        width: 100%;
+        height: 100%;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+    }
+
+    .lightbox-close {
+        position: absolute;
+        top: 1rem;
+        right: 1rem;
+        z-index: 10;
+        width: 2.5rem;
+        height: 2.5rem;
+        border-radius: 9999px;
+        background-color: rgba(255, 255, 255, 0.1);
+        border: 1px solid rgba(255, 255, 255, 0.2);
+        color: white;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        cursor: pointer;
+        transition: all 0.2s;
+    }
+
+    .lightbox-close:hover {
+        background-color: rgba(255, 255, 255, 0.2);
+        transform: scale(1.1);
+    }
+
+    .lightbox-close svg {
+        width: 1.25rem;
+        height: 1.25rem;
+    }
+
+    .lightbox-image-wrapper {
+        flex: 1;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        overflow: hidden;
+        padding: 2rem;
+    }
+
+    .lightbox-image {
+        max-width: 90vw;
+        max-height: 80vh;
+        object-fit: contain;
+        border-radius: 0.5rem;
+        box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+        transition: transform 0.2s ease-out;
+    }
+
+    .lightbox-toolbar {
+        position: absolute;
+        bottom: 2rem;
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        background-color: rgba(30, 30, 30, 0.9);
+        backdrop-filter: blur(8px);
+        padding: 0.75rem 1.25rem;
+        border-radius: 9999px;
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.5);
+    }
+
+    .lightbox-btn {
+        width: 2.5rem;
+        height: 2.5rem;
+        border-radius: 9999px;
+        background-color: rgba(255, 255, 255, 0.1);
+        border: none;
+        color: white;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        cursor: pointer;
+        transition: all 0.2s;
+    }
+
+    .lightbox-btn:hover {
+        background-color: rgba(255, 255, 255, 0.2);
+        transform: scale(1.1);
+    }
+
+    .lightbox-btn:active {
+        transform: scale(0.95);
+    }
+
+    .lightbox-btn svg {
+        width: 1.25rem;
+        height: 1.25rem;
+    }
+
+    .lightbox-divider {
+        width: 1px;
+        height: 1.5rem;
+        background-color: rgba(255, 255, 255, 0.2);
+        margin: 0 0.25rem;
+    }
+
+    .lightbox-zoom-label {
+        color: rgba(255, 255, 255, 0.7);
+        font-size: 0.875rem;
+        font-weight: 500;
+        min-width: 3rem;
+        text-align: center;
+    }
+
+    @@keyframes fadeIn {
+        from { opacity: 0; }
+        to { opacity: 1; }
     }
 </style>

@@ -23,17 +23,36 @@ window.downloadImage = function (fileName, dataUrl) {
     document.body.removeChild(a);
 };
 
-// Copy image to clipboard
+// Copy image to clipboard (converts to PNG because Clipboard API only supports PNG)
 window.copyImageToClipboard = async function (dataUrl) {
     try {
-        const response = await fetch(dataUrl);
-        const blob = await response.blob();
+        // Create an image element to load the data URL
+        const img = new Image();
+        
+        await new Promise((resolve, reject) => {
+            img.onload = resolve;
+            img.onerror = reject;
+            img.src = dataUrl;
+        });
+
+        // Draw to canvas and export as PNG
+        const canvas = document.createElement('canvas');
+        canvas.width = img.width;
+        canvas.height = img.height;
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(img, 0, 0);
+
+        // Get PNG blob from canvas
+        const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/png'));
+        
+        // Copy to clipboard
         await navigator.clipboard.write([
-            new ClipboardItem({ [blob.type]: blob })
+            new ClipboardItem({ 'image/png': blob })
         ]);
-        console.log('Image copied to clipboard');
+        console.log('Image copied to clipboard as PNG');
     } catch (err) {
         console.error('Failed to copy image:', err);
+        alert('Failed to copy image to clipboard: ' + err.message);
     }
 };
 
