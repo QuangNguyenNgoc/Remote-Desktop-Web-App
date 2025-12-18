@@ -111,6 +111,9 @@
     private HubConnection? _hubConnection;
     private bool IsConnected => _hubConnection?.State == HubConnectionState.Connected;
 
+    // Timer to refresh info bar (for "Last capture" display)
+    private System.Timers.Timer? _infoRefreshTimer;
+
     // Screenshot result
     private ScreenshotResult CurrentScreenshot { get; set; } = new()
     {
@@ -159,6 +162,11 @@
     protected override async Task OnInitializedAsync()
     {
         await InitializeSignalR();
+
+        // Auto-refresh info bar every 30 seconds to update "Last capture" display
+        _infoRefreshTimer = new System.Timers.Timer(30000);
+        _infoRefreshTimer.Elapsed += (s, e) => InvokeAsync(StateHasChanged);
+        _infoRefreshTimer.Start();
     }
 
     private async Task InitializeSignalR()
@@ -292,6 +300,9 @@
 
     public async ValueTask DisposeAsync()
     {
+        _infoRefreshTimer?.Stop();
+        _infoRefreshTimer?.Dispose();
+
         if (_hubConnection != null)
         {
             await _hubConnection.DisposeAsync();
