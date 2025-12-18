@@ -82,8 +82,27 @@ public class SystemInfoService
             CpuUsage = GetCpuUsage(),
             MemoryUsage = GetMemoryUsage(),
             ProcessCount = GetProcessCount(),
-            TotalMemoryMB = GetTotalMemoryMB()
+            TotalMemoryMB = GetTotalMemoryMB(),
+            AgentUptime = GetAgentUptime()
         };
+    }
+
+    // ====== Lấy Agent Uptime ======
+    private string GetAgentUptime()
+    {
+        try
+        {
+            var elapsed = DateTime.Now - Process.GetCurrentProcess().StartTime;
+            if (elapsed.TotalDays >= 1)
+                return $"{(int)elapsed.TotalDays}d {elapsed.Hours}h {elapsed.Minutes}m";
+            if (elapsed.TotalHours >= 1)
+                return $"{elapsed.Hours}h {elapsed.Minutes}m {elapsed.Seconds}s";
+            return $"{elapsed.Minutes}m {elapsed.Seconds}s";
+        }
+        catch
+        {
+            return "--";
+        }
     }
 
     // ====== Lấy CPU Usage (cached) ======

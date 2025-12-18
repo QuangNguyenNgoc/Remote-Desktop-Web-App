@@ -76,6 +76,12 @@ public class SystemInfo
     /// Number of running processes
     /// </summary>
     public int ProcessCount { get; set; }
+
+    /// <summary>
+    /// Agent app uptime (time since Agent application started)
+    /// Formatted as string for easy display (e.g., "2h 15m 30s")
+    /// </summary>
+    public string AgentUptime { get; set; } = "--";
 }
 
 /// <summary>

@@ -13,13 +13,11 @@
     private HubConnection? _hubConnection;
     private bool IsConnected => _hubConnection?.State == HubConnectionState.Connected;
     private System.Timers.Timer? _refreshTimer;
-    private System.Timers.Timer? _uptimeTimer;
-    private DateTime _connectionTime;
 
-    // System metrics - from SystemInfo
+    // System metrics - from Agent's SystemInfo response
     private double CpuUsage { get; set; } = 0;
     private double RamUsage { get; set; } = 0;
-    private string Uptime { get; set; } = "--";
+    private string Uptime { get; set; } = "--";  // AgentUptime from Agent
 
     // Top processes
     private List<ProcessInfo> AllProcesses { get; set; } = new();
@@ -38,18 +36,12 @@
         try
         {
             await _hubConnection.StartAsync();
-            _connectionTime = DateTime.Now;
             Console.WriteLine("[SystemMonitor] SignalR connected");
 
             // Auto-refresh every 3 seconds (sync with Task Manager)
             _refreshTimer = new System.Timers.Timer(3000);
             _refreshTimer.Elapsed += async (s, e) => await RequestSystemInfo();
             _refreshTimer.Start();
-
-            // Uptime timer - update every second
-            _uptimeTimer = new System.Timers.Timer(1000);
-            _uptimeTimer.Elapsed += (s, e) => UpdateUptime();
-            _uptimeTimer.Start();
 
             // Initial request
             await RequestSystemInfo();
@@ -58,19 +50,6 @@
         {
             Console.WriteLine($"[SystemMonitor] SignalR error: {ex.Message}");
         }
-    }
-
-    private void UpdateUptime()
-    {
-        var elapsed = DateTime.Now - _connectionTime;
-        if (elapsed.TotalDays >= 1)
-            Uptime = $"{(int)elapsed.TotalDays}d {elapsed.Hours}h {elapsed.Minutes}m";
-        else if (elapsed.TotalHours >= 1)
-            Uptime = $"{elapsed.Hours}h {elapsed.Minutes}m {elapsed.Seconds}s";
-        else
-            Uptime = $"{elapsed.Minutes}m {elapsed.Seconds}s";
-        
-        InvokeAsync(StateHasChanged);
     }
 
     private async Task RequestSystemInfo()
@@ -124,6 +103,7 @@
                     {
                         CpuUsage = Math.Round(systemInfo.CpuUsage, 1);
                         RamUsage = Math.Round(systemInfo.MemoryUsage, 1);
+                        Uptime = systemInfo.AgentUptime;  // Use Agent's uptime
                         InvokeAsync(StateHasChanged);
                     }
                 }
@@ -136,8 +116,6 @@
     {
         _refreshTimer?.Stop();
         _refreshTimer?.Dispose();
-        _uptimeTimer?.Stop();
-        _uptimeTimer?.Dispose();
         if (_hubConnection != null)
         {
             await _hubConnection.DisposeAsync();
