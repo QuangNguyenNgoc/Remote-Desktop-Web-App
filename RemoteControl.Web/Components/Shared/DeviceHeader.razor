@@ -1,3 +1,7 @@
+@using Microsoft.AspNetCore.SignalR.Client
+@using RemoteControl.Shared.Models
+@implements IAsyncDisposable
+
 <div class="rounded-xl p-4 mb-6 flex flex-col md:flex-row justify-between items-center gap-4"
     style="background-color: var(--card-bg); border: 1px solid var(--card-border);">
     <div class="flex items-center gap-4">
@@ -33,11 +37,50 @@
 
 @code {
     [Parameter] public string DeviceId { get; set; } = "Unknown";
-    [Parameter] public string IpAddress { get; set; } = "192.168.1.104";
     [Inject] NavigationManager Nav { get; set; } = default!;
+
+    private HubConnection? _hubConnection;
+    private string IpAddress { get; set; } = "Loading...";
+
+    protected override async Task OnInitializedAsync()
+    {
+        _hubConnection = new HubConnectionBuilder()
+            .WithUrl(Nav.ToAbsoluteUri("/remotehub"))
+            .Build();
+
+        try
+        {
+            await _hubConnection.StartAsync();
+            
+            // Get all connected agents and find matching one
+            var agents = await _hubConnection.InvokeAsync<List<AgentInfo>>("GetAllAgents");
+            var agent = agents?.FirstOrDefault(a => a.AgentId == DeviceId);
+            
+            if (agent != null && !string.IsNullOrEmpty(agent.IpAddress))
+            {
+                IpAddress = agent.IpAddress;
+            }
+            else
+            {
+                IpAddress = "Unknown";
+            }
+        }
+        catch
+        {
+            IpAddress = "Error";
+        }
+    }
 
     void GoBack()
     {
         Nav.NavigateTo("/devices");
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        if (_hubConnection != null)
+        {
+            await _hubConnection.DisposeAsync();
+        }
     }
 }
