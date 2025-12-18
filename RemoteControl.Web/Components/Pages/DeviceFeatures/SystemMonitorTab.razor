@@ -168,7 +168,7 @@
                 <span class="metric-value">@CpuUsage%</span>
             </div>
             <div class="progress-bar">
-                <div class="progress-fill cpu-fill" style="width: @CpuUsage%"></div>
+                <div class="progress-fill cpu-fill" style="width: @(CpuUsage.ToString(System.Globalization.CultureInfo.InvariantCulture))%"></div>
             </div>
         </div>
 
@@ -188,7 +188,7 @@
                 <span class="metric-value">@RamUsage%</span>
             </div>
             <div class="progress-bar">
-                <div class="progress-fill ram-fill" style="width: @RamUsage%"></div>
+                <div class="progress-fill ram-fill" style="width: @(RamUsage.ToString(System.Globalization.CultureInfo.InvariantCulture))%"></div>
             </div>
         </div>
 
