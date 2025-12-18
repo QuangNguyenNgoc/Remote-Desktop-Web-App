@@ -25,6 +25,7 @@
                     id="passkey-input" 
                     type="@(_showPassword ? "text" : "password")" 
                     @bind="_passkey" 
+                    @bind:event="oninput"
                     @onkeypress="HandleKeyPress"
                     placeholder="enter here"
                     class="passkey-input" />
