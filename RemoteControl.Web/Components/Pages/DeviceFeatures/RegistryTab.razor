@@ -4,8 +4,11 @@
 *@
 
 @using RemoteControl.Shared.Models
+@using RemoteControl.Shared.Constants
 @using Microsoft.AspNetCore.SignalR.Client
 @inject IJSRuntime JS
+@inject NavigationManager Nav
+@implements IAsyncDisposable
 
 <div class="registry-container" @onclick="CloseContextMenus">
     @* ====== TOOLBAR ====== *@
@@ -192,7 +195,10 @@
 @code {
     // ====== Parameters ======
     [CascadingParameter(Name = "AgentId")] public string AgentId { get; set; } = "";
-    [CascadingParameter] public HubConnection? HubConnection { get; set; }
+    
+    // ====== SignalR ======
+    private HubConnection? _hubConnection;
+    private bool IsConnected => _hubConnection?.State == HubConnectionState.Connected;
 
     // ====== State ======
     private string _currentPath = "HKEY_CURRENT_USER\\Software";
@@ -242,8 +248,27 @@
     protected override async Task OnInitializedAsync()
     {
         InitializeRootKeys();
+        
+        // Create SignalR connection
+        _hubConnection = new HubConnectionBuilder()
+            .WithUrl(Nav.ToAbsoluteUri("/remotehub"))
+            .WithAutomaticReconnect()
+            .Build();
+        
         SetupSignalRHandlers();
-        await NavigateToPath();
+        
+        try
+        {
+            await _hubConnection.StartAsync();
+            _statusMessage = "Connected to agent";
+            Console.WriteLine("[RegistryTab] SignalR connected");
+            await NavigateToPath();
+        }
+        catch (Exception ex)
+        {
+            _statusMessage = $"Connection failed: {ex.Message}";
+            Console.WriteLine($"[RegistryTab] SignalR error: {ex.Message}");
+        }
     }
 
     private void InitializeRootKeys()
@@ -260,10 +285,15 @@
 
     private void SetupSignalRHandlers()
     {
-        if (HubConnection == null) return;
+        if (_hubConnection == null) return;
 
-        HubConnection.On<CommandResult>("ReceiveCommandResult", async (result) =>
+        _hubConnection.On<CommandResult>(HubEvents.CommandCompleted, async (result) =>
         {
+            // Filter by AgentId
+            if (result.AgentId != AgentId) return;
+            
+            Console.WriteLine($"[RegistryTab] Received result: Success={result.Success}, Data type={result.Data?.GetType().Name}");
+            
             if (!result.Success)
             {
                 _statusMessage = $"Error: {result.Message}";
@@ -272,21 +302,56 @@
                 return;
             }
 
-            switch (result.Data)
+            // Parse JSON response like other tabs
+            if (result.Data is System.Text.Json.JsonElement jsonElement)
             {
-                case RegistrySubKeysResult subKeysResult:
-                    HandleSubKeysResult(subKeysResult);
-                    break;
-                case RegistryValuesResult valuesResult:
-                    HandleValuesResult(valuesResult);
-                    break;
-                case RegistryResult regResult:
-                    _statusMessage = regResult.OperationMessage;
-                    if (!regResult.OperationMessage.StartsWith("Lỗi"))
+                var rawText = jsonElement.GetRawText();
+                var options = new System.Text.Json.JsonSerializerOptions { PropertyNameCaseInsensitive = true };
+                
+                Console.WriteLine($"[RegistryTab] Raw JSON: {rawText.Substring(0, Math.Min(200, rawText.Length))}...");
+
+                try
+                {
+                    // Check for SubKeys result (from ListRegistrySubKeys)
+                    if (rawText.Contains("\"subKeys\"", StringComparison.OrdinalIgnoreCase))
                     {
-                        await RefreshCurrentKey();
+                        var subKeysResult = System.Text.Json.JsonSerializer.Deserialize<RegistrySubKeysResult>(rawText, options);
+                        if (subKeysResult?.SubKeys != null)
+                        {
+                            HandleSubKeysResult(subKeysResult);
+                            Console.WriteLine($"[RegistryTab] Loaded {subKeysResult.SubKeys.Count} subkeys");
+                        }
                     }
-                    break;
+                    // Check for Values result (from ListRegistryValues)
+                    else if (rawText.Contains("\"values\"", StringComparison.OrdinalIgnoreCase))
+                    {
+                        var valuesResult = System.Text.Json.JsonSerializer.Deserialize<RegistryValuesResult>(rawText, options);
+                        if (valuesResult?.Values != null)
+                        {
+                            HandleValuesResult(valuesResult);
+                            Console.WriteLine($"[RegistryTab] Loaded {valuesResult.Values.Count} values");
+                        }
+                    }
+                    // Check for generic RegistryResult (from Write/Create/Delete)
+                    else if (rawText.Contains("\"operationMessage\"", StringComparison.OrdinalIgnoreCase))
+                    {
+                        var regResult = System.Text.Json.JsonSerializer.Deserialize<RegistryResult>(rawText, options);
+                        if (regResult != null)
+                        {
+                            _statusMessage = regResult.OperationMessage;
+                            // Refresh if operation was successful (not an error message)
+                            if (!regResult.OperationMessage.StartsWith("Lỗi", StringComparison.OrdinalIgnoreCase))
+                            {
+                                await RefreshCurrentKey();
+                            }
+                        }
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"[RegistryTab] JSON parse error: {ex.Message}");
+                    _statusMessage = $"Parse error: {ex.Message}";
+                }
             }
             
             _isLoading = false;
@@ -407,14 +472,15 @@
         CloseContextMenus();
         StateHasChanged();
 
-        if (HubConnection?.State == HubConnectionState.Connected)
+        if (_hubConnection?.State == HubConnectionState.Connected)
         {
             var request = new CommandRequest
             {
+                AgentId = AgentId,
                 Type = CommandType.ListRegistryValues,
                 RegistryKeyPath = _currentPath
             };
-            await HubConnection.SendAsync("SendCommand", AgentId, request);
+            await _hubConnection.InvokeAsync("SendCommand", request);
         }
         else
         {
@@ -450,17 +516,18 @@
     {
         node.IsExpanded = !node.IsExpanded;
         
-        if (node.IsExpanded && !node.IsLoaded && HubConnection?.State == HubConnectionState.Connected)
+        if (node.IsExpanded && !node.IsLoaded && _hubConnection?.State == HubConnectionState.Connected)
         {
             node.IsLoading = true;
             _selectedNode = node;
             
             var request = new CommandRequest
             {
+                AgentId = AgentId,
                 Type = CommandType.ListRegistrySubKeys,
                 RegistryKeyPath = node.FullPath
             };
-            await HubConnection.SendAsync("SendCommand", AgentId, request);
+            await _hubConnection.InvokeAsync("SendCommand", request);
         }
         
         StateHasChanged();
@@ -490,18 +557,19 @@
         _dialogInput = value.Data;
         _dialogCallback = async () =>
         {
-            if (HubConnection?.State == HubConnectionState.Connected)
+            if (_hubConnection?.State == HubConnectionState.Connected)
             {
                 var valueName = value.Name == "(Default)" ? "" : value.Name;
                 var request = new CommandRequest
                 {
+                    AgentId = AgentId,
                     Type = CommandType.WriteRegistry,
                     RegistryKeyPath = _currentPath,
                     RegistryValueName = valueName,
                     RegistryValue = _dialogInput,
                     RegistryValueType = value.Type
                 };
-                await HubConnection.SendAsync("SendCommand", AgentId, request);
+                await _hubConnection.InvokeAsync("SendCommand", request);
             }
         };
         _showInputDialog = true;
@@ -516,14 +584,15 @@
         _dialogInput = "NewKey";
         _dialogCallback = async () =>
         {
-            if (HubConnection?.State == HubConnectionState.Connected)
+            if (_hubConnection?.State == HubConnectionState.Connected)
             {
                 var request = new CommandRequest
                 {
+                    AgentId = AgentId,
                     Type = CommandType.CreateRegistryKey,
                     RegistryKeyPath = $"{_currentPath}\\{_dialogInput}"
                 };
-                await HubConnection.SendAsync("SendCommand", AgentId, request);
+                await _hubConnection.InvokeAsync("SendCommand", request);
             }
         };
         _showInputDialog = true;
@@ -537,17 +606,18 @@
         _dialogInput = "NewValue";
         _dialogCallback = async () =>
         {
-            if (HubConnection?.State == HubConnectionState.Connected)
+            if (_hubConnection?.State == HubConnectionState.Connected)
             {
                 var request = new CommandRequest
                 {
+                    AgentId = AgentId,
                     Type = CommandType.WriteRegistry,
                     RegistryKeyPath = _currentPath,
                     RegistryValueName = _dialogInput,
                     RegistryValue = "",
                     RegistryValueType = valueType
                 };
-                await HubConnection.SendAsync("SendCommand", AgentId, request);
+                await _hubConnection.InvokeAsync("SendCommand", request);
             }
         };
         _showInputDialog = true;
@@ -576,14 +646,15 @@
         _dialogPrompt = $"Delete key '{_selectedNode.Name}' and all its contents?";
         _dialogCallback = async () =>
         {
-            if (HubConnection?.State == HubConnectionState.Connected)
+            if (_hubConnection?.State == HubConnectionState.Connected)
             {
                 var request = new CommandRequest
                 {
+                    AgentId = AgentId,
                     Type = CommandType.DeleteRegistryKey,
                     RegistryKeyPath = _selectedNode.FullPath
                 };
-                await HubConnection.SendAsync("SendCommand", AgentId, request);
+                await _hubConnection.InvokeAsync("SendCommand", request);
             }
         };
         _showConfirmDialog = true;
@@ -598,16 +669,17 @@
         _dialogPrompt = $"Delete value '{_selectedValue.Name}'?";
         _dialogCallback = async () =>
         {
-            if (HubConnection?.State == HubConnectionState.Connected)
+            if (_hubConnection?.State == HubConnectionState.Connected)
             {
                 var valueName = _selectedValue.Name == "(Default)" ? "" : _selectedValue.Name;
                 var request = new CommandRequest
                 {
+                    AgentId = AgentId,
                     Type = CommandType.DeleteRegistryValue,
                     RegistryKeyPath = _currentPath,
                     RegistryValueName = valueName
                 };
-                await HubConnection.SendAsync("SendCommand", AgentId, request);
+                await _hubConnection.InvokeAsync("SendCommand", request);
             }
         };
         _showConfirmDialog = true;
@@ -694,6 +766,15 @@
     private string TruncateData(string data)
     {
         return data.Length > 100 ? data.Substring(0, 100) + "..." : data;
+    }
+
+    // ====== IAsyncDisposable ======
+    public async ValueTask DisposeAsync()
+    {
+        if (_hubConnection != null)
+        {
+            await _hubConnection.DisposeAsync();
+        }
     }
 }
 
