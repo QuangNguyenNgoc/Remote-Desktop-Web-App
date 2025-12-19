@@ -339,18 +339,14 @@
                         if (regResult != null)
                         {
                             _statusMessage = regResult.OperationMessage;
-                            // Refresh if operation was successful (not an error message)
-                            if (!regResult.OperationMessage.StartsWith("Lỗi", StringComparison.OrdinalIgnoreCase))
-                            {
-                                await RefreshCurrentKey();
-                            }
+                            Console.WriteLine($"[RegistryTab] Operation result: {regResult.OperationMessage}");
+                            // Don't auto-refresh here - let user manually refresh to avoid loops
                         }
                     }
                 }
                 catch (Exception ex)
                 {
                     Console.WriteLine($"[RegistryTab] JSON parse error: {ex.Message}");
-                    _statusMessage = $"Parse error: {ex.Message}";
                 }
             }
             
