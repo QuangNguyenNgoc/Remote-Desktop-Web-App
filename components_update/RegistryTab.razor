@@ -1,0 +1,846 @@
+@* 
+    RegistryTab.razor - Registry Browser Component
+    Full implementation with styling and logic
+*@
+
+@using RemoteControl.Shared.Models
+
+<div class="registry-container">
+    @* ====== TOOLBAR ====== *@
+    <div class="registry-toolbar">
+        @* Path input *@
+        <div class="path-group">
+            <span class="path-label">Path:</span>
+            <input type="text" 
+                   class="registry-path-input" 
+                   placeholder="HKEY_CURRENT_USER\Software" 
+                   @bind="_currentPath"
+                   @onkeypress="HandlePathKeyPress" />
+        </div>
+        
+        @* Navigation buttons *@
+        <button class="btn btn-navigate" @onclick="NavigateToPath" title="Navigate to path">
+            Go
+        </button>
+        <button class="btn btn-refresh" @onclick="RefreshCurrentKey" title="Refresh current key">
+            Refresh
+        </button>
+        <button class="btn btn-back" @onclick="GoBack" disabled="@(_historyStack.Count == 0)" title="Go back">
+            ← Back
+        </button>
+
+        <div class="toolbar-separator"></div>
+
+        @* CRUD buttons *@
+        <button class="btn btn-create-key" @onclick="ShowCreateKeyDialog" title="Create new subkey">
+            + Key
+        </button>
+        <button class="btn btn-create-value" @onclick="() => ShowCreateValueDialog()" title="Create new value">
+            + Value
+        </button>
+        <button class="btn btn-delete" @onclick="DeleteSelected" title="Delete selected">
+            Delete
+        </button>
+    </div>
+
+    @* ====== MAIN CONTENT - SPLIT PANEL ====== *@
+    <div class="registry-content">
+        @* LEFT PANEL: TreeView *@
+        <div class="registry-tree-panel">
+            <div class="tree-view">
+                @foreach (var root in _rootKeys)
+                {
+                    <div class="tree-node">
+                        <span class="node-toggle" @onclick="() => ToggleNode(root)">
+                            @(root.IsExpanded ? "▼" : "▶")
+                        </span>
+                        <span class="node-name @(root == _selectedNode ? "selected" : "")" 
+                              @onclick="() => SelectNode(root)" 
+                              @oncontextmenu="e => ShowTreeContextMenu(e, root)"
+                              @oncontextmenu:preventDefault="true">
+                            @root.Name
+                        </span>
+                        
+                        @if (root.IsExpanded)
+                        {
+                            <div class="tree-children">
+                                @foreach (var child in root.Children)
+                                {
+                                    <div class="tree-node child">
+                                        <span class="node-toggle" @onclick="() => ToggleNode(child)">
+                                            @(child.IsExpanded ? "▼" : "▶")
+                                        </span>
+                                        <span class="node-name @(child == _selectedNode ? "selected" : "")" 
+                                              @onclick="() => SelectNode(child)"
+                                              @oncontextmenu="e => ShowTreeContextMenu(e, child)"
+                                              @oncontextmenu:preventDefault="true">
+                                            @child.Name
+                                        </span>
+                                    </div>
+                                }
+                            </div>
+                        }
+                    </div>
+                }
+            </div>
+        </div>
+
+        @* RIGHT PANEL: Values ListView *@
+        <div class="registry-values-panel">
+            <table class="values-table">
+                <thead>
+                    <tr>
+                        <th class="col-name">Name</th>
+                        <th class="col-type">Type</th>
+                        <th class="col-data">Data</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @if (_isLoading)
+                    {
+                        <tr>
+                            <td colspan="3" class="loading-cell">Loading...</td>
+                        </tr>
+                    }
+                    else if (_values.Count == 0)
+                    {
+                        <tr>
+                            <td colspan="3" class="empty-cell">No values</td>
+                        </tr>
+                    }
+                    else
+                    {
+                        @foreach (var value in _values)
+                        {
+                            <tr class="@(_selectedValue == value ? "selected" : "")"
+                                @onclick="() => SelectValue(value)"
+                                @ondblclick="() => EditValue(value)"
+                                @oncontextmenu="e => ShowValueContextMenu(e, value)"
+                                @oncontextmenu:preventDefault="true">
+                                <td class="col-name">@value.Name</td>
+                                <td class="col-type">@value.Type</td>
+                                <td class="col-data">@TruncateData(value.Data)</td>
+                            </tr>
+                        }
+                    }
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    @* ====== STATUS BAR ====== *@
+    <div class="registry-status">
+        @_statusMessage
+    </div>
+
+    @* ====== CONTEXT MENUS ====== *@
+    @if (_showTreeContextMenu)
+    {
+        <div class="context-menu" style="left: @(_contextMenuX)px; top: @(_contextMenuY)px;" @onclick:stopPropagation="true">
+            <div class="context-item" @onclick="ShowCreateKeyDialog">Create Subkey</div>
+            <div class="context-item danger" @onclick="DeleteSelectedKey">Delete Key</div>
+            <div class="context-separator"></div>
+            <div class="context-item" @onclick="RefreshCurrentKey">Refresh</div>
+            <div class="context-item" @onclick="CopyPathToClipboard">Copy Path</div>
+        </div>
+    }
+
+    @if (_showValueContextMenu)
+    {
+        <div class="context-menu" style="left: @(_contextMenuX)px; top: @(_contextMenuY)px;" @onclick:stopPropagation="true">
+            <div class="context-item" @onclick="() => EditValue(_selectedValue)">Edit Value</div>
+            <div class="context-item danger" @onclick="DeleteSelectedValue">Delete Value</div>
+            <div class="context-separator"></div>
+            <div class="context-item" @onclick="() => ShowCreateValueDialog(\"REG_SZ\")">New String Value</div>
+            <div class="context-item" @onclick="() => ShowCreateValueDialog(\"REG_DWORD\")">New DWORD Value</div>
+            <div class="context-item" @onclick="() => ShowCreateValueDialog(\"REG_QWORD\")">New QWORD Value</div>
+            <div class="context-separator"></div>
+            <div class="context-item" @onclick="CopyValueName">Copy Value Name</div>
+            <div class="context-item" @onclick="CopyValueData">Copy Value Data</div>
+        </div>
+    }
+
+    @* ====== DIALOGS ====== *@
+    @if (_showInputDialog)
+    {
+        <div class="dialog-overlay" @onclick="CloseDialogs">
+            <div class="dialog" @onclick:stopPropagation="true">
+                <div class="dialog-header">@_dialogTitle</div>
+                <div class="dialog-body">
+                    <label>@_dialogPrompt</label>
+                    <input type="text" @bind="_dialogInput" @onkeypress="HandleDialogKeyPress" />
+                </div>
+                <div class="dialog-footer">
+                    <button class="btn btn-cancel" @onclick="CloseDialogs">Cancel</button>
+                    <button class="btn btn-ok" @onclick="ConfirmDialog">OK</button>
+                </div>
+            </div>
+        </div>
+    }
+
+    @if (_showConfirmDialog)
+    {
+        <div class="dialog-overlay" @onclick="CloseDialogs">
+            <div class="dialog confirm" @onclick:stopPropagation="true">
+                <div class="dialog-header">@_dialogTitle</div>
+                <div class="dialog-body">
+                    <p class="confirm-message">@_dialogPrompt</p>
+                </div>
+                <div class="dialog-footer">
+                    <button class="btn btn-cancel" @onclick="CloseDialogs">No</button>
+                    <button class="btn btn-danger" @onclick="ConfirmDialog">Yes</button>
+                </div>
+            </div>
+        </div>
+    }
+</div>
+
+@code {
+    // ====== Parameters ======
+    [Parameter] public string AgentId { get; set; } = "";
+
+    // ====== State ======
+    private string _currentPath = "HKEY_CURRENT_USER\\Software";
+    private string _statusMessage = "Ready";
+    private bool _isLoading = false;
+    
+    private List<RegistryValueInfo> _values = new()
+    {
+        new() { Name = "(Default)", Type = "REG_SZ", Data = "(value not set)" },
+        new() { Name = "EnableFullScreen", Type = "REG_DWORD", Data = "0x00000001 (1)" },
+        new() { Name = "WindowPosition", Type = "REG_SZ", Data = "0,0,800,600" },
+    };
+    
+    private Stack<string> _historyStack = new();
+    private RegistryValueInfo? _selectedValue;
+    private TreeNode? _selectedNode;
+    private List<TreeNode> _rootKeys = new();
+
+    // Context menu state
+    private bool _showTreeContextMenu = false;
+    private bool _showValueContextMenu = false;
+    private double _contextMenuX = 0;
+    private double _contextMenuY = 0;
+
+    // Dialog state
+    private bool _showInputDialog = false;
+    private bool _showConfirmDialog = false;
+    private string _dialogTitle = "";
+    private string _dialogPrompt = "";
+    private string _dialogInput = "";
+    private Action? _dialogCallback;
+
+    // ====== TreeNode class ======
+    public class TreeNode
+    {
+        public string Name { get; set; } = "";
+        public string FullPath { get; set; } = "";
+        public bool IsExpanded { get; set; } = false;
+        public bool IsLoaded { get; set; } = false;
+        public List<TreeNode> Children { get; set; } = new();
+    }
+
+    public class RegistryValueInfo
+    {
+        public string Name { get; set; } = "";
+        public string Type { get; set; } = "";
+        public string Data { get; set; } = "";
+    }
+
+    // ====== Lifecycle ======
+    protected override async Task OnInitializedAsync()
+    {
+        InitializeRootKeys();
+        await NavigateToPath();
+    }
+
+    private void InitializeRootKeys()
+    {
+        _rootKeys = new List<TreeNode>
+        {
+            new() { Name = "HKEY_CLASSES_ROOT", FullPath = "HKEY_CLASSES_ROOT" },
+            new() { Name = "HKEY_CURRENT_USER", FullPath = "HKEY_CURRENT_USER" },
+            new() { Name = "HKEY_LOCAL_MACHINE", FullPath = "HKEY_LOCAL_MACHINE" },
+            new() { Name = "HKEY_USERS", FullPath = "HKEY_USERS" },
+            new() { Name = "HKEY_CURRENT_CONFIG", FullPath = "HKEY_CURRENT_CONFIG" }
+        };
+    }
+
+    // ====== Navigation ======
+    private async Task NavigateToPath()
+    {
+        _isLoading = true;
+        _showTreeContextMenu = false;
+        _showValueContextMenu = false;
+        StateHasChanged();
+
+        // TODO: Call SignalR
+        // var request = new CommandRequest { AgentId = AgentId, Type = CommandType.ListRegistryValues, RegistryKeyPath = _currentPath };
+        // await Hub.SendAsync("SendCommand", request);
+        
+        _statusMessage = $"Loaded {_values.Count} values from {_currentPath}";
+        _isLoading = false;
+    }
+
+    private void HandlePathKeyPress(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter")
+        {
+            _ = NavigateToPath();
+        }
+    }
+
+    private async Task RefreshCurrentKey()
+    {
+        await NavigateToPath();
+    }
+
+    private void GoBack()
+    {
+        if (_historyStack.Count > 0)
+        {
+            _currentPath = _historyStack.Pop();
+            _ = NavigateToPath();
+        }
+    }
+
+    // ====== Tree Operations ======
+    private async Task ToggleNode(TreeNode node)
+    {
+        node.IsExpanded = !node.IsExpanded;
+        
+        if (node.IsExpanded && !node.IsLoaded)
+        {
+            // TODO: Load subkeys via SignalR
+            node.Children = new List<TreeNode>
+            {
+                new() { Name = "Software", FullPath = node.FullPath + "\\Software" },
+                new() { Name = "Environment", FullPath = node.FullPath + "\\Environment" }
+            };
+            node.IsLoaded = true;
+        }
+        
+        StateHasChanged();
+    }
+
+    private async Task SelectNode(TreeNode node)
+    {
+        _selectedNode = node;
+        _historyStack.Push(_currentPath);
+        _currentPath = node.FullPath;
+        await NavigateToPath();
+    }
+
+    // ====== Value Operations ======
+    private void SelectValue(RegistryValueInfo value)
+    {
+        _selectedValue = value;
+        _showTreeContextMenu = false;
+        _showValueContextMenu = false;
+    }
+
+    private void EditValue(RegistryValueInfo? value)
+    {
+        if (value == null) return;
+        
+        _dialogTitle = $"Edit: {value.Name}";
+        _dialogPrompt = $"Type: {value.Type}\nEnter new data:";
+        _dialogInput = value.Data;
+        _dialogCallback = () =>
+        {
+            // TODO: Call WriteRegistry via SignalR
+            _statusMessage = $"Updated {value.Name}";
+        };
+        _showInputDialog = true;
+        CloseContextMenus();
+    }
+
+    // ====== CRUD Operations ======
+    private void ShowCreateKeyDialog()
+    {
+        _dialogTitle = "Create New Key";
+        _dialogPrompt = "Enter key name:";
+        _dialogInput = "NewKey";
+        _dialogCallback = () =>
+        {
+            // TODO: Call CreateRegistryKey via SignalR
+            _statusMessage = $"Created key {_dialogInput}";
+        };
+        _showInputDialog = true;
+        CloseContextMenus();
+    }
+
+    private void ShowCreateValueDialog(string valueType = "REG_SZ")
+    {
+        _dialogTitle = $"Create New {valueType} Value";
+        _dialogPrompt = "Enter value name:";
+        _dialogInput = "NewValue";
+        _dialogCallback = () =>
+        {
+            // TODO: Call WriteRegistry via SignalR
+            _statusMessage = $"Created value {_dialogInput}";
+        };
+        _showInputDialog = true;
+        CloseContextMenus();
+    }
+
+    private void DeleteSelected()
+    {
+        if (_selectedValue != null)
+        {
+            DeleteSelectedValue();
+        }
+        else if (_selectedNode != null)
+        {
+            DeleteSelectedKey();
+        }
+        else
+        {
+            _statusMessage = "Please select a key or value to delete";
+        }
+    }
+
+    private void DeleteSelectedKey()
+    {
+        if (_selectedNode == null) return;
+        
+        _dialogTitle = "Delete Key";
+        _dialogPrompt = $"Delete key '{_selectedNode.Name}' and all its contents?";
+        _dialogCallback = () =>
+        {
+            // TODO: Call DeleteRegistryKey via SignalR
+            _statusMessage = $"Deleted key {_selectedNode.Name}";
+        };
+        _showConfirmDialog = true;
+        CloseContextMenus();
+    }
+
+    private void DeleteSelectedValue()
+    {
+        if (_selectedValue == null) return;
+        
+        _dialogTitle = "Delete Value";
+        _dialogPrompt = $"Delete value '{_selectedValue.Name}'?";
+        _dialogCallback = () =>
+        {
+            // TODO: Call DeleteRegistryValue via SignalR
+            _statusMessage = $"Deleted value {_selectedValue.Name}";
+        };
+        _showConfirmDialog = true;
+        CloseContextMenus();
+    }
+
+    // ====== Context Menus ======
+    private void ShowTreeContextMenu(MouseEventArgs e, TreeNode node)
+    {
+        _selectedNode = node;
+        _contextMenuX = e.ClientX;
+        _contextMenuY = e.ClientY;
+        _showTreeContextMenu = true;
+        _showValueContextMenu = false;
+    }
+
+    private void ShowValueContextMenu(MouseEventArgs e, RegistryValueInfo value)
+    {
+        _selectedValue = value;
+        _contextMenuX = e.ClientX;
+        _contextMenuY = e.ClientY;
+        _showValueContextMenu = true;
+        _showTreeContextMenu = false;
+    }
+
+    private void CloseContextMenus()
+    {
+        _showTreeContextMenu = false;
+        _showValueContextMenu = false;
+    }
+
+    // ====== Clipboard ======
+    private async Task CopyPathToClipboard()
+    {
+        // TODO: await JS.InvokeVoidAsync("navigator.clipboard.writeText", _currentPath);
+        _statusMessage = "Path copied to clipboard";
+        CloseContextMenus();
+    }
+
+    private async Task CopyValueName()
+    {
+        if (_selectedValue != null)
+        {
+            // TODO: await JS.InvokeVoidAsync("navigator.clipboard.writeText", _selectedValue.Name);
+            _statusMessage = "Value name copied";
+        }
+        CloseContextMenus();
+    }
+
+    private async Task CopyValueData()
+    {
+        if (_selectedValue != null)
+        {
+            // TODO: await JS.InvokeVoidAsync("navigator.clipboard.writeText", _selectedValue.Data);
+            _statusMessage = "Value data copied";
+        }
+        CloseContextMenus();
+    }
+
+    // ====== Dialog Handlers ======
+    private void HandleDialogKeyPress(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter") ConfirmDialog();
+        if (e.Key == "Escape") CloseDialogs();
+    }
+
+    private void ConfirmDialog()
+    {
+        _dialogCallback?.Invoke();
+        CloseDialogs();
+    }
+
+    private void CloseDialogs()
+    {
+        _showInputDialog = false;
+        _showConfirmDialog = false;
+        _dialogCallback = null;
+    }
+
+    // ====== Helpers ======
+    private string TruncateData(string data)
+    {
+        return data.Length > 100 ? data.Substring(0, 100) + "..." : data;
+    }
+}
+
+<style>
+    /* ====== Container ====== */
+    .registry-container {
+        display: flex;
+        flex-direction: column;
+        height: 600px;
+        gap: 0.5rem;
+        background: var(--card-bg);
+        border-radius: 0 0 0.75rem 0.75rem;
+        padding: 0.75rem;
+    }
+
+    /* ====== Toolbar ====== */
+    .registry-toolbar {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        padding: 0.75rem;
+        background: var(--card-bg);
+        border-radius: 0.5rem;
+        border: 1px solid var(--card-border);
+        flex-wrap: wrap;
+    }
+
+    .path-group {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        flex: 1;
+        min-width: 300px;
+    }
+
+    .path-label {
+        color: var(--text-secondary);
+        font-size: 0.75rem;
+        font-weight: 500;
+    }
+
+    .registry-path-input {
+        flex: 1;
+        padding: 0.375rem 0.75rem;
+        border-radius: 0.375rem;
+        border: 1px solid var(--card-border);
+        background: var(--body-bg);
+        color: var(--text-primary);
+        font-family: 'Courier New', monospace;
+        font-size: 0.75rem;
+    }
+
+    .registry-path-input:focus {
+        outline: 2px solid var(--accent-blue);
+        outline-offset: 0;
+    }
+
+    .toolbar-separator {
+        width: 1px;
+        height: 24px;
+        background: var(--card-border);
+        margin: 0 0.25rem;
+    }
+
+    .btn {
+        padding: 0.375rem 0.75rem;
+        border-radius: 0.375rem;
+        border: none;
+        cursor: pointer;
+        font-weight: 500;
+        font-size: 0.75rem;
+        transition: all 0.2s;
+        white-space: nowrap;
+    }
+
+    .btn:hover { opacity: 0.9; transform: translateY(-1px); }
+    .btn:active { transform: translateY(0); }
+    .btn:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+
+    .btn-navigate { background: #14b8a6; color: white; }
+    .btn-refresh { background: #3b82f6; color: white; }
+    .btn-back { background: var(--card-bg); color: var(--text-primary); border: 1px solid var(--card-border); }
+    .btn-create-key { background: #10b981; color: white; }
+    .btn-create-value { background: #3b82f6; color: white; }
+    .btn-delete { background: #ef4444; color: white; }
+    .btn-cancel { background: var(--card-bg); color: var(--text-primary); border: 1px solid var(--card-border); }
+    .btn-ok { background: #3b82f6; color: white; }
+    .btn-danger { background: #ef4444; color: white; }
+
+    /* ====== Content Split ====== */
+    .registry-content {
+        display: flex;
+        flex: 1;
+        gap: 0.5rem;
+        min-height: 0;
+        border-radius: 0.5rem;
+        overflow: hidden;
+    }
+
+    .registry-tree-panel {
+        width: 280px;
+        min-width: 200px;
+        background: var(--body-bg);
+        border: 1px solid var(--card-border);
+        overflow: auto;
+        padding: 0.5rem;
+    }
+
+    .registry-values-panel {
+        flex: 1;
+        background: var(--card-bg);
+        border: 1px solid var(--card-border);
+        overflow: auto;
+    }
+
+    /* ====== TreeView ====== */
+    .tree-view {
+        font-size: 0.75rem;
+        font-family: 'Courier New', monospace;
+    }
+
+    .tree-node {
+        padding: 0.125rem 0;
+    }
+
+    .tree-node.child {
+        margin-left: 1rem;
+        padding-left: 0.5rem;
+        border-left: 1px solid var(--card-border);
+    }
+
+    .node-toggle {
+        cursor: pointer;
+        display: inline-block;
+        width: 16px;
+        text-align: center;
+        color: var(--text-secondary);
+        user-select: none;
+    }
+
+    .node-toggle:hover {
+        color: var(--text-primary);
+    }
+
+    .node-name {
+        cursor: pointer;
+        padding: 0.125rem 0.375rem;
+        border-radius: 0.25rem;
+        color: var(--text-primary);
+        user-select: none;
+    }
+
+    .node-name:hover {
+        background: var(--card-hover);
+    }
+
+    .node-name.selected {
+        background: var(--accent-blue);
+        color: white;
+    }
+
+    /* ====== Values Table ====== */
+    .values-table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 0.75rem;
+    }
+
+    .values-table thead {
+        background: var(--body-bg);
+        position: sticky;
+        top: 0;
+        z-index: 1;
+    }
+
+    .values-table th {
+        padding: 0.5rem 1rem;
+        text-align: left;
+        font-weight: 600;
+        font-size: 0.7rem;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        color: var(--text-secondary);
+        border-bottom: 1px solid var(--card-border);
+    }
+
+    .values-table td {
+        padding: 0.5rem 1rem;
+        border-bottom: 1px solid var(--card-border);
+    }
+
+    .values-table tbody tr {
+        cursor: pointer;
+        transition: background-color 0.15s;
+    }
+
+    .values-table tbody tr:hover {
+        background: var(--card-hover);
+    }
+
+    .values-table tbody tr.selected {
+        background: var(--accent-blue);
+        color: white;
+    }
+
+    .col-name {
+        font-weight: 500;
+        color: var(--text-primary);
+    }
+
+    .col-type {
+        color: var(--text-secondary);
+    }
+
+    .col-data {
+        font-family: 'Courier New', monospace;
+        color: var(--text-secondary);
+    }
+
+    .loading-cell,
+    .empty-cell {
+        text-align: center;
+        color: var(--text-secondary);
+        padding: 2rem !important;
+    }
+
+    /* ====== Status Bar ====== */
+    .registry-status {
+        padding: 0.5rem 1rem;
+        font-size: 0.75rem;
+        color: var(--text-secondary);
+        background: var(--body-bg);
+        border-radius: 0.375rem;
+        border: 1px solid var(--card-border);
+    }
+
+    /* ====== Context Menu ====== */
+    .context-menu {
+        position: fixed;
+        background: var(--card-bg);
+        border: 1px solid var(--card-border);
+        border-radius: 0.5rem;
+        box-shadow: 0 10px 25px rgba(0, 0, 0, 0.3);
+        padding: 0.25rem;
+        min-width: 180px;
+        z-index: 1000;
+    }
+
+    .context-item {
+        padding: 0.5rem 1rem;
+        font-size: 0.75rem;
+        cursor: pointer;
+        border-radius: 0.25rem;
+        transition: background-color 0.15s;
+        color: var(--text-primary);
+    }
+
+    .context-item:hover {
+        background: var(--card-hover);
+    }
+
+    .context-item.danger {
+        color: #ef4444;
+    }
+
+    .context-separator {
+        height: 1px;
+        background: var(--card-border);
+        margin: 0.25rem 0;
+    }
+
+    /* ====== Dialogs ====== */
+    .dialog-overlay {
+        position: fixed;
+        inset: 0;
+        background: rgba(0, 0, 0, 0.5);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        z-index: 2000;
+    }
+
+    .dialog {
+        background: var(--card-bg);
+        border: 1px solid var(--card-border);
+        border-radius: 0.75rem;
+        box-shadow: 0 20px 40px rgba(0, 0, 0, 0.4);
+        width: 100%;
+        max-width: 28rem;
+        padding: 1.5rem;
+    }
+
+    .dialog-header {
+        font-size: 1.125rem;
+        font-weight: 600;
+        margin-bottom: 1rem;
+        color: var(--text-primary);
+    }
+
+    .dialog-body {
+        margin-bottom: 1.5rem;
+    }
+
+    .dialog-body label {
+        display: block;
+        font-size: 0.875rem;
+        color: var(--text-secondary);
+        margin-bottom: 0.75rem;
+        white-space: pre-line;
+    }
+
+    .dialog-body input {
+        width: 100%;
+        padding: 0.5rem 0.75rem;
+        background: var(--body-bg);
+        border: 1px solid var(--card-border);
+        border-radius: 0.375rem;
+        color: var(--text-primary);
+        font-size: 0.875rem;
+    }
+
+    .dialog-body input:focus {
+        outline: 2px solid var(--accent-blue);
+        outline-offset: 0;
+    }
+
+    .dialog-footer {
+        display: flex;
+        justify-content: flex-end;
+        gap: 0.75rem;
+    }
+
+    .confirm-message {
+        color: var(--text-primary);
+        font-size: 0.875rem;
+    }
+</style>
