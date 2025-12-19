@@ -11,6 +11,9 @@ builder.Services.AddRazorComponents()
 // Add Controllers for API endpoints
 builder.Services.AddControllers();
 
+// (NEW) HttpClient để Login.razor gọi API /api/auth/verify
+builder.Services.AddHttpClient();
+
 // SignalR với MaxMessageSize lớn cho Screenshot base64
 builder.Services.AddSignalR(o =>
 {

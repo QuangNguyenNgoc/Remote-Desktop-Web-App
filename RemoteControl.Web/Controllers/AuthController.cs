@@ -1,10 +1,12 @@
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.Extensions.Configuration;
 
 namespace RemoteControl.Web.Controllers
 {
     [ApiController]
+    // Giữ route cũ: /Auth/verify
     [Route("[controller]")]
+    // Thêm route mới đúng checklist: /api/auth/verify
+    [Route("api/auth")]
     public class AuthController : ControllerBase
     {
         private readonly string _expectedPasskey;
@@ -21,9 +23,7 @@ namespace RemoteControl.Web.Controllers
         public ActionResult<VerifyResponse> Verify([FromBody] VerifyRequest request)
         {
             if (string.IsNullOrWhiteSpace(request?.Passkey))
-            {
                 return Ok(new VerifyResponse(false));
-            }
 
             var isValid = string.Equals(request.Passkey, _expectedPasskey, StringComparison.Ordinal);
             return Ok(new VerifyResponse(isValid));
