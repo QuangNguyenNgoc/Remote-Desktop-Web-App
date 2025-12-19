@@ -179,3 +179,91 @@ public class RegistryResult
     /// </summary>
     public string OperationMessage { get; set; } = string.Empty;
 }
+
+/// <summary>
+/// Result for ListRegistrySubKeys command
+/// Trả về danh sách các subkeys trong một registry key
+/// </summary>
+public class RegistrySubKeysResult
+{
+    /// <summary>
+    /// Registry key path được query
+    /// </summary>
+    public string KeyPath { get; set; } = string.Empty;
+
+    /// <summary>
+    /// Danh sách tên các subkeys
+    /// </summary>
+    public List<string> SubKeys { get; set; } = new();
+}
+
+/// <summary>
+/// Result for ListRegistryValues command
+/// Trả về danh sách tất cả values trong một registry key
+/// </summary>
+public class RegistryValuesResult
+{
+    /// <summary>
+    /// Registry key path được query
+    /// </summary>
+    public string KeyPath { get; set; } = string.Empty;
+
+    /// <summary>
+    /// Danh sách information của các values
+    /// </summary>
+    public List<RegistryValueInfo> Values { get; set; } = new();
+}
+
+/// <summary>
+/// Information about a single registry value
+/// Chi tiết về một registry value bao gồm tên, loại, và dữ liệu
+/// </summary>
+public class RegistryValueInfo
+{
+    /// <summary>
+    /// Tên value (hoặc "(Default)" cho default value)
+    /// </summary>
+    public string Name { get; set; } = string.Empty;
+
+    /// <summary>
+    /// Loại value: REG_SZ, REG_DWORD, REG_QWORD, REG_BINARY, REG_MULTI_SZ, REG_EXPAND_SZ
+    /// </summary>
+    public string Type { get; set; } = string.Empty;
+
+    /// <summary>
+    /// Dữ liệu của value (converted to string for display)
+    /// </summary>
+    public string Data { get; set; } = string.Empty;
+}
+
+/// <summary>
+/// Result for GetRegistryKeyInfo command
+/// Thông tin chi tiết về một registry key
+/// </summary>
+public class RegistryKeyInfoResult
+{
+    /// <summary>
+    /// Registry key path
+    /// </summary>
+    public string KeyPath { get; set; } = string.Empty;
+
+    /// <summary>
+    /// Số lượng subkeys
+    /// </summary>
+    public int SubKeyCount { get; set; }
+
+    /// <summary>
+    /// Số lượng values
+    /// </summary>
+    public int ValueCount { get; set; }
+
+    /// <summary>
+    /// Thời gian chỉnh sửa cuối (nếu có)
+    /// </summary>
+    public DateTime? LastWriteTime { get; set; }
+
+    /// <summary>
+    /// Key có tồn tại hay không
+    /// </summary>
+    public bool Exists { get; set; }
+}
