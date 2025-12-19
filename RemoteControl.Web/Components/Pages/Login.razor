@@ -1,5 +1,6 @@
 @page "/login"
 @layout EmptyLayout
+@using System.Net.Http.Json
 @inject NavigationManager Nav
 @inject IJSRuntime JS
 
@@ -48,6 +49,15 @@
                 </div>
             </div>
 
+            <!-- Remember Me checkbox -->
+            <div class="remember-row">
+                <label class="remember-label">
+                    <input type="checkbox" @bind="_rememberMe" disabled="@_isLoading" />
+                    <span>Remember me</span>
+                    <span class="remember-hint">(1 hour)</span>
+                </label>
+            </div>
+
             @if (!string.IsNullOrWhiteSpace(_error))
             {
                 <div class="error-message">@_error</div>
@@ -74,21 +84,55 @@
             </div>
         </div>
     </div>
+
+    @if (_toastVisible)
+    {
+        <div class="toast" role="status" aria-live="polite">
+            @_toastMessage
+        </div>
+    }
 </div>
 
 @code {
+    // Response class for API
+    private sealed class VerifyResponse
+    {
+        public bool Success { get; set; }
+    }
+
+    // State variables
     private string _passkey = "";
     private string _error = "";
     private bool _isLoading = false;
     private bool _showPassword = false;
+    private bool _rememberMe = false;
+    
+    // Toast state
+    private bool _toastVisible = false;
+    private string _toastMessage = "";
 
     private void TogglePassword() => _showPassword = !_showPassword;
 
+    // Auto-login check on page load
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender) return;
+
+        // If already logged in, redirect to home
+        if (await IsRememberedAndValidAsync())
+        {
+            Nav.NavigateTo("/", forceLoad: true);
+        }
+    }
+
     private async Task LoginAsync()
     {
+        if (_isLoading) return;
+
         if (string.IsNullOrWhiteSpace(_passkey))
         {
             _error = "Please enter passkey.";
+            await ShowToastAsync("Please enter passkey.");
             return;
         }
 
@@ -97,23 +141,38 @@
 
         try
         {
-            // Call backend API to verify passkey
-            var ok = await JS.InvokeAsync<bool>("passkeyAuth.verify", _passkey);
-            
-            if (!ok)
+            // Native C# HttpClient API call
+            using var http = new HttpClient { BaseAddress = new Uri(Nav.BaseUri) };
+            var resp = await http.PostAsJsonAsync("/auth/verify", new { Passkey = _passkey });
+
+            if (!resp.IsSuccessStatusCode)
             {
-                _error = "Invalid passkey.";
-                _isLoading = false;
+                _error = "Login failed. Please try again.";
+                await ShowToastAsync("Login failed.");
                 return;
             }
 
-            // Save to localStorage and redirect
-            await JS.InvokeVoidAsync("passkeyAuth.setLoggedIn", true);
+            var data = await resp.Content.ReadFromJsonAsync<VerifyResponse>();
+            var ok = data?.Success == true;
+
+            if (!ok)
+            {
+                _error = "Invalid passkey.";
+                await ShowToastAsync("Invalid passkey.");
+                return;
+            }
+
+            // Persist login with Remember Me
+            await PersistLoginAsync(_rememberMe);
             Nav.NavigateTo("/", forceLoad: true);
         }
-        catch (Exception ex)
+        catch
         {
-            _error = $"Error: {ex.Message}";
+            _error = "Login failed. Please try again.";
+            await ShowToastAsync("Login failed.");
+        }
+        finally
+        {
             _isLoading = false;
         }
     }
@@ -124,6 +183,52 @@
         {
             _ = LoginAsync();
         }
+    }
+
+    // Persist login to storage
+    private async Task PersistLoginAsync(bool remember)
+    {
+        if (remember)
+        {
+            var until = DateTimeOffset.UtcNow.AddHours(1).ToUnixTimeSeconds().ToString();
+            await JS.InvokeVoidAsync("localStorage.setItem", "rc_auth_until", until);
+            await JS.InvokeVoidAsync("localStorage.setItem", "rc_auth", "1");
+            await JS.InvokeVoidAsync("sessionStorage.removeItem", "rc_auth_session");
+        }
+        else
+        {
+            await JS.InvokeVoidAsync("sessionStorage.setItem", "rc_auth_session", "1");
+            await JS.InvokeVoidAsync("localStorage.removeItem", "rc_auth_until");
+            await JS.InvokeVoidAsync("localStorage.removeItem", "rc_auth");
+        }
+    }
+
+    // Check if user is remembered and still valid
+    private async Task<bool> IsRememberedAndValidAsync()
+    {
+        var session = await JS.InvokeAsync<string>("sessionStorage.getItem", "rc_auth_session");
+        if (session == "1") return true;
+
+        var flag = await JS.InvokeAsync<string>("localStorage.getItem", "rc_auth");
+        var untilStr = await JS.InvokeAsync<string>("localStorage.getItem", "rc_auth_until");
+        if (flag != "1" || string.IsNullOrWhiteSpace(untilStr)) return false;
+
+        if (!long.TryParse(untilStr, out var until)) return false;
+        var now = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
+        return now <= until;
+    }
+
+    // Toast notification
+    private async Task ShowToastAsync(string message)
+    {
+        _toastMessage = message;
+        _toastVisible = true;
+        StateHasChanged();
+
+        await Task.Delay(2500);
+
+        _toastVisible = false;
+        StateHasChanged();
     }
 }
 
@@ -288,5 +393,52 @@
         font-size: 0.75rem;
         color: var(--text-quaternary);
         margin: 0;
+    }
+
+    /* Remember Me */
+    .remember-row {
+        margin-top: -0.25rem;
+    }
+
+    .remember-label {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        font-size: 0.875rem;
+        color: var(--text-secondary);
+        cursor: pointer;
+    }
+
+    .remember-label input[type="checkbox"] {
+        width: 1rem;
+        height: 1rem;
+        accent-color: #3b82f6;
+        cursor: pointer;
+    }
+
+    .remember-hint {
+        color: var(--text-quaternary);
+        font-size: 0.75rem;
+    }
+
+    /* Toast notification */
+    .toast {
+        position: fixed;
+        bottom: 24px;
+        left: 50%;
+        transform: translateX(-50%);
+        background: #ef4444;
+        color: #fff;
+        padding: 12px 24px;
+        border-radius: 8px;
+        font-size: 14px;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+        z-index: 9999;
+        animation: slideUp 0.3s ease;
+    }
+
+    @@keyframes slideUp {
+        from { opacity: 0; transform: translateX(-50%) translateY(20px); }
+        to { opacity: 1; transform: translateX(-50%) translateY(0); }
     }
 </style>
