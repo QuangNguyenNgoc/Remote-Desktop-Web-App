@@ -1,0 +1,125 @@
+@using Microsoft.JSInterop
+@implements IAsyncDisposable
+@inject IJSRuntime JS
+
+@* Layout:
+   - Mobile: 1 cột (line -> pie -> bar)
+   - >= sm: 3 cột, line chiếm 2 cột bên trái, bên phải là 2 chart xếp dọc *@
+
+<div class="grid grid-cols-1 sm:grid-cols-3 gap-6 mb-8">
+
+    @* Line chart: span 2 cột từ sm *@
+    <div class="sm:col-span-2 rounded-xl p-6 shadow-sm"
+         style="background-color: var(--card-bg); border: 1px solid var(--card-border);">
+        <div class="flex justify-between items-center mb-4">
+            <div>
+                <h3 class="font-semibold" style="color: var(--text-primary);">Agents over Time (24h)</h3>
+                <p class="text-xs" style="color: var(--text-tertiary);">Mock data</p>
+            </div>
+        </div>
+        <div style="height: 260px;">
+            <canvas id="@LineId"></canvas>
+        </div>
+    </div>
+
+    @* Cột phải: 2 chart xếp dọc *@
+    <div class="sm:col-span-1 grid grid-cols-1 gap-6">
+
+        <div class="rounded-xl p-6 shadow-sm"
+             style="background-color: var(--card-bg); border: 1px solid var(--card-border);">
+            <div class="flex justify-between items-center mb-4">
+                <div>
+                    <h3 class="font-semibold" style="color: var(--text-primary);">OS Distribution</h3>
+                    <p class="text-xs" style="color: var(--text-tertiary);">Mock data</p>
+                </div>
+            </div>
+            <div style="height: 220px;">
+                <canvas id="@PieId"></canvas>
+            </div>
+        </div>
+
+        <div class="rounded-xl p-6 shadow-sm"
+             style="background-color: var(--card-bg); border: 1px solid var(--card-border);">
+            <div class="flex justify-between items-center mb-4">
+                <div>
+                    <h3 class="font-semibold" style="color: var(--text-primary);">Commands Frequency</h3>
+                    <p class="text-xs" style="color: var(--text-tertiary);">Mock data</p>
+                </div>
+            </div>
+            <div style="height: 220px;">
+                <canvas id="@BarId"></canvas>
+            </div>
+        </div>
+
+    </div>
+</div>
+
+@code {
+    [Parameter] public int TotalAgents { get; set; }
+    [Parameter] public int OnlineAgents { get; set; }
+    [Parameter] public int CommandsExecuted { get; set; }
+
+    private const string LineId = "dash_line_agents_24h";
+    private const string PieId  = "dash_pie_os";
+    private const string BarId  = "dash_bar_commands";
+
+    private bool _rendered;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender || _rendered) return;
+        _rendered = true;
+
+        // ===== Line (24h) =====
+        var labels = Enumerable.Range(0, 24).Select(h => $"{h:00}:00").ToList();
+
+        // mock: tạo đường cong quanh OnlineAgents (không đụng Agent/Shared)
+        var baseVal = Math.Max(1, OnlineAgents > 0 ? OnlineAgents : TotalAgents);
+        var rnd = new Random(7);
+        var values = labels.Select((_, i) =>
+        {
+            var wiggle = (int)Math.Round(Math.Sin(i / 3.0) * 2) + rnd.Next(-1, 2);
+            return Math.Max(0, baseVal + wiggle);
+        }).ToList();
+
+        await JS.InvokeVoidAsync("dashboardCharts.renderLine", LineId, labels, values);
+
+        // ===== Pie (OS) =====
+        var osLabels = new List<string> { "Windows 11", "Windows 10", "Windows 7", "Other" };
+
+        var t = Math.Max(1, TotalAgents);
+        var w11 = (int)Math.Round(t * 0.55);
+        var w10 = (int)Math.Round(t * 0.30);
+        var w7  = Math.Max(0, (int)Math.Round(t * 0.10));
+        var oth = Math.Max(0, t - w11 - w10 - w7);
+
+        var osValues = new List<int> { w11, w10, w7, oth };
+        await JS.InvokeVoidAsync("dashboardCharts.renderPie", PieId, osLabels, osValues);
+
+        // ===== Bar (Commands) =====
+        var cmdLabels = new List<string> { "Capture", "Process", "Keylog", "Registry", "System" };
+
+        var c = Math.Max(1, CommandsExecuted);
+        var barValues = new List<int>
+        {
+            Math.Max(0, (int)Math.Round(c * 0.35)),
+            Math.Max(0, (int)Math.Round(c * 0.25)),
+            Math.Max(0, (int)Math.Round(c * 0.20)),
+            Math.Max(0, (int)Math.Round(c * 0.10)),
+            Math.Max(0, c - (int)Math.Round(c * 0.35) - (int)Math.Round(c * 0.25) - (int)Math.Round(c * 0.20) - (int)Math.Round(c * 0.10))
+        };
+
+        await JS.InvokeVoidAsync("dashboardCharts.renderBar", BarId, cmdLabels, barValues);
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        try
+        {
+            await JS.InvokeVoidAsync("dashboardCharts.destroy", LineId);
+            await JS.InvokeVoidAsync("dashboardCharts.destroy", PieId);
+            await JS.InvokeVoidAsync("dashboardCharts.destroy", BarId);
+        }
+        catch { }
+    }
+}

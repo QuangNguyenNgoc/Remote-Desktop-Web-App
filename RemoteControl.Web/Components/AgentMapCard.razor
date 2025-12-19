@@ -1,0 +1,64 @@
+@using Microsoft.JSInterop
+@implements IAsyncDisposable
+@inject IJSRuntime JS
+
+<div class="rounded-xl p-6 shadow-sm"
+     style="background-color: var(--card-bg); border: 1px solid var(--card-border);">
+    <div class="flex items-start justify-between gap-4">
+        <div>
+            <h3 class="font-semibold" style="color: var(--text-primary);">Agent Map (Optional)</h3>
+            <p class="text-xs mt-1" style="color: var(--text-tertiary);">
+                UI ready. Need agent geolocation (lat/lng) to show real markers.
+            </p>
+        </div>
+
+        <button class="text-sm transition-colors"
+                style="color: var(--btn-primary-bg);"
+                @onclick="CenterVietnam">
+            Reset
+        </button>
+    </div>
+
+    <div class="mt-4 rounded-lg overflow-hidden"
+         style="border: 1px solid var(--card-border); height: 260px;">
+        <div id="@MapId" style="height: 260px; width: 100%;"></div>
+    </div>
+
+    @if (Markers.Count == 0)
+    {
+        <div class="mt-3 text-sm" style="color: var(--text-tertiary);">
+            No markers yet (Agent chưa gửi location).
+        </div>
+    }
+</div>
+
+@code {
+    private const string MapId = "agent_map_main";
+    private bool _inited;
+
+    // Sau này bạn chỉ cần fill Markers từ hub (lat/lng thật)
+    private List<MapMarker> Markers { get; set; } = new();
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender || _inited) return;
+        _inited = true;
+
+        await JS.InvokeVoidAsync("agentMap.init", MapId, new { center = new[] { 14.0583, 108.2772 }, zoom = 5 });
+        await JS.InvokeVoidAsync("agentMap.setMarkers", MapId, Markers);
+    }
+
+    private async Task CenterVietnam()
+    {
+        // Re-init đơn giản cho nhanh
+        _inited = false;
+        await InvokeAsync(StateHasChanged);
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        try { await JS.InvokeVoidAsync("agentMap.destroy", MapId); } catch { }
+    }
+
+    public record MapMarker(double lat, double lng, string? label);
+}
