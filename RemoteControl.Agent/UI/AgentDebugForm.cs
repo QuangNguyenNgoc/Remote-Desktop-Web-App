@@ -45,6 +45,12 @@ public class AgentDebugForm : Form
     private Button _btnStartKeyLog = null!, _btnStopKeyLog = null!;
     private System.Windows.Forms.Timer _logTimer = null!;
 
+    // Registry
+    private TreeView _tvRegistry = null!;
+    private ListView _lvRegistryValues = null!;
+    private TextBox _txtRegistryPath = null!;
+    private readonly RegistryService _registryService;
+
     public AgentDebugForm(Microsoft.Extensions.Configuration.IConfiguration configuration)
     {
         _configuration = configuration;
@@ -63,6 +69,9 @@ public class AgentDebugForm : Form
         {
             this.Text = $"RemoteControl Agent - Developer Console [{state}]";
         });
+
+        // Init RegistryService
+        _registryService = new RegistryService();
 
         // Form Setup - Fixed size behavior
         this.Text = "RemoteControl Agent - Developer Console";
@@ -113,6 +122,7 @@ public class AgentDebugForm : Form
         InitWebcamTab();
         InitKeyLoggerTab();
         InitPowerTab(); // Add Power Tab
+        InitRegistryTab(); // Add Registry Tab
 
         // Disable TabStop for all controls to allow KeyLogger testing
         DisableTabStop(this);
@@ -174,6 +184,216 @@ public class AgentDebugForm : Form
             }
         };
         return btn;
+    }
+
+    // =================================================================================
+    // TAB 7: REGISTRY BROWSER
+    // =================================================================================
+    private void InitRegistryTab()
+    {
+        var tab = new TabPage("Registry") { Padding = new Padding(5) };
+
+        // Top bar with path and navigation
+        var topPanel = new Panel { Dock = DockStyle.Top, Height = 40 };
+        
+        var lblPath = new Label
+        {
+            Text = "Path:",
+            Location = new Point(5, 10),
+            AutoSize = true
+        };
+        
+        _txtRegistryPath = new TextBox
+        {
+            Location = new Point(45, 7),
+            Width = 500,
+            Text = "HKEY_CURRENT_USER\\Software"
+        };
+        
+        var btnGo = Btn("Go", Color.Teal, 555, 5);
+        btnGo.Click += (s, e) => NavigateToRegistryPath(_txtRegistryPath.Text);
+        
+        var btnRefresh = Btn("Refresh", Color.RoyalBlue, 650, 5);
+        btnRefresh.Click += (s, e) => RefreshRegistryView();
+        
+        topPanel.Controls.AddRange(new Control[] { lblPath, _txtRegistryPath, btnGo, btnRefresh });
+
+        // Split container for tree and values
+        var splitContainer = new SplitContainer
+        {
+            Dock = DockStyle.Fill,
+            Orientation = Orientation.Vertical,
+            SplitterDistance = 300,
+            BorderStyle = BorderStyle.FixedSingle
+        };
+
+        // Left panel: TreeView for registry structure
+        _tvRegistry = new TreeView
+        {
+            Dock = DockStyle.Fill,
+            Font = new Font("Segoe UI", 9F),
+            ShowLines = true,
+            ShowPlusMinus = true,
+            ShowRootLines = true,
+            HideSelection = false
+        };
+        _tvRegistry.AfterSelect += TvRegistry_AfterSelect;
+        _tvRegistry.BeforeExpand += TvRegistry_BeforeExpand;
+        
+        // Initialize root keys
+        InitializeRegistryRoots();
+
+        // Right panel: ListView for values
+        _lvRegistryValues = new ListView
+        {
+            Dock = DockStyle.Fill,
+            View = View.Details,
+            FullRowSelect = true,
+            GridLines = true,
+            Font = new Font("Segoe UI", 9F)
+        };
+        _lvRegistryValues.Columns.Add("Name", 180);
+        _lvRegistryValues.Columns.Add("Type", 100);
+        _lvRegistryValues.Columns.Add("Data", 350);
+
+        splitContainer.Panel1.Controls.Add(_tvRegistry);
+        splitContainer.Panel2.Controls.Add(_lvRegistryValues);
+
+        tab.Controls.Add(splitContainer);
+        tab.Controls.Add(topPanel);
+        _tabControl.TabPages.Add(tab);
+    }
+
+    private void InitializeRegistryRoots()
+    {
+        _tvRegistry.Nodes.Clear();
+        
+        var roots = new[]
+        {
+            ("HKEY_CLASSES_ROOT", "HKCR"),
+            ("HKEY_CURRENT_USER", "HKCU"),
+            ("HKEY_LOCAL_MACHINE", "HKLM"),
+            ("HKEY_USERS", "HKU"),
+            ("HKEY_CURRENT_CONFIG", "HKCC")
+        };
+
+        foreach (var (fullName, shortName) in roots)
+        {
+            var node = new TreeNode(fullName)
+            {
+                Tag = fullName,
+                Name = fullName
+            };
+            // Add dummy node for expand
+            node.Nodes.Add(new TreeNode("Loading...") { Tag = "DUMMY" });
+            _tvRegistry.Nodes.Add(node);
+        }
+    }
+
+    private void TvRegistry_BeforeExpand(object? sender, TreeViewCancelEventArgs e)
+    {
+        if (e.Node == null) return;
+
+        // Check if first child is dummy
+        if (e.Node.Nodes.Count == 1 && e.Node.Nodes[0].Tag?.ToString() == "DUMMY")
+        {
+            e.Node.Nodes.Clear();
+            LoadSubKeys(e.Node);
+        }
+    }
+
+    private void LoadSubKeys(TreeNode parentNode)
+    {
+        var keyPath = parentNode.Tag?.ToString();
+        if (string.IsNullOrEmpty(keyPath)) return;
+
+        try
+        {
+            var result = _registryService.ListSubKeys(keyPath);
+            foreach (var subKey in result.SubKeys)
+            {
+                var childNode = new TreeNode(subKey)
+                {
+                    Tag = $"{keyPath}\\{subKey}",
+                    Name = subKey
+                };
+                // Add dummy for lazy loading
+                childNode.Nodes.Add(new TreeNode("Loading...") { Tag = "DUMMY" });
+                parentNode.Nodes.Add(childNode);
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[Registry] Error loading subkeys: {ex.Message}");
+        }
+    }
+
+    private void TvRegistry_AfterSelect(object? sender, TreeViewEventArgs e)
+    {
+        if (e.Node?.Tag == null) return;
+
+        var keyPath = e.Node.Tag.ToString();
+        if (string.IsNullOrEmpty(keyPath)) return;
+
+        _txtRegistryPath.Text = keyPath;
+        LoadRegistryValues(keyPath);
+    }
+
+    private void LoadRegistryValues(string keyPath)
+    {
+        _lvRegistryValues.BeginUpdate();
+        _lvRegistryValues.Items.Clear();
+
+        try
+        {
+            var result = _registryService.ListValues(keyPath);
+            foreach (var val in result.Values)
+            {
+                var item = new ListViewItem(val.Name);
+                item.SubItems.Add(val.Type);
+                item.SubItems.Add(val.Data.Length > 200 ? val.Data.Substring(0, 200) + "..." : val.Data);
+                _lvRegistryValues.Items.Add(item);
+            }
+            UpdateStatus($"Loaded {result.Values.Count} values from {keyPath}");
+        }
+        catch (Exception ex)
+        {
+            UpdateStatus($"Error: {ex.Message}");
+        }
+
+        _lvRegistryValues.EndUpdate();
+    }
+
+    private void NavigateToRegistryPath(string path)
+    {
+        if (string.IsNullOrWhiteSpace(path)) return;
+
+        // Kiểm tra key có tồn tại không
+        var keyInfo = _registryService.GetKeyInfo(path);
+        if (!keyInfo.Exists)
+        {
+            UpdateStatus($"Key không tồn tại: {path}");
+            return;
+        }
+
+        LoadRegistryValues(path);
+        UpdateStatus($"Navigated to {path}");
+    }
+
+    private void RefreshRegistryView()
+    {
+        if (_tvRegistry.SelectedNode != null)
+        {
+            var path = _tvRegistry.SelectedNode.Tag?.ToString();
+            if (!string.IsNullOrEmpty(path))
+            {
+                LoadRegistryValues(path);
+            }
+        }
+        else if (!string.IsNullOrEmpty(_txtRegistryPath.Text))
+        {
+            NavigateToRegistryPath(_txtRegistryPath.Text);
+        }
     }
 
     private void DisableTabStop(Control parent)

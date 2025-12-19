@@ -84,6 +84,71 @@ public class CommandRequest
 
     #endregion
 
+    #region Registry convenience properties
+
+    /// <summary>
+    /// Registry key path, lưu/đọc từ Parameters["KeyPath"]
+    /// Example: HKEY_CURRENT_USER\Software\MyApp
+    /// </summary>
+    public string? RegistryKeyPath
+    {
+        get => Parameters.TryGetValue("KeyPath", out var v) ? v : null;
+        set
+        {
+            if (string.IsNullOrWhiteSpace(value))
+                Parameters.Remove("KeyPath");
+            else
+                Parameters["KeyPath"] = value;
+        }
+    }
+
+    /// <summary>
+    /// Registry value name, lưu/đọc từ Parameters["ValueName"]
+    /// </summary>
+    public string? RegistryValueName
+    {
+        get => Parameters.TryGetValue("ValueName", out var v) ? v : null;
+        set
+        {
+            if (string.IsNullOrWhiteSpace(value))
+                Parameters.Remove("ValueName");
+            else
+                Parameters["ValueName"] = value;
+        }
+    }
+
+    /// <summary>
+    /// Registry value data, lưu/đọc từ Parameters["Value"]
+    /// </summary>
+    public string? RegistryValue
+    {
+        get => Parameters.TryGetValue("Value", out var v) ? v : null;
+        set
+        {
+            if (string.IsNullOrWhiteSpace(value))
+                Parameters.Remove("Value");
+            else
+                Parameters["Value"] = value;
+        }
+    }
+
+    /// <summary>
+    /// Registry value type (REG_SZ, REG_DWORD, etc.), lưu/đọc từ Parameters["ValueType"]
+    /// </summary>
+    public string? RegistryValueType
+    {
+        get => Parameters.TryGetValue("ValueType", out var v) ? v : null;
+        set
+        {
+            if (string.IsNullOrWhiteSpace(value))
+                Parameters.Remove("ValueType");
+            else
+                Parameters["ValueType"] = value;
+        }
+    }
+
+    #endregion
+
     #region Factory helpers cho từng loại command
 
     public static CommandRequest CreateCaptureScreen(string deviceId)
@@ -256,9 +321,27 @@ public enum CommandType
 
     /// <summary>
     /// Delete registry value (Delete value command)
-    /// Params: Link, ValueName
+    /// Params: KeyPath, ValueName
     /// </summary>
     DeleteRegistryValue,
+
+    /// <summary>
+    /// List all subkeys of a registry key
+    /// Params: KeyPath
+    /// </summary>
+    ListRegistrySubKeys,
+
+    /// <summary>
+    /// List all values of a registry key
+    /// Params: KeyPath
+    /// </summary>
+    ListRegistryValues,
+
+    /// <summary>
+    /// Get detailed information about a registry key
+    /// Params: KeyPath
+    /// </summary>
+    GetRegistryKeyInfo,
 
     // ===== Control =====
     /// <summary>
