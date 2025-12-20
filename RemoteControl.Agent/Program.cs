@@ -3,6 +3,9 @@
 //   --mode=debug   : Debug UI với WinForms (mặc định)
 //   --mode=service : Chạy như Windows Service
 //   --mode=hidden  : Chạy ẩn không có UI
+//
+// Argument: --server=IP:PORT để chỉ định server cố định
+//   Ví dụ: Agent.exe --mode=hidden --server=192.168.1.100:5048
 
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -13,13 +16,32 @@ using RemoteControl.Agent.Workers;
 
 // ====== Parse Command-Line Arguments ======
 var mode = GetRunMode(args);
+var serverArg = GetServerArg(args);
+
 Console.WriteLine($"[Agent] Starting in {mode} mode...");
+if (!string.IsNullOrEmpty(serverArg))
+{
+    Console.WriteLine($"[Agent] Server: {serverArg}");
+}
 
 // Build Configuration
 var configBuilder = new ConfigurationBuilder()
-    .SetBasePath(Directory.GetCurrentDirectory())
+    .SetBasePath(AppContext.BaseDirectory) // Use exe directory, not current directory
     .AddJsonFile("appsettings.json", optional: true, reloadOnChange: true)
     .AddCommandLine(args);
+
+// Override SignalR:HubUrl if --server is specified
+if (!string.IsNullOrEmpty(serverArg))
+{
+    var hubUrl = serverArg.StartsWith("http") 
+        ? serverArg 
+        : $"http://{serverArg}/remotehub";
+    configBuilder.AddInMemoryCollection(new Dictionary<string, string?>
+    {
+        ["SignalR:HubUrl"] = hubUrl
+    });
+}
+
 IConfiguration configuration = configBuilder.Build();
 
 // ====== Run theo mode ======
@@ -57,6 +79,19 @@ static RunMode GetRunMode(string[] args)
             return RunMode.Service;
     }
     return RunMode.Debug;
+}
+
+// ====== Helper: Parse --server=IP:PORT ======
+static string? GetServerArg(string[] args)
+{
+    foreach (var arg in args)
+    {
+        if (arg.StartsWith("--server=", StringComparison.OrdinalIgnoreCase))
+        {
+            return arg.Substring("--server=".Length);
+        }
+    }
+    return null;
 }
 
 // ====== Mode 1: Debug UI (WinForms) ======
