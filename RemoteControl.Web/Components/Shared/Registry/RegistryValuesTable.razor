@@ -1,0 +1,183 @@
+@* 
+    RegistryValuesTable.razor - Registry Values Table Component
+    Displays registry values with selection, editing, and context menu
+*@
+
+<div class="registry-values-panel">
+    <table class="values-table">
+        <thead>
+            <tr>
+                <th class="col-name">Name</th>
+                <th class="col-type">Type</th>
+                <th class="col-data">Data</th>
+            </tr>
+        </thead>
+        <tbody>
+            @if (IsLoading)
+            {
+                <tr>
+                    <td colspan="3" class="loading-cell">
+                        <div class="loading-spinner"></div>
+                        Loading...
+                    </td>
+                </tr>
+            }
+            else if (FilteredValues.Count == 0)
+            {
+                <tr>
+                    <td colspan="3" class="empty-cell">
+                        @(string.IsNullOrEmpty(SearchQuery) ? "No values" : "No matching values")
+                    </td>
+                </tr>
+            }
+            else
+            {
+                @foreach (var value in FilteredValues)
+                {
+                    <tr class="@(SelectedValue == value ? "selected" : "")"
+                        @onclick="() => OnValueSelected.InvokeAsync(value)"
+                        @onclick:stopPropagation="true"
+                        @ondblclick="() => OnValueEdit.InvokeAsync(value)"
+                        @oncontextmenu="e => OnContextMenu.InvokeAsync((e, value))"
+                        @oncontextmenu:preventDefault="true">
+                        <td class="col-name">@HighlightMatch(value.Name)</td>
+                        <td class="col-type">@value.Type</td>
+                        <td class="col-data">@HighlightMatch(TruncateData(value.Data))</td>
+                    </tr>
+                }
+            }
+        </tbody>
+    </table>
+</div>
+
+@code {
+    [Parameter] public List<RegistryValueInfo> Values { get; set; } = new();
+    [Parameter] public RegistryValueInfo? SelectedValue { get; set; }
+    [Parameter] public string SearchQuery { get; set; } = "";
+    [Parameter] public bool IsLoading { get; set; }
+    
+    [Parameter] public EventCallback<RegistryValueInfo> OnValueSelected { get; set; }
+    [Parameter] public EventCallback<RegistryValueInfo> OnValueEdit { get; set; }
+    [Parameter] public EventCallback<(MouseEventArgs, RegistryValueInfo)> OnContextMenu { get; set; }
+
+    private List<RegistryValueInfo> FilteredValues => string.IsNullOrEmpty(SearchQuery) 
+        ? Values 
+        : Values.Where(v => 
+            v.Name.Contains(SearchQuery, StringComparison.OrdinalIgnoreCase) ||
+            v.Data.Contains(SearchQuery, StringComparison.OrdinalIgnoreCase)
+        ).ToList();
+
+    private MarkupString HighlightMatch(string text)
+    {
+        if (string.IsNullOrEmpty(SearchQuery) || string.IsNullOrEmpty(text))
+            return new MarkupString(System.Web.HttpUtility.HtmlEncode(text));
+
+        var index = text.IndexOf(SearchQuery, StringComparison.OrdinalIgnoreCase);
+        if (index < 0)
+            return new MarkupString(System.Web.HttpUtility.HtmlEncode(text));
+
+        var before = System.Web.HttpUtility.HtmlEncode(text.Substring(0, index));
+        var match = System.Web.HttpUtility.HtmlEncode(text.Substring(index, SearchQuery.Length));
+        var after = System.Web.HttpUtility.HtmlEncode(text.Substring(index + SearchQuery.Length));
+        
+        return new MarkupString($"{before}<mark>{match}</mark>{after}");
+    }
+
+    private string TruncateData(string data)
+    {
+        return data.Length > 100 ? data.Substring(0, 100) + "..." : data;
+    }
+
+    // Inner class for value info
+    public class RegistryValueInfo
+    {
+        public string Name { get; set; } = "";
+        public string Type { get; set; } = "";
+        public string Data { get; set; } = "";
+    }
+}
+
+<style>
+    .registry-values-panel {
+        flex: 1;
+        background: var(--card-bg);
+        border: 1px solid var(--card-border);
+        border-radius: 0.5rem;
+        overflow: auto;
+    }
+
+    .values-table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 0.75rem;
+    }
+
+    .values-table thead {
+        background: var(--body-bg);
+        position: sticky;
+        top: 0;
+        z-index: 1;
+    }
+
+    .values-table th {
+        padding: 0.5rem 1rem;
+        text-align: left;
+        font-weight: 600;
+        font-size: 0.7rem;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        color: var(--text-secondary);
+        border-bottom: 1px solid var(--card-border);
+    }
+
+    .values-table td {
+        padding: 0.5rem 1rem;
+        border-bottom: 1px solid var(--card-border);
+    }
+
+    .values-table tbody tr {
+        cursor: pointer;
+        transition: background-color 0.15s;
+    }
+
+    .values-table tbody tr:hover {
+        background: var(--card-hover);
+    }
+
+    .values-table tbody tr.selected {
+        background: var(--accent-blue);
+        color: white;
+    }
+
+    .col-name { width: 30%; }
+    .col-type { width: 15%; color: var(--text-tertiary); }
+    .col-data { width: 55%; font-family: 'Courier New', monospace; word-break: break-all; }
+
+    .loading-cell, .empty-cell {
+        text-align: center;
+        padding: 2rem !important;
+        color: var(--text-tertiary);
+    }
+
+    .loading-spinner {
+        display: inline-block;
+        width: 1rem;
+        height: 1rem;
+        border: 2px solid var(--card-border);
+        border-top-color: var(--accent-blue);
+        border-radius: 50%;
+        animation: spin 1s linear infinite;
+        margin-right: 0.5rem;
+    }
+
+    @@keyframes spin {
+        to { transform: rotate(360deg); }
+    }
+
+    mark {
+        background: #fbbf24;
+        color: black;
+        padding: 0 0.125rem;
+        border-radius: 0.125rem;
+    }
+</style>
