@@ -4,7 +4,8 @@ using Microsoft.Extensions.Configuration;
 namespace RemoteControl.Web.Controllers
 {
     [ApiController]
-    [Route("[controller]")]
+    [Route("[controller]")]     // /Auth/verify (legacy)
+    [Route("api/auth")]         // /api/auth/verify (REST standard)
     public class AuthController : ControllerBase
     {
         private readonly string _expectedPasskey;

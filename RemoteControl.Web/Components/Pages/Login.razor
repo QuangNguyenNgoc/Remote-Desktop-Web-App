@@ -1,5 +1,6 @@
 @page "/login"
 @layout EmptyLayout
+@using System.Net.Http.Json
 @inject NavigationManager Nav
 @inject IJSRuntime JS
 
@@ -48,6 +49,15 @@
                 </div>
             </div>
 
+            <!-- Remember Me checkbox -->
+            <div class="remember-row">
+                <label class="remember-label">
+                    <input type="checkbox" @bind="_rememberMe" disabled="@_isLoading" />
+                    <span>Remember me</span>
+                    <span class="remember-hint">(1 hour)</span>
+                </label>
+            </div>
+
             @if (!string.IsNullOrWhiteSpace(_error))
             {
                 <div class="error-message">@_error</div>
@@ -74,21 +84,55 @@
             </div>
         </div>
     </div>
+
+    @if (_toastVisible)
+    {
+        <div class="toast" role="status" aria-live="polite">
+            @_toastMessage
+        </div>
+    }
 </div>
 
 @code {
+    // Response class for API
+    private sealed class VerifyResponse
+    {
+        public bool Success { get; set; }
+    }
+
+    // State variables
     private string _passkey = "";
     private string _error = "";
     private bool _isLoading = false;
     private bool _showPassword = false;
+    private bool _rememberMe = false;
+    
+    // Toast state
+    private bool _toastVisible = false;
+    private string _toastMessage = "";
 
     private void TogglePassword() => _showPassword = !_showPassword;
 
+    // Auto-login check on page load
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender) return;
+
+        // If already logged in, redirect to home
+        if (await IsRememberedAndValidAsync())
+        {
+            Nav.NavigateTo("/", forceLoad: true);
+        }
+    }
+
     private async Task LoginAsync()
     {
+        if (_isLoading) return;
+
         if (string.IsNullOrWhiteSpace(_passkey))
         {
             _error = "Please enter passkey.";
+            await ShowToastAsync("Please enter passkey.");
             return;
         }
 
@@ -97,23 +141,38 @@
 
         try
         {
-            // Call backend API to verify passkey
-            var ok = await JS.InvokeAsync<bool>("passkeyAuth.verify", _passkey);
-            
-            if (!ok)
+            // Native C# HttpClient API call
+            using var http = new HttpClient { BaseAddress = new Uri(Nav.BaseUri) };
+            var resp = await http.PostAsJsonAsync("/auth/verify", new { Passkey = _passkey });
+
+            if (!resp.IsSuccessStatusCode)
             {
-                _error = "Invalid passkey.";
-                _isLoading = false;
+                _error = "Login failed. Please try again.";
+                await ShowToastAsync("Login failed.");
                 return;
             }
 
-            // Save to localStorage and redirect
-            await JS.InvokeVoidAsync("passkeyAuth.setLoggedIn", true);
+            var data = await resp.Content.ReadFromJsonAsync<VerifyResponse>();
+            var ok = data?.Success == true;
+
+            if (!ok)
+            {
+                _error = "Invalid passkey.";
+                await ShowToastAsync("Invalid passkey.");
+                return;
+            }
+
+            // Persist login with Remember Me
+            await PersistLoginAsync(_rememberMe);
             Nav.NavigateTo("/", forceLoad: true);
         }
-        catch (Exception ex)
+        catch
         {
-            _error = $"Error: {ex.Message}";
+            _error = "Login failed. Please try again.";
+            await ShowToastAsync("Login failed.");
+        }
+        finally
+        {
             _isLoading = false;
         }
     }
@@ -125,27 +184,81 @@
             _ = LoginAsync();
         }
     }
+
+    // Persist login to storage
+    private async Task PersistLoginAsync(bool remember)
+    {
+        if (remember)
+        {
+            var until = DateTimeOffset.UtcNow.AddHours(1).ToUnixTimeSeconds().ToString();
+            await JS.InvokeVoidAsync("localStorage.setItem", "rc_auth_until", until);
+            await JS.InvokeVoidAsync("localStorage.setItem", "rc_auth", "1");
+            await JS.InvokeVoidAsync("sessionStorage.removeItem", "rc_auth_session");
+        }
+        else
+        {
+            await JS.InvokeVoidAsync("sessionStorage.setItem", "rc_auth_session", "1");
+            await JS.InvokeVoidAsync("localStorage.removeItem", "rc_auth_until");
+            await JS.InvokeVoidAsync("localStorage.removeItem", "rc_auth");
+        }
+    }
+
+    // Check if user is remembered and still valid
+    private async Task<bool> IsRememberedAndValidAsync()
+    {
+        var session = await JS.InvokeAsync<string>("sessionStorage.getItem", "rc_auth_session");
+        if (session == "1") return true;
+
+        var flag = await JS.InvokeAsync<string>("localStorage.getItem", "rc_auth");
+        var untilStr = await JS.InvokeAsync<string>("localStorage.getItem", "rc_auth_until");
+        if (flag != "1" || string.IsNullOrWhiteSpace(untilStr)) return false;
+
+        if (!long.TryParse(untilStr, out var until)) return false;
+        var now = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
+        return now <= until;
+    }
+
+    // Toast notification
+    private async Task ShowToastAsync(string message)
+    {
+        _toastMessage = message;
+        _toastVisible = true;
+        StateHasChanged();
+
+        await Task.Delay(2500);
+
+        _toastVisible = false;
+        StateHasChanged();
+    }
 }
 
 <style>
+    /* Centered container layout */
     .login-page {
         min-height: 100vh;
         display: flex;
+        align-items: center;
         justify-content: center;
-        align-items: flex-start;
-        padding-top: 8rem;
-        background: var(--background);
+        padding: 1rem;
+        background: var(--body-bg);
     }
 
+    /* Card with shadow and rounded corners */
     .login-box {
         width: 100%;
-        max-width: 24rem;
+        max-width: 26rem;
         padding: 2rem;
+        border-radius: 1rem;
+        background: var(--card-bg);
+        box-shadow: 0 4px 24px rgba(0, 0, 0, 0.12), 0 2px 8px rgba(0, 0, 0, 0.06);
+        border: 1px solid var(--card-border);
     }
 
+    /* Centered header with icon and bold title */
     .login-header {
         display: flex;
         align-items: center;
+        justify-content: center;
         gap: 0.75rem;
         margin-bottom: 2rem;
     }
@@ -167,7 +280,7 @@
 
     .login-header h1 {
         font-size: 1.5rem;
-        font-weight: 600;
+        font-weight: 700;
         color: var(--text-primary);
         margin: 0;
     }
@@ -175,24 +288,32 @@
     .login-form {
         display: flex;
         flex-direction: column;
-        gap: 1rem;
+        gap: 1.25rem;
     }
 
+    .form-group {
+        display: flex;
+        flex-direction: column;
+    }
+
+    /* Medium font weight for label */
     .form-group label {
         display: block;
         font-size: 0.875rem;
+        font-weight: 500;
         margin-bottom: 0.5rem;
-        color: var(--text-tertiary);
+        color: var(--text-primary);
     }
 
     .input-wrapper {
         position: relative;
     }
 
+    /* Updated border radius */
     .passkey-input {
         width: 100%;
-        padding: 0.75rem 2.5rem 0.75rem 1rem;
-        border-radius: 0.5rem;
+        padding: 0.75rem 2.75rem 0.75rem 1rem;
+        border-radius: 0.625rem;
         font-size: 1rem;
         background: var(--card-bg);
         border: 2px solid var(--card-border);
@@ -204,47 +325,52 @@
 
     .passkey-input:focus {
         border-color: #3b82f6;
-        box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.15);
+        box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
     }
 
     .passkey-input::placeholder {
         color: var(--text-quaternary);
+        opacity: 0.6;
     }
 
+    /* Toggle password button */
     .toggle-password-btn {
         position: absolute;
         right: 0.75rem;
         top: 50%;
         transform: translateY(-50%);
-        background: none;
-        border: none;
         padding: 0.25rem;
+        background: transparent;
+        border: none;
         cursor: pointer;
         color: var(--text-quaternary);
+        border-radius: 0.25rem;
+        transition: all 0.2s;
         display: flex;
         align-items: center;
         justify-content: center;
-        transition: color 0.2s;
     }
 
     .toggle-password-btn:hover {
+        background: rgba(0, 0, 0, 0.05);
         color: var(--text-secondary);
     }
 
     .error-message {
         padding: 0.75rem;
-        border-radius: 0.5rem;
+        border-radius: 0.625rem;
         background: rgba(239, 68, 68, 0.1);
         border: 1px solid rgba(239, 68, 68, 0.3);
         color: #ef4444;
         font-size: 0.875rem;
     }
 
+    /* Updated button with semibold font and scale effect */
     .login-btn {
         width: 100%;
         padding: 0.75rem 1.5rem;
-        border-radius: 0.5rem;
-        font-weight: 500;
+        border-radius: 0.625rem;
+        font-weight: 600;
         font-size: 0.875rem;
         color: white;
         background: #3b82f6;
@@ -261,8 +387,12 @@
         background: #2563eb;
     }
 
+    .login-btn:active:not(:disabled) {
+        transform: scale(0.98);
+    }
+
     .login-btn:disabled {
-        opacity: 0.6;
+        opacity: 0.5;
         cursor: not-allowed;
     }
 
@@ -279,14 +409,63 @@
         to { transform: rotate(360deg); }
     }
 
+    /* Updated footer text */
     .login-footer {
         text-align: center;
-        padding-top: 0.5rem;
+        padding-top: 0.75rem;
     }
 
     .login-footer p {
         font-size: 0.75rem;
+        font-weight: 500;
         color: var(--text-quaternary);
         margin: 0;
+    }
+
+    /* Remember Me */
+    .remember-row {
+        margin-top: -0.25rem;
+    }
+
+    .remember-label {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        font-size: 0.875rem;
+        color: var(--text-secondary);
+        cursor: pointer;
+    }
+
+    .remember-label input[type="checkbox"] {
+        width: 1rem;
+        height: 1rem;
+        accent-color: #3b82f6;
+        cursor: pointer;
+    }
+
+    .remember-hint {
+        color: var(--text-quaternary);
+        font-size: 0.75rem;
+    }
+
+    /* Toast notification */
+    .toast {
+        position: fixed;
+        bottom: 24px;
+        left: 50%;
+        transform: translateX(-50%);
+        background: #ef4444;
+        color: #fff;
+        padding: 12px 24px;
+        border-radius: 8px;
+        font-size: 14px;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+        z-index: 9999;
+        animation: slideUp 0.3s ease;
+    }
+
+    @@keyframes slideUp {
+        from { opacity: 0; transform: translateX(-50%) translateY(20px); }
+        to { opacity: 1; transform: translateX(-50%) translateY(0); }
     }
 </style>

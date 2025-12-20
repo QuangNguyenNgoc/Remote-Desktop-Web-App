@@ -206,17 +206,27 @@ public class AgentDebugForm : Form
         _txtRegistryPath = new TextBox
         {
             Location = new Point(45, 7),
-            Width = 500,
+            Width = 350,
             Text = "HKEY_CURRENT_USER\\Software"
         };
         
-        var btnGo = Btn("Go", Color.Teal, 555, 5);
+        var btnGo = Btn("Go", Color.Teal, 405, 5);
         btnGo.Click += (s, e) => NavigateToRegistryPath(_txtRegistryPath.Text);
         
-        var btnRefresh = Btn("Refresh", Color.RoyalBlue, 650, 5);
+        var btnRefresh = Btn("Refresh", Color.RoyalBlue, 500, 5);
         btnRefresh.Click += (s, e) => RefreshRegistryView();
+
+        // CRUD Buttons
+        var btnCreateKey = Btn("+ Key", Color.MediumSeaGreen, 600, 5);
+        btnCreateKey.Click += (s, e) => CreateNewKey();
+
+        var btnNewValue = Btn("+ Value", Color.DodgerBlue, 695, 5);
+        btnNewValue.Click += (s, e) => CreateNewValue();
+
+        var btnDelete = Btn("Delete", Color.IndianRed, 790, 5);
+        btnDelete.Click += (s, e) => DeleteSelected();
         
-        topPanel.Controls.AddRange(new Control[] { lblPath, _txtRegistryPath, btnGo, btnRefresh });
+        topPanel.Controls.AddRange(new Control[] { lblPath, _txtRegistryPath, btnGo, btnRefresh, btnCreateKey, btnNewValue, btnDelete });
 
         // Split container for tree and values
         var splitContainer = new SplitContainer
@@ -239,6 +249,15 @@ public class AgentDebugForm : Form
         };
         _tvRegistry.AfterSelect += TvRegistry_AfterSelect;
         _tvRegistry.BeforeExpand += TvRegistry_BeforeExpand;
+
+        // TreeView Context Menu
+        var treeContextMenu = new ContextMenuStrip();
+        treeContextMenu.Items.Add("Create Subkey", null, (s, e) => CreateNewKey());
+        treeContextMenu.Items.Add("Delete Key", null, (s, e) => DeleteSelectedKey());
+        treeContextMenu.Items.Add(new ToolStripSeparator());
+        treeContextMenu.Items.Add("Refresh", null, (s, e) => RefreshRegistryView());
+        treeContextMenu.Items.Add("Copy Path", null, (s, e) => CopyPathToClipboard());
+        _tvRegistry.ContextMenuStrip = treeContextMenu;
         
         // Initialize root keys
         InitializeRegistryRoots();
@@ -256,12 +275,261 @@ public class AgentDebugForm : Form
         _lvRegistryValues.Columns.Add("Type", 100);
         _lvRegistryValues.Columns.Add("Data", 350);
 
+        // Double-click to edit value
+        _lvRegistryValues.DoubleClick += (s, e) => EditSelectedValue();
+
+        // ListView Context Menu
+        var valuesContextMenu = new ContextMenuStrip();
+        valuesContextMenu.Items.Add("Edit Value", null, (s, e) => EditSelectedValue());
+        valuesContextMenu.Items.Add("Delete Value", null, (s, e) => DeleteSelectedValue());
+        valuesContextMenu.Items.Add(new ToolStripSeparator());
+        valuesContextMenu.Items.Add("New String Value", null, (s, e) => CreateNewValue("REG_SZ"));
+        valuesContextMenu.Items.Add("New DWORD Value", null, (s, e) => CreateNewValue("REG_DWORD"));
+        valuesContextMenu.Items.Add("New QWORD Value", null, (s, e) => CreateNewValue("REG_QWORD"));
+        valuesContextMenu.Items.Add(new ToolStripSeparator());
+        valuesContextMenu.Items.Add("Copy Value Name", null, (s, e) => CopyValueNameToClipboard());
+        valuesContextMenu.Items.Add("Copy Value Data", null, (s, e) => CopyValueDataToClipboard());
+        _lvRegistryValues.ContextMenuStrip = valuesContextMenu;
+
         splitContainer.Panel1.Controls.Add(_tvRegistry);
         splitContainer.Panel2.Controls.Add(_lvRegistryValues);
 
         tab.Controls.Add(splitContainer);
         tab.Controls.Add(topPanel);
         _tabControl.TabPages.Add(tab);
+    }
+
+    // ====== Registry CRUD Operations ======
+    private void CreateNewKey()
+    {
+        var currentPath = _txtRegistryPath.Text;
+        if (string.IsNullOrWhiteSpace(currentPath))
+        {
+            UpdateStatus("Please select a key first");
+            return;
+        }
+
+        var keyName = ShowInputDialog("Create New Key", "Enter key name:", "NewKey");
+        if (string.IsNullOrWhiteSpace(keyName)) return;
+
+        var newPath = $"{currentPath}\\{keyName}";
+        var result = _registryService.CreateKey(newPath);
+        UpdateStatus(result.OperationMessage);
+
+        if (!result.OperationMessage.StartsWith("Lỗi"))
+        {
+            RefreshRegistryView();
+        }
+    }
+
+    private void CreateNewValue(string valueType = "REG_SZ")
+    {
+        var currentPath = _txtRegistryPath.Text;
+        if (string.IsNullOrWhiteSpace(currentPath))
+        {
+            UpdateStatus("Please select a key first");
+            return;
+        }
+
+        var valueName = ShowInputDialog("Create New Value", "Enter value name:", "NewValue");
+        if (string.IsNullOrWhiteSpace(valueName)) return;
+
+        var valueData = ShowInputDialog("Set Value Data", $"Enter data for {valueName}:", "");
+        
+        var result = _registryService.WriteValue(currentPath, valueName, valueData ?? "", valueType);
+        UpdateStatus(result.OperationMessage);
+
+        if (!result.OperationMessage.StartsWith("Lỗi"))
+        {
+            LoadRegistryValues(currentPath);
+        }
+    }
+
+    private void EditSelectedValue()
+    {
+        if (_lvRegistryValues.SelectedItems.Count == 0)
+        {
+            UpdateStatus("Please select a value to edit");
+            return;
+        }
+
+        var currentPath = _txtRegistryPath.Text;
+        var selectedItem = _lvRegistryValues.SelectedItems[0];
+        var valueName = selectedItem.Text;
+        var valueType = selectedItem.SubItems[1].Text;
+        var currentData = selectedItem.SubItems[2].Text;
+
+        // Remove (Default) display name
+        if (valueName == "(Default)") valueName = "";
+
+        var newData = ShowInputDialog($"Edit Value: {(string.IsNullOrEmpty(valueName) ? "(Default)" : valueName)}", 
+            $"Type: {valueType}\nEnter new data:", currentData);
+        
+        if (newData == null) return; // Cancelled
+
+        var result = _registryService.WriteValue(currentPath, valueName, newData, valueType);
+        UpdateStatus(result.OperationMessage);
+
+        if (!result.OperationMessage.StartsWith("Lỗi"))
+        {
+            LoadRegistryValues(currentPath);
+        }
+    }
+
+    private void DeleteSelected()
+    {
+        if (_lvRegistryValues.SelectedItems.Count > 0)
+        {
+            DeleteSelectedValue();
+        }
+        else if (_tvRegistry.SelectedNode != null)
+        {
+            DeleteSelectedKey();
+        }
+        else
+        {
+            UpdateStatus("Please select a key or value to delete");
+        }
+    }
+
+    private void DeleteSelectedKey()
+    {
+        if (_tvRegistry.SelectedNode == null) return;
+
+        var keyPath = _tvRegistry.SelectedNode.Tag?.ToString();
+        if (string.IsNullOrEmpty(keyPath)) return;
+
+        // Confirm deletion
+        var confirm = MessageBox.Show(
+            $"Are you sure you want to delete this key?\n\n{keyPath}\n\nThis will also delete all subkeys and values!",
+            "Confirm Delete",
+            MessageBoxButtons.YesNo,
+            MessageBoxIcon.Warning
+        );
+
+        if (confirm != DialogResult.Yes) return;
+
+        var result = _registryService.DeleteKey(keyPath, recursive: true);
+        UpdateStatus(result.OperationMessage);
+
+        if (!result.OperationMessage.StartsWith("Lỗi"))
+        {
+            // Navigate to parent
+            var parentPath = keyPath.Contains("\\") 
+                ? keyPath.Substring(0, keyPath.LastIndexOf('\\'))
+                : keyPath;
+            _txtRegistryPath.Text = parentPath;
+            RefreshRegistryView();
+        }
+    }
+
+    private void DeleteSelectedValue()
+    {
+        if (_lvRegistryValues.SelectedItems.Count == 0) return;
+
+        var currentPath = _txtRegistryPath.Text;
+        var valueName = _lvRegistryValues.SelectedItems[0].Text;
+        if (valueName == "(Default)") valueName = "";
+
+        var confirm = MessageBox.Show(
+            $"Delete value '{(string.IsNullOrEmpty(valueName) ? "(Default)" : valueName)}'?",
+            "Confirm Delete",
+            MessageBoxButtons.YesNo,
+            MessageBoxIcon.Question
+        );
+
+        if (confirm != DialogResult.Yes) return;
+
+        var result = _registryService.DeleteValue(currentPath, valueName);
+        UpdateStatus(result.OperationMessage);
+
+        if (!result.OperationMessage.StartsWith("Lỗi"))
+        {
+            LoadRegistryValues(currentPath);
+        }
+    }
+
+    private void CopyPathToClipboard()
+    {
+        if (!string.IsNullOrEmpty(_txtRegistryPath.Text))
+        {
+            Clipboard.SetText(_txtRegistryPath.Text);
+            UpdateStatus("Path copied to clipboard");
+        }
+    }
+
+    private void CopyValueNameToClipboard()
+    {
+        if (_lvRegistryValues.SelectedItems.Count > 0)
+        {
+            Clipboard.SetText(_lvRegistryValues.SelectedItems[0].Text);
+            UpdateStatus("Value name copied to clipboard");
+        }
+    }
+
+    private void CopyValueDataToClipboard()
+    {
+        if (_lvRegistryValues.SelectedItems.Count > 0)
+        {
+            Clipboard.SetText(_lvRegistryValues.SelectedItems[0].SubItems[2].Text);
+            UpdateStatus("Value data copied to clipboard");
+        }
+    }
+
+    private string? ShowInputDialog(string title, string prompt, string defaultValue)
+    {
+        using var form = new Form
+        {
+            Text = title,
+            Width = 400,
+            Height = 180,
+            FormBorderStyle = FormBorderStyle.FixedDialog,
+            StartPosition = FormStartPosition.CenterParent,
+            MaximizeBox = false,
+            MinimizeBox = false
+        };
+
+        var lblPrompt = new Label
+        {
+            Text = prompt,
+            Left = 15,
+            Top = 15,
+            Width = 360,
+            AutoSize = false,
+            Height = 40
+        };
+
+        var txtInput = new TextBox
+        {
+            Text = defaultValue,
+            Left = 15,
+            Top = 60,
+            Width = 355
+        };
+
+        var btnOk = new Button
+        {
+            Text = "OK",
+            DialogResult = DialogResult.OK,
+            Left = 210,
+            Top = 100,
+            Width = 75
+        };
+
+        var btnCancel = new Button
+        {
+            Text = "Cancel",
+            DialogResult = DialogResult.Cancel,
+            Left = 295,
+            Top = 100,
+            Width = 75
+        };
+
+        form.Controls.AddRange(new Control[] { lblPrompt, txtInput, btnOk, btnCancel });
+        form.AcceptButton = btnOk;
+        form.CancelButton = btnCancel;
+
+        return form.ShowDialog() == DialogResult.OK ? txtInput.Text : null;
     }
 
     private void InitializeRegistryRoots()

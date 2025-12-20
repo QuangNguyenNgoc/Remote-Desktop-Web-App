@@ -45,7 +45,7 @@ else
 
         try
         {
-            var isLoggedIn = await JS.InvokeAsync<bool>("passkeyAuth.isLoggedIn");
+            var isLoggedIn = await IsAuthenticatedAsync();
             
             if (!isLoggedIn)
             {
@@ -61,5 +61,22 @@ else
             // If JS fails, redirect to login
             Nav.NavigateTo("/login", forceLoad: true);
         }
+    }
+
+    // Check authentication with session storage and localStorage TTL
+    private async Task<bool> IsAuthenticatedAsync()
+    {
+        // Check session storage first (not remembered, valid for browser session)
+        var session = await JS.InvokeAsync<string>("sessionStorage.getItem", "rc_auth_session");
+        if (session == "1") return true;
+
+        // Check localStorage with TTL (remembered, valid for 7 days)
+        var flag = await JS.InvokeAsync<string>("localStorage.getItem", "rc_auth");
+        var untilStr = await JS.InvokeAsync<string>("localStorage.getItem", "rc_auth_until");
+        if (flag != "1" || string.IsNullOrWhiteSpace(untilStr)) return false;
+
+        if (!long.TryParse(untilStr, out var until)) return false;
+        var now = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
+        return now <= until;
     }
 }
