@@ -40,52 +40,14 @@
         </div>
 
         @* RIGHT PANEL: Values ListView *@
-        <div class="registry-values-panel">
-            <table class="values-table">
-                <thead>
-                    <tr>
-                        <th class="col-name">Name</th>
-                        <th class="col-type">Type</th>
-                        <th class="col-data">Data</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    @if (_isLoading)
-                    {
-                        <tr>
-                            <td colspan="3" class="loading-cell">
-                                <div class="loading-spinner"></div>
-                                Loading...
-                            </td>
-                        </tr>
-                    }
-                    else if (GetFilteredValues().Count == 0)
-                    {
-                        <tr>
-                            <td colspan="3" class="empty-cell">
-                                @(string.IsNullOrEmpty(_searchQuery) ? "No values" : "No matching values")
-                            </td>
-                        </tr>
-                    }
-                    else
-                    {
-                        @foreach (var value in GetFilteredValues())
-                        {
-                            <tr class="@(_selectedValue == value ? "selected" : "")"
-                                @onclick="() => SelectValue(value)"
-                                @onclick:stopPropagation="true"
-                                @ondblclick="() => EditValue(value)"
-                                @oncontextmenu="e => ShowValueContextMenu(e, value)"
-                                @oncontextmenu:preventDefault="true">
-                                <td class="col-name">@HighlightMatch(value.Name)</td>
-                                <td class="col-type">@value.Type</td>
-                                <td class="col-data">@HighlightMatch(TruncateData(value.Data))</td>
-                            </tr>
-                        }
-                    }
-                </tbody>
-            </table>
-        </div>
+        <RegistryValuesTable 
+            Values="@_values.Select(v => new RegistryValuesTable.RegistryValueInfo { Name = v.Name, Type = v.Type, Data = v.Data }).ToList()"
+            SelectedValue="@(_selectedValue != null ? new RegistryValuesTable.RegistryValueInfo { Name = _selectedValue.Name, Type = _selectedValue.Type, Data = _selectedValue.Data } : null)"
+            SearchQuery="@_searchQuery"
+            IsLoading="@_isLoading"
+            OnValueSelected="HandleValueSelected"
+            OnValueEdit="HandleValueEdit"
+            OnContextMenu="HandleValueContextMenu" />
     </div>
 
     @* ====== STATUS BAR ====== *@
@@ -484,6 +446,24 @@
     }
 
     // ====== Value Operations ======
+    private void HandleValueSelected(RegistryValuesTable.RegistryValueInfo value)
+    {
+        _selectedValue = _values.FirstOrDefault(v => v.Name == value.Name);
+        CloseContextMenus();
+    }
+
+    private void HandleValueEdit(RegistryValuesTable.RegistryValueInfo value)
+    {
+        var original = _values.FirstOrDefault(v => v.Name == value.Name);
+        if (original != null) EditValue(original);
+    }
+
+    private void HandleValueContextMenu((MouseEventArgs e, RegistryValuesTable.RegistryValueInfo value) args)
+    {
+        var original = _values.FirstOrDefault(v => v.Name == args.value.Name);
+        if (original != null) ShowValueContextMenu(args.e, original);
+    }
+
     private void SelectValue(RegistryValueInfo value)
     {
         _selectedValue = value;
