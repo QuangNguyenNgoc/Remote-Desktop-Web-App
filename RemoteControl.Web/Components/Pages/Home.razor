@@ -635,45 +635,8 @@
 
     private void SeedMockRecentActivities()
     {
-        RecentActivities = new()
-        {
-            new AgentActivityModel
-            {
-                AgentId = "MayTinhCuaQuangUwU",
-                FilterKey = "Command",
-                EventType = "Command",
-                BadgeTextColor = "var(--btn-primary-bg)",
-                BadgeBgColor = "rgba(37, 99, 235, 0.12)",
-                Summary = "Started 'chrome.exe'",
-                Details = "Process started: chrome.exe",
-                TimestampUtc = DateTime.UtcNow.AddMinutes(-2),
-                TimeText = "2 mins ago"
-            },
-            new AgentActivityModel
-            {
-                AgentId = "LAPTOP-WRK",
-                FilterKey = "Connect",
-                EventType = "Connect",
-                BadgeTextColor = "var(--status-online)",
-                BadgeBgColor = "var(--status-badge-online-bg)",
-                Summary = "Agent connected",
-                Details = "Connected to Hub",
-                TimestampUtc = DateTime.UtcNow.AddMinutes(-5),
-                TimeText = "5 mins ago"
-            },
-            new AgentActivityModel
-            {
-                AgentId = "SERVER-09",
-                FilterKey = "Disconnect",
-                EventType = "Disconnect",
-                BadgeTextColor = "var(--btn-stop-bg)",
-                BadgeBgColor = "rgba(239, 68, 68, 0.12)",
-                Summary = "Agent disconnected",
-                Details = "Disconnected from Hub",
-                TimestampUtc = DateTime.UtcNow.AddMinutes(-12),
-                TimeText = "12 mins ago"
-            }
-        };
+        // Start with empty list - real data comes from SignalR events
+        RecentActivities = new();
     }
 
     // ============================
