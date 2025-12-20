@@ -1,282 +1,695 @@
 ﻿@page "/"
 
-@* Dùng SignalR client trong Blazor *@
 @using Microsoft.AspNetCore.SignalR.Client
 @using RemoteControl.Shared.Models
 @using RemoteControl.Shared.Constants
+@using System.Text.Json
+@using System.Globalization
+@using System.Text
+@using Microsoft.JSInterop
 
-@* Để component tự dispose HubConnection khi bị hủy *@
 @implements IAsyncDisposable
-
-@* Lấy base URL để build endpoint cho Hub *@
 @inject NavigationManager NavigationManager
+@inject IJSRuntime JS
 
-@* --- Stat Cards --- *@
+@* ┌─────────────────────────────────────────────────────────────┐
+   │  📊 Dashboard (Figma-like charts)                           │
+   └─────────────────────────────────────────────────────────────┘ *@
+
+@* [A] 4 STAT CARDS (real-time) *@
 <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-    <StatCard Title="Active Agents" Value="12" SubText="+2 connected just now"
-        ColorClass="bg-blue-500/10 text-blue-500">
+    <StatCard Title="Total" Value="@TotalAgents.ToString()" SubText="Total agents seen"
+              ColorClass="bg-blue-500/10 text-blue-500">
         <Icon>
             <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                    d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z">
-                </path>
+                      d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
             </svg>
         </Icon>
         <SubContent>
-            <p class="text-xs text-green-400 mt-2 flex items-center">
-                <span class="mr-1">↑</span> +2 connected just now
-            </p>
+            <p class="text-xs mt-2" style="color: var(--text-quaternary);">Last sync: @_lastSyncText</p>
         </SubContent>
     </StatCard>
 
-    <StatCard Title="Total Keylogs" Value="8.4k" SubText="Captured in last 24h"
-        ColorClass="bg-purple-500/10 text-purple-500">
+    <StatCard Title="Online" Value="@OnlineAgents.ToString()" SubText="Agents currently online"
+              ColorClass="bg-green-500/10 text-green-500">
         <Icon>
             <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                    d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z">
-                </path>
+                      d="M9 12l2 2 4-4M12 22C6.477 22 2 17.523 2 12S6.477 2 12 2s10 4.477 10 10-4.477 10-10 10z" />
             </svg>
         </Icon>
     </StatCard>
 
-    <StatCard Title="Screenshots" Value="142" SubText="Stored in /temp" ColorClass="bg-indigo-500/10 text-indigo-500">
+    <StatCard Title="Offline" Value="@OfflineAgents.ToString()" SubText="Total - Online"
+              ColorClass="bg-yellow-500/10 text-yellow-500">
         <Icon>
             <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                    d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z">
-                </path>
+                      d="M18.364 5.636l-12.728 12.728M6.343 6.343a8 8 0 0111.314 11.314A8 8 0 016.343 6.343z" />
             </svg>
         </Icon>
     </StatCard>
 
-    <StatCard Title="System Load" Value="14%" ColorClass="bg-green-500/10 text-green-500">
+    <StatCard Title="Commands" Value="@_commandsThisSession.ToString()" SubText="Completed in this session"
+              ColorClass="bg-purple-500/10 text-purple-500">
         <Icon>
             <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                    d="M9 3v2m6-2v2M9 19v2m6-2v2M5 9H3m2 6H3m18-6h-2m2 6h-2M7 19h10a2 2 0 002-2V7a2 2 0 00-2-2H7a2 2 0 00-2 2v10a2 2 0 002 2zM9 9h6v6H9V9z">
-                </path>
+                      d="M8 9l3 3-3 3m5 0h3M4 4h16v16H4V4z" />
             </svg>
         </Icon>
         <SubContent>
-            <div class="w-24 h-1 mt-3 rounded-full overflow-hidden" style="background-color: var(--progress-bg);">
-                <div class="h-full w-[14%]" style="background-color: var(--progress-fill);"></div>
-            </div>
+            <p class="text-xs mt-2" style="color: var(--text-quaternary);">Uptime: @_uptimeCompact</p>
         </SubContent>
     </StatCard>
 </div>
 
-@* --- Layout --- *@
+@* [B] CHARTS (Figma-like) - ✅ Chart.js *@
+<div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+
+    @* (1) Agents over Time (24h) *@
+    <div class="rounded-2xl p-6 overflow-hidden"
+         style="background-color: var(--card-bg); border: 1px solid var(--card-border); box-shadow: 0 8px 18px rgba(0,0,0,0.04);">
+        <div class="flex items-center justify-between mb-4">
+            <h3 class="font-semibold text-lg" style="color: var(--text-primary);">Agents over Time (24h)</h3>
+        </div>
+
+        <div class="relative rounded-2xl p-4 overflow-hidden"
+             style="background-color: var(--table-bg); border: 1px solid var(--table-border); height: 280px;">
+            <div style="height: 250px;">
+                <canvas id="agentsLineChart"></canvas>
+            </div>
+        </div>
+    </div>
+
+    @* (2) Commands Frequency (Bar) *@
+    <div class="rounded-2xl p-6 overflow-hidden"
+         style="background-color: var(--card-bg); border: 1px solid var(--card-border); box-shadow: 0 8px 18px rgba(0,0,0,0.04);">
+        <div class="flex items-center justify-between mb-4">
+            <h3 class="font-semibold text-lg" style="color: var(--text-primary);">Commands Frequency</h3>
+            <span class="text-xs" style="color: var(--text-quaternary);">Session: @_commandsThisSession</span>
+        </div>
+
+        <div class="relative rounded-2xl p-4 overflow-hidden"
+             style="background-color: var(--table-bg); border: 1px solid var(--table-border); height: 280px;">
+            <div style="height: 250px;">
+                <canvas id="commandsBarChart"></canvas>
+            </div>
+        </div>
+    </div>
+</div>
+
+@* --- Main Layout --- *@
 <div class="grid grid-cols-1 xl:grid-cols-3 gap-6">
 
-    @* Cột Trái *@
+    @* Recent Activity *@
     <div class="xl:col-span-2 rounded-xl overflow-hidden flex flex-col h-full"
-        style="background-color: var(--card-bg); border: 1px solid var(--card-border);">
-        <div class="px-6 py-4 flex justify-between items-center" style="border-bottom: 1px solid var(--card-border);">
-            <h3 class="font-semibold text-lg" style="color: var(--text-primary);">Recent Agent Activity</h3>
-            <button class="text-sm transition-colors" style="color: var(--btn-primary-bg);"
-                onmouseover="this.style.color='var(--btn-primary-hover)';"
-                onmouseout="this.style.color='var(--btn-primary-bg)';">
+         style="background-color: var(--card-bg); border: 1px solid var(--card-border);">
+
+        <div class="px-6 py-4 flex items-center justify-between gap-4"
+             style="border-bottom: 1px solid var(--card-border);">
+            <div class="flex items-center gap-3">
+                <h3 class="font-semibold text-lg" style="color: var(--text-primary);">Recent Activity</h3>
+
+                <div class="flex items-center gap-2 text-sm">
+                    @foreach (var f in _activityFilters)
+                    {
+                        var active = _activityFilter == f;
+                        <button class="px-3 py-1 rounded-full transition-colors"
+                                style="
+                                    border: 1px solid var(--card-border);
+                                    background-color: @(active ? "rgba(37, 99, 235, 0.12)" : "transparent");
+                                    color: @(active ? "var(--text-primary)" : "var(--text-secondary)");
+                                "
+                                @onclick="() => SetFilter(f)">
+                            @f
+                        </button>
+                    }
+                </div>
+            </div>
+
+            <button class="text-sm transition-colors"
+                    style="color: var(--btn-primary-bg);"
+                    onmouseover="this.style.color='var(--btn-primary-hover)';"
+                    onmouseout="this.style.color='var(--btn-primary-bg)';">
                 View All Logs
             </button>
         </div>
+
         <div class="overflow-x-auto grow">
             <table class="w-full text-left text-sm" style="color: var(--table-text);">
                 <thead class="uppercase text-xs font-semibold"
-                    style="background-color: var(--table-header-bg); color: var(--table-header-text);">
+                       style="background-color: var(--table-header-bg); color: var(--table-header-text);">
                     <tr>
-                        <th class="px-6 py-3">Agent ID</th>
-                        <th class="px-6 py-3">Event Type</th>
+                        <th class="px-6 py-3">Agent</th>
+                        <th class="px-6 py-3">Type</th>
                         <th class="px-6 py-3">Details</th>
                         <th class="px-6 py-3">Time</th>
                     </tr>
                 </thead>
                 <tbody style="border-top: 1px solid var(--table-border);">
-                    @foreach (var activity in RecentActivities)
+                    @if (FilteredActivities.Count == 0)
                     {
-                        <tr class="transition-colors" style="border-bottom: 1px solid var(--table-border);"
-                            onmouseover="this.style.backgroundColor='var(--table-row-hover)';"
-                            onmouseout="this.style.backgroundColor='transparent';">
-                            <td class="px-6 py-4 font-medium" style="color: var(--table-text-primary);">@activity.AgentId
+                        <tr style="border-bottom: 1px solid var(--table-border);">
+                            <td class="px-6 py-6" colspan="4" style="color: var(--text-secondary);">
+                                No activities for filter:
+                                <span class="font-semibold" style="color: var(--text-primary);">@_activityFilter</span>
                             </td>
-                            <td class="px-6 py-4">
-                                <span class="px-2 py-1 rounded text-xs"
-                                    style="background-color: @activity.BadgeBgColor; color: @activity.BadgeTextColor;">
-                                    @activity.EventType
-                                </span>
-                            </td>
-                            <td class="px-6 py-4">@activity.Details</td>
-                            <td class="px-6 py-4">@activity.TimeAgo</td>
                         </tr>
+                    }
+                    else
+                    {
+                        @foreach (var activity in FilteredActivities)
+                        {
+                            <tr class="transition-colors cursor-pointer"
+                                style="border-bottom: 1px solid var(--table-border);"
+                                onmouseover="this.style.backgroundColor='var(--table-row-hover)';"
+                                onmouseout="this.style.backgroundColor='transparent';"
+                                @onclick="() => OpenDetail(activity)">
+                                <td class="px-6 py-4 font-medium" style="color: var(--table-text-primary);">@activity.AgentId</td>
+                                <td class="px-6 py-4">
+                                    <span class="px-2 py-1 rounded text-xs"
+                                          style="background-color: @activity.BadgeBgColor; color: @activity.BadgeTextColor;">
+                                        @activity.EventType
+                                    </span>
+                                </td>
+                                <td class="px-6 py-4">@activity.Summary</td>
+                                <td class="px-6 py-4">@activity.TimeText</td>
+                            </tr>
+                        }
                     }
                 </tbody>
             </table>
         </div>
     </div>
 
-    @* Cột Phải *@
-    <div class="xl:col-span-1 h-full">
-        @* Gọi Component ResourceUsageCard ở đây *@
-        <ResourceUsageCard />
+    @* Right column *@
+    <div class="xl:col-span-1 h-full space-y-6">
+
+        <div class="rounded-2xl p-6"
+             style="background-color: var(--card-bg); border: 1px solid var(--card-border); box-shadow: 0 8px 18px rgba(0,0,0,0.04);">
+            <div class="flex items-center justify-between mb-4">
+                <h3 class="font-semibold text-lg" style="color: var(--text-primary);">Agent Map (Optional)</h3>
+                <span class="text-xs" style="color: var(--text-quaternary);">Advanced</span>
+            </div>
+
+            <div class="rounded-2xl p-4 h-48 flex items-center justify-center text-center"
+                 style="
+                    background:
+                        radial-gradient(circle at 20% 30%, rgba(37,99,235,0.12) 0%, transparent 45%),
+                        radial-gradient(circle at 70% 60%, rgba(16,185,129,0.10) 0%, transparent 45%),
+                        var(--table-header-bg);
+                    border: 1px dashed rgba(148,163,184,0.55);
+                 ">
+                <div class="text-sm" style="color: var(--text-secondary);">
+                    Chưa có geolocation từ Agent.<br />
+                    <span class="text-xs" style="color: var(--text-quaternary);">
+                        (Giữ chỗ UI – không ảnh hưởng tính năng gốc)
+                    </span>
+                </div>
+            </div>
+
+            <div class="mt-4 text-xs" style="color: var(--text-quaternary);">
+                Hiện tại chỉ scaffold UI. Khi có geolocation mới vẽ map thật.
+            </div>
+        </div>
     </div>
 </div>
 
+@* Detail Modal - Fixed overlay *@
+@if (_detailOpen && _selectedActivity is not null)
+{
+    <div class="fixed inset-0 flex items-center justify-center"
+         style="z-index: 9999; background: rgba(0,0,0,0.6); backdrop-filter: blur(2px);"
+         @onclick="CloseDetail">
+        <div class="w-full max-w-md mx-4 rounded-2xl overflow-hidden shadow-2xl"
+             style="background-color: var(--card-bg); border: 1px solid var(--card-border); box-shadow: 0 25px 50px -12px rgba(0,0,0,0.5);"
+             @onclick:stopPropagation="true">
+            <div class="px-5 py-4 flex items-center justify-between"
+                 style="border-bottom: 1px solid var(--card-border);">
+                <div>
+                    <div class="text-base font-semibold" style="color: var(--text-primary);">Activity Detail</div>
+                    <div class="text-xs mt-0.5" style="color: var(--text-quaternary);">@_selectedActivity.TimeText</div>
+                </div>
+                <button class="p-1.5 rounded-lg hover:bg-white/10 transition-colors"
+                        style="color: var(--text-secondary);"
+                        @onclick="CloseDetail">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                    </svg>
+                </button>
+            </div>
+
+            <div class="px-5 py-4 space-y-3 text-sm">
+                <div class="flex items-center gap-2">
+                    <span style="color: var(--text-tertiary); min-width: 50px;">Agent</span>
+                    <span class="font-medium" style="color: var(--text-primary);">@_selectedActivity.AgentId</span>
+                </div>
+
+                <div class="flex items-center gap-2">
+                    <span style="color: var(--text-tertiary); min-width: 50px;">Type</span>
+                    <span class="px-2 py-0.5 rounded text-xs"
+                          style="background-color: @_selectedActivity.BadgeBgColor; color: @_selectedActivity.BadgeTextColor;">
+                        @_selectedActivity.EventType
+                    </span>
+                </div>
+
+                <div>
+                    <div class="mb-1.5" style="color: var(--text-tertiary);">Details</div>
+                    <div class="rounded-lg p-3 text-xs whitespace-pre-wrap max-h-40 overflow-auto"
+                         style="background-color: var(--table-header-bg); border: 1px solid var(--card-border); color: var(--text-primary);">
+                        @_selectedActivity.Details
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
 @code {
     // ============================
-    // 1) State cho UI hiện tại
+    // SignalR + stats
     // ============================
 
-    // Danh sách activity dùng để bind vào bảng Recent Agent Activity
-    private List<AgentActivityModel> RecentActivities { get; set; } = new();
-
-    // Lưu lại kết quả command mới nhất (nếu cần hiển thị thêm sau này)
-    private CommandResult? _lastCommandResult;
-
-    // ============================
-    // 2) SignalR connection
-    // ============================
-
-    // Field HubConnection theo checklist
     private HubConnection? _hubConnection;
 
-    // Thuộc tính tiện để biết có đang connect hay không (nếu muốn disable/enable nút UI)
-    private bool IsConnected =>
-        _hubConnection?.State == HubConnectionState.Connected;
+    private readonly HashSet<string> _knownAgentIds = new(StringComparer.Ordinal);
+    private readonly HashSet<string> _onlineAgentIds = new(StringComparer.Ordinal);
+
+    private int TotalAgents => _knownAgentIds.Count;
+    private int OnlineAgents => _onlineAgentIds.Count;
+    private int OfflineAgents => Math.Max(0, TotalAgents - OnlineAgents);
+
+    private int _commandsThisSession = 0;
+
+    private static readonly DateTime _appStartUtc = DateTime.UtcNow;
+    private string _uptimeCompact = "0s";
+    private System.Threading.Timer? _uptimeTimer;
+
+    private string _lastSyncText = "—";
 
     // ============================
-    // 3) Khởi tạo component + tạo SignalR connection
+    // Activity list + filter + detail
     // ============================
 
-    // Thay vì OnInitialized(), ta dùng OnInitializedAsync()
-    // để vừa seed dữ liệu giả, vừa khởi tạo connection SignalR.
+    private readonly List<string> _activityFilters = new() { "All", "Connect", "Disconnect", "Command" };
+    private string _activityFilter = "All";
+
+    private List<AgentActivityModel> RecentActivities { get; set; } = new();
+
+    private List<AgentActivityModel> FilteredActivities =>
+        (_activityFilter == "All"
+            ? RecentActivities
+            : RecentActivities.Where(a => a.FilterKey == _activityFilter))
+        .Take(10).ToList();
+
+    private bool _detailOpen = false;
+    private AgentActivityModel? _selectedActivity;
+
+    private void SetFilter(string f) => _activityFilter = f;
+
+    private void OpenDetail(AgentActivityModel a)
+    {
+        _selectedActivity = a;
+        _detailOpen = true;
+    }
+
+    private void CloseDetail()
+    {
+        _detailOpen = false;
+        _selectedActivity = null;
+    }
+
+    // ============================
+    // Chart data state
+    // ============================
+
+    // Online series for last 24h
+    private readonly List<(DateTime tUtc, int online)> _onlineSeries = new();
+    private System.Threading.Timer? _chartTimer;
+
+    // Command buckets
+    private readonly Dictionary<string, int> _commandCount = new(StringComparer.Ordinal)
+    {
+        ["Capture"] = 0,
+        ["Process"] = 0,
+        ["Keylog"] = 0,
+        ["Registry"] = 0,
+        ["Other"] = 0
+    };
+
+    // ============================
+    // JS interop for charts
+    // ============================
+
+    private IJSObjectReference? _chartsModule;
+    private bool _chartsPendingUpdate = true; // page load => render once
+    private bool _chartsInitialized = false;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            // import ES module from wwwroot
+            _chartsModule = await JS.InvokeAsync<IJSObjectReference>("import", "./js/dashboardCharts.js");
+            _chartsInitialized = true;
+
+            // first paint
+            await UpdateChartsAsync();
+            _chartsPendingUpdate = false;
+        }
+        else if (_chartsInitialized && _chartsPendingUpdate)
+        {
+            _chartsPendingUpdate = false;
+            await UpdateChartsAsync();
+        }
+    }
+
+    private void QueueChartsUpdate()
+    {
+        _chartsPendingUpdate = true;
+
+        // nếu module đã sẵn => update ngay trên UI thread
+        if (_chartsInitialized)
+        {
+            _ = InvokeAsync(async () =>
+            {
+                await UpdateChartsAsync();
+                StateHasChanged();
+            });
+        }
+    }
+
+    private async Task UpdateChartsAsync()
+    {
+        if (_chartsModule is null) return;
+
+        BuildAgents24hSeries(out var timeLabels, out var agentsValues);
+        BuildCommandsSeries(out var cmdLabels, out var cmdValues);
+
+        await _chartsModule.InvokeVoidAsync("createOrUpdateAgentsLine", "agentsLineChart", timeLabels, agentsValues);
+        await _chartsModule.InvokeVoidAsync("createOrUpdateCommandsBar", "commandsBarChart", cmdLabels, cmdValues);
+    }
+
+    private void BuildAgents24hSeries(out List<string> labels, out List<int> values)
+    {
+        // 24h, step 2h => 13 điểm (giống cảm giác figma)
+        var end = DateTime.UtcNow;
+        var start = end.AddHours(-24);
+
+        labels = new List<string>(13);
+        values = new List<int>(13);
+
+        int j = 0;
+        int lastKnown = (_onlineSeries.Count > 0) ? _onlineSeries[0].online : OnlineAgents;
+
+        for (int i = 0; i <= 12; i++)
+        {
+            var t = start.AddHours(2 * i);
+
+            while (j < _onlineSeries.Count && _onlineSeries[j].tUtc <= t)
+            {
+                lastKnown = _onlineSeries[j].online;
+                j++;
+            }
+
+            labels.Add(t.ToLocalTime().ToString("HH:mm"));
+            values.Add(lastKnown);
+        }
+    }
+
+    private void BuildCommandsSeries(out List<string> labels, out List<int> values)
+    {
+        var order = new[] { "Capture", "Process", "Keylog", "Registry", "Other" };
+        labels = order.ToList();
+        values = order.Select(k => _commandCount.TryGetValue(k, out var v) ? v : 0).ToList();
+    }
+
+    // ============================
+    // Init
+    // ============================
+
     protected override async Task OnInitializedAsync()
     {
-        // 3.1 Seed dữ liệu mock như code cũ (cho UI có sẵn vài dòng mẫu)
         SeedMockRecentActivities();
 
-        // 3.2 Tạo HubConnection tới RemoteControlHub
-        // Endpoint "/remotehub" phải trùng với MapHub<RemoteControlHub> trong Program.cs
+        // seed 1 điểm initial
+        AddOnlinePoint();
+
         _hubConnection = new HubConnectionBuilder()
             .WithUrl(NavigationManager.ToAbsoluteUri("/remotehub"))
-            .WithAutomaticReconnect()                // cho phép tự reconnect khi mất kết nối
+            .WithAutomaticReconnect()
             .Build();
 
-        // 3.3 Đăng ký (subscribe) các event từ server
-
-        // Khi server gửi event AgentConnected -> có agent mới connect
         _hubConnection.On<AgentInfo>(HubEvents.AgentConnected, agent =>
         {
-            Console.WriteLine($"[Home] AgentRegistered: {agent.AgentId}");
+            TrackAgentOnline(agent);
 
-            // Thêm 1 activity mới lên đầu danh sách để UI cập nhật
-            RecentActivities.Insert(0, new AgentActivityModel
+            PushActivity(new AgentActivityModel
             {
                 AgentId = agent.AgentId,
-                EventType = "Network",                       // tùy ý đặt nhãn
-                BadgeTextColor = "#2563eb",
-                BadgeBgColor = "rgba(37, 99, 235, 0.1)",
+                FilterKey = "Connect",
+                EventType = "Connect",
+                BadgeTextColor = "var(--status-online)",
+                BadgeBgColor = "var(--status-badge-online-bg)",
+                Summary = "Agent connected",
                 Details = "Connected to Hub",
-                TimeAgo = "Just now"
+                TimestampUtc = DateTime.UtcNow
             });
 
-            // Vì callback SignalR chạy trên background thread,
-            // cần InvokeAsync(StateHasChanged) để Blazor re-render UI.
-            InvokeAsync(StateHasChanged);
+            AddOnlinePoint();
+            QueueChartsUpdate();
+            SyncTick();
         });
 
-        // Khi server broadcast kết quả command
+        _hubConnection.On<string>(HubEvents.AgentDisconnected, agentId =>
+        {
+            TrackAgentOffline(agentId);
+
+            PushActivity(new AgentActivityModel
+            {
+                AgentId = agentId,
+                FilterKey = "Disconnect",
+                EventType = "Disconnect",
+                BadgeTextColor = "var(--btn-stop-bg)",
+                BadgeBgColor = "rgba(239, 68, 68, 0.12)",
+                Summary = "Agent disconnected",
+                Details = "Disconnected from Hub",
+                TimestampUtc = DateTime.UtcNow
+            });
+
+            AddOnlinePoint();
+            QueueChartsUpdate();
+            SyncTick();
+        });
+
         _hubConnection.On<CommandResult>(HubEvents.CommandCompleted, result =>
         {
-            Console.WriteLine($"[Home] CommandCompleted: {result.CommandId}, Success = {result.Success}");
+            _commandsThisSession++;
 
-            _lastCommandResult = result;
+            var bucket = ClassifyCommand(result);
+            if (_commandCount.ContainsKey(bucket)) _commandCount[bucket]++;
+            else _commandCount["Other"]++;
 
-            // Thêm activity hiển thị kết quả command
-            RecentActivities.Insert(0, new AgentActivityModel
+            PushActivity(new AgentActivityModel
             {
                 AgentId = result.AgentId,
+                FilterKey = "Command",
                 EventType = "Command",
-                BadgeTextColor = result.Success ? "#10b981" : "#ef4444",
-                BadgeBgColor = result.Success
-                    ? "rgba(16, 185, 129, 0.1)"
-                    : "rgba(239, 68, 68, 0.1)",
-                Details = $"Command {result.CommandId} completed (Success = {result.Success})",
-                TimeAgo = "Just now"
+                BadgeTextColor = result.Success ? "var(--status-online)" : "var(--btn-stop-bg)",
+                BadgeBgColor = result.Success ? "var(--status-badge-online-bg)" : "rgba(239, 68, 68, 0.12)",
+                Summary = $"Command completed (Success={result.Success})",
+                Details = $"CommandId: {result.CommandId}\nSuccess: {result.Success}\nMessage: {result.Message}",
+                TimestampUtc = DateTime.UtcNow
             });
 
-            InvokeAsync(StateHasChanged);
+            QueueChartsUpdate();
+            SyncTick();
         });
 
-        // 3.4 Bắt đầu kết nối tới Hub
         try
         {
             await _hubConnection.StartAsync();
-            Console.WriteLine("[Home] Hub connection started");
+
+            try
+            {
+                var agents = await _hubConnection.InvokeAsync<List<AgentInfo>>(HubEvents.GetAllAgents);
+
+                _knownAgentIds.Clear();
+                _onlineAgentIds.Clear();
+
+                foreach (var a in agents)
+                {
+                    if (string.IsNullOrWhiteSpace(a.AgentId)) continue;
+
+                    _knownAgentIds.Add(a.AgentId);
+
+                    if (a.Status == AgentStatus.Online)
+                        _onlineAgentIds.Add(a.AgentId);
+                }
+
+                AddOnlinePoint();
+                QueueChartsUpdate();
+
+                SyncTick();
+                await InvokeAsync(StateHasChanged);
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"[Home] Cannot load agents list: {ex.Message}");
+            }
         }
         catch (Exception ex)
         {
             Console.WriteLine($"[Home] Cannot start hub connection: {ex.Message}");
         }
+
+        _uptimeTimer = new System.Threading.Timer(_ =>
+        {
+            UpdateUptimeText();
+            InvokeAsync(StateHasChanged);
+        }, null, TimeSpan.Zero, TimeSpan.FromSeconds(1));
+
+        _chartTimer = new System.Threading.Timer(_ =>
+        {
+            AddOnlinePoint();
+            QueueChartsUpdate();
+            InvokeAsync(StateHasChanged);
+        }, null, TimeSpan.FromSeconds(10), TimeSpan.FromSeconds(60));
     }
 
-    // Hàm private giữ lại logic seed dữ liệu cũ để code gọn gàng hơn
+    private void SyncTick()
+    {
+        _lastSyncText = DateTime.Now.ToString("HH:mm:ss");
+        InvokeAsync(StateHasChanged);
+    }
+
+    private void TrackAgentOnline(AgentInfo agent)
+    {
+        if (string.IsNullOrWhiteSpace(agent.AgentId)) return;
+        _knownAgentIds.Add(agent.AgentId);
+        _onlineAgentIds.Add(agent.AgentId);
+    }
+
+    private void TrackAgentOffline(string agentId)
+    {
+        if (string.IsNullOrWhiteSpace(agentId)) return;
+        _knownAgentIds.Add(agentId);
+        _onlineAgentIds.Remove(agentId);
+    }
+
+    private void PushActivity(AgentActivityModel a)
+    {
+        a.TimeText = DateTime.Now.ToString("HH:mm:ss");
+        RecentActivities.Insert(0, a);
+
+        if (RecentActivities.Count > 50)
+            RecentActivities.RemoveRange(50, RecentActivities.Count - 50);
+    }
+
+    private void UpdateUptimeText()
+    {
+        var uptime = DateTime.UtcNow - _appStartUtc;
+        if (uptime.TotalDays >= 1) _uptimeCompact = $"{(int)uptime.TotalDays}d {(int)uptime.Hours}h";
+        else if (uptime.TotalHours >= 1) _uptimeCompact = $"{(int)uptime.TotalHours}h {(int)uptime.Minutes}m";
+        else if (uptime.TotalMinutes >= 1) _uptimeCompact = $"{(int)uptime.TotalMinutes}m {(int)uptime.Seconds}s";
+        else _uptimeCompact = $"{(int)uptime.TotalSeconds}s";
+    }
+
     private void SeedMockRecentActivities()
     {
-        RecentActivities = new()
-        {
-            new AgentActivityModel
-            {
-                AgentId = "MayTinhCuaQuangUwU",
-                EventType = "Process",
-                BadgeTextColor = "#eab308",
-                BadgeBgColor = "rgba(234, 179, 8, 0.1)",
-                Details = "Started 'chrome.exe'",
-                TimeAgo = "2 mins ago"
-            },
-            new AgentActivityModel
-            {
-                AgentId = "LAPTOP-WRK",
-                EventType = "Network",
-                BadgeTextColor = "#2563eb",
-                BadgeBgColor = "rgba(37, 99, 235, 0.1)",
-                Details = "Connected to Hub",
-                TimeAgo = "5 mins ago"
-            },
-            new AgentActivityModel
-            {
-                AgentId = "SERVER-09",
-                EventType = "System",
-                BadgeTextColor = "#10b981",
-                BadgeBgColor = "rgba(16, 185, 129, 0.1)",
-                Details = "Webcam activated",
-                TimeAgo = "12 mins ago"
-            }
-        };
+        // Start with empty list - real data comes from SignalR events
+        RecentActivities = new();
     }
 
     // ============================
-    // 4) Dọn dẹp connection khi rời trang
+    // Online series
     // ============================
+
+    private void AddOnlinePoint()
+    {
+        var now = DateTime.UtcNow;
+        _onlineSeries.Add((now, OnlineAgents));
+
+        var cut = now.AddHours(-24);
+        while (_onlineSeries.Count > 0 && _onlineSeries[0].tUtc < cut)
+            _onlineSeries.RemoveAt(0);
+    }
+
+    // ============================
+    // Helpers
+    // ============================
+
+    private static bool HasPropIgnoreCase(JsonElement obj, string name)
+    {
+        if (obj.ValueKind != JsonValueKind.Object) return false;
+        foreach (var p in obj.EnumerateObject())
+        {
+            if (string.Equals(p.Name, name, StringComparison.OrdinalIgnoreCase))
+                return true;
+        }
+        return false;
+    }
+
+    private string ClassifyCommand(CommandResult r)
+    {
+        if (r.Data is ScreenshotResult) return "Capture";
+        if (r.Data is ProcessListResult) return "Process";
+        if (r.Data is KeylogResult) return "Keylog";
+        if (r.Data is RegistryResult) return "Registry";
+
+        if (r.Data is JsonElement je)
+        {
+            if (HasPropIgnoreCase(je, "imageBase64")) return "Capture";
+            if (HasPropIgnoreCase(je, "processes")) return "Process";
+            if (HasPropIgnoreCase(je, "entries")) return "Keylog";
+            if (HasPropIgnoreCase(je, "keyPath")) return "Registry";
+        }
+
+        var msg = r.Message ?? "";
+        if (msg.Contains("screenshot", StringComparison.OrdinalIgnoreCase) || msg.Contains("capture", StringComparison.OrdinalIgnoreCase)) return "Capture";
+        if (msg.Contains("process", StringComparison.OrdinalIgnoreCase) || msg.Contains("ứng dụng", StringComparison.OrdinalIgnoreCase)) return "Process";
+        if (msg.Contains("keylog", StringComparison.OrdinalIgnoreCase)) return "Keylog";
+        if (msg.Contains("registry", StringComparison.OrdinalIgnoreCase)) return "Registry";
+
+        return "Other";
+    }
 
     public async ValueTask DisposeAsync()
     {
-        if (_hubConnection is not null)
+        _uptimeTimer?.Dispose();
+        _uptimeTimer = null;
+
+        _chartTimer?.Dispose();
+        _chartTimer = null;
+
+        // destroy charts
+        if (_chartsModule is not null)
         {
-            await _hubConnection.DisposeAsync();
+            try
+            {
+                await _chartsModule.InvokeVoidAsync("destroyChart", "agentsLineChart");
+                await _chartsModule.InvokeVoidAsync("destroyChart", "commandsBarChart");
+                await _chartsModule.DisposeAsync();
+            }
+            catch { }
         }
+
+        if (_hubConnection is not null)
+            await _hubConnection.DisposeAsync();
     }
 
-    // ============================
-    // 5) Model dùng cho bảng activity
-    // ============================
-
-    public record AgentActivityModel
+    public class AgentActivityModel
     {
-        public string AgentId { get; init; } = string.Empty;
-        public string EventType { get; init; } = string.Empty;
-        public string BadgeTextColor { get; init; } = string.Empty;
-        public string BadgeBgColor { get; init; } = string.Empty;
-        public string Details { get; init; } = string.Empty;
-        public string TimeAgo { get; init; } = string.Empty;
+        public string AgentId { get; set; } = "";
+        public string FilterKey { get; set; } = "All";
+        public string EventType { get; set; } = "";
+        public string BadgeTextColor { get; set; } = "";
+        public string BadgeBgColor { get; set; } = "";
+        public string Summary { get; set; } = "";
+        public string Details { get; set; } = "";
+        public DateTime TimestampUtc { get; set; } = DateTime.UtcNow;
+        public string TimeText { get; set; } = "—";
     }
 }
