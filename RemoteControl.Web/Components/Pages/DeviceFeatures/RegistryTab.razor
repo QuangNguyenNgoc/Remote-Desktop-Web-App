@@ -7,63 +7,25 @@
 @using RemoteControl.Shared.Constants
 @using Microsoft.AspNetCore.SignalR.Client
 @using RemoteControl.Web.Components.Shared.Dialogs
+@using RemoteControl.Web.Components.Shared.Registry
 @inject IJSRuntime JS
 @inject NavigationManager Nav
 @implements IAsyncDisposable
 
 <div class="registry-container" @onclick="CloseContextMenus">
     @* ====== TOOLBAR ====== *@
-    <div class="registry-toolbar">
-        @* Path input *@
-        <div class="path-group">
-            <span class="path-label">Path:</span>
-            <input type="text" 
-                   class="registry-path-input" 
-                   placeholder="HKEY_CURRENT_USER\Software" 
-                   @bind="_currentPath"
-                   @onkeypress="HandlePathKeyPress" />
-        </div>
-        
-        @* Navigation buttons *@
-        <button class="btn btn-navigate" @onclick="NavigateToPath" title="Navigate to path">
-            Go
-        </button>
-        <button class="btn btn-refresh" @onclick="RefreshCurrentKey" title="Refresh current key">
-            Refresh
-        </button>
-        <button class="btn btn-back" @onclick="GoBack" disabled="@(_historyStack.Count == 0)" title="Go back">
-            ← Back
-        </button>
-
-        <div class="toolbar-separator"></div>
-
-        @* Search input *@
-        <div class="search-group">
-            <input type="text" 
-                   class="registry-search-input" 
-                   placeholder="Search keys/values..." 
-                   @bind="_searchQuery"
-                   @bind:event="oninput"
-                   @onkeypress="HandleSearchKeyPress" />
-            @if (!string.IsNullOrEmpty(_searchQuery))
-            {
-                <button class="btn-clear-search" @onclick="ClearSearch" title="Clear search">×</button>
-            }
-        </div>
-
-        <div class="toolbar-separator"></div>
-
-        @* CRUD buttons *@
-        <button class="btn btn-create-key" @onclick="ShowCreateKeyDialog" title="Create new subkey">
-            + Key
-        </button>
-        <button class="btn btn-create-value" @onclick="() => ShowCreateValueDialog()" title="Create new value">
-            + Value
-        </button>
-        <button class="btn btn-delete" @onclick="DeleteSelected" title="Delete selected">
-            Delete
-        </button>
-    </div>
+    <RegistryToolbar 
+        CurrentPath="@_currentPath"
+        CurrentPathChanged="path => _currentPath = path"
+        SearchQuery="@_searchQuery"
+        SearchQueryChanged="query => _searchQuery = query"
+        CanGoBack="@(_historyStack.Count > 0)"
+        OnNavigate="NavigateToPath"
+        OnRefresh="RefreshCurrentKey"
+        OnGoBack="GoBack"
+        OnCreateKey="ShowCreateKeyDialog"
+        OnCreateValue="() => ShowCreateValueDialog()"
+        OnDelete="DeleteSelected" />
 
     @* ====== MAIN CONTENT - SPLIT PANEL ====== *@
     <div class="registry-content">
