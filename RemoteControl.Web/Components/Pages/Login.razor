@@ -63,8 +63,12 @@
                 <div class="error-message">@_error</div>
             }
 
-            <button class="login-btn" @onclick="LoginAsync" disabled="@_isLoading">
-                @if (_isLoading)
+            <button class="login-btn" @onclick="LoginAsync" disabled="@(_isLoading || _isLocked)">
+                @if (_isLocked)
+                {
+                    <span>🔒 Locked (@_lockoutSecondsRemaining s)</span>
+                }
+                else if (_isLoading)
                 {
                     <span class="loading-spinner"></span>
                     <span>Logging in...</span>
@@ -107,6 +111,11 @@
     private bool _showPassword = false;
     private bool _rememberMe = false;
     
+    // Rate limit lockout state
+    private bool _isLocked = false;
+    private int _lockoutSecondsRemaining = 0;
+    private System.Timers.Timer? _lockoutTimer;
+    
     // Toast state
     private bool _toastVisible = false;
     private string _toastMessage = "";
@@ -145,6 +154,15 @@
             using var http = new HttpClient { BaseAddress = new Uri(Nav.BaseUri) };
             var resp = await http.PostAsJsonAsync("/auth/verify", new { Passkey = _passkey });
 
+            if (resp.StatusCode == System.Net.HttpStatusCode.TooManyRequests)
+            {
+                // Rate limited - start lockout countdown
+                StartLockout(60);
+                _error = $"Too many attempts. Please wait {_lockoutSecondsRemaining} seconds.";
+                await ShowToastAsync("Too many login attempts!");
+                return;
+            }
+            
             if (!resp.IsSuccessStatusCode)
             {
                 _error = "Login failed. Please try again.";
@@ -183,6 +201,31 @@
         {
             _ = LoginAsync();
         }
+    }
+
+    // Start lockout countdown timer
+    private void StartLockout(int seconds)
+    {
+        _isLocked = true;
+        _lockoutSecondsRemaining = seconds;
+        
+        _lockoutTimer?.Stop();
+        _lockoutTimer = new System.Timers.Timer(1000); // 1 second interval
+        _lockoutTimer.Elapsed += (s, e) =>
+        {
+            _lockoutSecondsRemaining--;
+            _error = $"Too many attempts. Please wait {_lockoutSecondsRemaining} seconds.";
+            
+            if (_lockoutSecondsRemaining <= 0)
+            {
+                _isLocked = false;
+                _error = "";
+                _lockoutTimer?.Stop();
+            }
+            
+            InvokeAsync(StateHasChanged);
+        };
+        _lockoutTimer.Start();
     }
 
     // Persist login to storage

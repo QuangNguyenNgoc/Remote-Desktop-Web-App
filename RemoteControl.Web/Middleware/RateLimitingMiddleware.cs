@@ -34,7 +34,7 @@ public class RateLimitingMiddleware
         int limit;
         string limitType;
         
-        if (path.StartsWith("/api/auth"))
+        if (path.StartsWith("/auth") || path.StartsWith("/api/auth"))
         {
             limit = AuthLimit;
             limitType = "auth";

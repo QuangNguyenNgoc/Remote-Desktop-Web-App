@@ -29,14 +29,14 @@ public class SecurityHeadersMiddleware
         // Permissions policy (disable unused features)
         context.Response.Headers["Permissions-Policy"] = "geolocation=(), microphone=(), camera=()";
         
-        // Content Security Policy - allow self and inline styles/scripts for Blazor
+        // Content Security Policy - allow self, inline, and CDN for Chart.js
         context.Response.Headers["Content-Security-Policy"] = 
             "default-src 'self'; " +
-            "script-src 'self' 'unsafe-inline' 'unsafe-eval'; " +
-            "style-src 'self' 'unsafe-inline'; " +
+            "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdnjs.cloudflare.com https://cdn.jsdelivr.net; " +
+            "style-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com https://cdn.jsdelivr.net; " +
             "img-src 'self' data: blob:; " +
             "connect-src 'self' ws: wss:; " +
-            "font-src 'self'; " +
+            "font-src 'self' https://cdnjs.cloudflare.com https://cdn.jsdelivr.net; " +
             "frame-ancestors 'self';";
 
         await _next(context);
