@@ -3,6 +3,7 @@
 @using Microsoft.AspNetCore.SignalR.Client
 @using RemoteControl.Shared.Models
 @using RemoteControl.Shared.Constants
+@using RemoteControl.Web.Services
 @using System.Text.Json
 @using System.Globalization
 @using System.Text
@@ -11,6 +12,7 @@
 @implements IAsyncDisposable
 @inject NavigationManager NavigationManager
 @inject IJSRuntime JS
+@inject DashboardStateService DashboardState
 
 @* ┌─────────────────────────────────────────────────────────────┐
    │  📊 Dashboard (Figma-like charts)                           │
@@ -257,34 +259,26 @@
 
 @code {
     // ============================
-    // SignalR + stats
+    // State from DashboardStateService
+    // (persists across navigation)
     // ============================
 
-    private HubConnection? _hubConnection;
+    private int TotalAgents => DashboardState.TotalAgents;
+    private int OnlineAgents => DashboardState.OnlineAgents;
+    private int OfflineAgents => DashboardState.OfflineAgents;
+    private int _commandsThisSession => DashboardState.CommandsThisSession;
+    private List<AgentActivityModel> RecentActivities => DashboardState.RecentActivities;
 
-    private readonly HashSet<string> _knownAgentIds = new(StringComparer.Ordinal);
-    private readonly HashSet<string> _onlineAgentIds = new(StringComparer.Ordinal);
+    // ============================
+    // Local UI state (component-specific)
+    // ============================
 
-    private int TotalAgents => _knownAgentIds.Count;
-    private int OnlineAgents => _onlineAgentIds.Count;
-    private int OfflineAgents => Math.Max(0, TotalAgents - OnlineAgents);
-
-    private int _commandsThisSession = 0;
-
-    private static readonly DateTime _appStartUtc = DateTime.UtcNow;
     private string _uptimeCompact = "0s";
     private System.Threading.Timer? _uptimeTimer;
-
     private string _lastSyncText = "—";
-
-    // ============================
-    // Activity list + filter + detail
-    // ============================
 
     private readonly List<string> _activityFilters = new() { "All", "Connect", "Disconnect", "Command" };
     private string _activityFilter = "All";
-
-    private List<AgentActivityModel> RecentActivities { get; set; } = new();
 
     private List<AgentActivityModel> FilteredActivities =>
         (_activityFilter == "All"
@@ -298,30 +292,13 @@
     private void SetFilter(string f) => _activityFilter = f;
 
     // ============================
-    // Chart data state
-    // ============================
-
-    // Online series for last 24h
-    private readonly List<(DateTime tUtc, int online)> _onlineSeries = new();
-    private System.Threading.Timer? _chartTimer;
-
-    // Command buckets
-    private readonly Dictionary<string, int> _commandCount = new(StringComparer.Ordinal)
-    {
-        ["Capture"] = 0,
-        ["Process"] = 0,
-        ["Keylog"] = 0,
-        ["Registry"] = 0,
-        ["Other"] = 0
-    };
-
-    // ============================
     // JS interop for charts
     // ============================
 
     private IJSObjectReference? _chartsModule;
     private bool _chartsPendingUpdate = true; // page load => render once
     private bool _chartsInitialized = false;
+    private System.Threading.Timer? _chartTimer;
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
@@ -377,16 +354,17 @@
         labels = new List<string>(13);
         values = new List<int>(13);
 
+        var series = DashboardState.OnlineSeries;
         int j = 0;
-        int lastKnown = (_onlineSeries.Count > 0) ? _onlineSeries[0].online : OnlineAgents;
+        int lastKnown = series.Count > 0 ? series[0].online : OnlineAgents;
 
         for (int i = 0; i <= 12; i++)
         {
             var t = start.AddHours(2 * i);
 
-            while (j < _onlineSeries.Count && _onlineSeries[j].tUtc <= t)
+            while (j < series.Count && series[j].tUtc <= t)
             {
-                lastKnown = _onlineSeries[j].online;
+                lastKnown = series[j].online;
                 j++;
             }
 
@@ -397,9 +375,7 @@
 
     private void BuildCommandsSeries(out List<string> labels, out List<int> values)
     {
-        var order = new[] { "Capture", "Process", "Keylog", "Registry", "Other" };
-        labels = order.ToList();
-        values = order.Select(k => _commandCount.TryGetValue(k, out var v) ? v : 0).ToList();
+        (labels, values) = DashboardState.GetCommandCountsData();
     }
 
     // ============================
@@ -408,189 +384,55 @@
 
     protected override async Task OnInitializedAsync()
     {
-        SeedMockRecentActivities();
-
-        // seed 1 điểm initial
-        AddOnlinePoint();
-
-        _hubConnection = new HubConnectionBuilder()
-            .WithUrl(NavigationManager.ToAbsoluteUri("/remotehub"))
-            .WithAutomaticReconnect()
-            .Build();
-
-        _hubConnection.On<AgentInfo>(HubEvents.AgentConnected, agent =>
-        {
-            TrackAgentOnline(agent);
-
-            PushActivity(new AgentActivityModel
-            {
-                AgentId = agent.AgentId,
-                FilterKey = "Connect",
-                EventType = "Connect",
-                BadgeTextColor = "var(--status-online)",
-                BadgeBgColor = "var(--status-badge-online-bg)",
-                Summary = "Agent connected",
-                Details = "Connected to Hub",
-                TimestampUtc = DateTime.UtcNow
-            });
-
-            AddOnlinePoint();
-            QueueChartsUpdate();
-            SyncTick();
-        });
-
-        _hubConnection.On<string>(HubEvents.AgentDisconnected, agentId =>
-        {
-            TrackAgentOffline(agentId);
-
-            PushActivity(new AgentActivityModel
-            {
-                AgentId = agentId,
-                FilterKey = "Disconnect",
-                EventType = "Disconnect",
-                BadgeTextColor = "var(--btn-stop-bg)",
-                BadgeBgColor = "rgba(239, 68, 68, 0.12)",
-                Summary = "Agent disconnected",
-                Details = "Disconnected from Hub",
-                TimestampUtc = DateTime.UtcNow
-            });
-
-            AddOnlinePoint();
-            QueueChartsUpdate();
-            SyncTick();
-        });
-
-        _hubConnection.On<CommandResult>(HubEvents.CommandCompleted, result =>
-        {
-            _commandsThisSession++;
-
-            var bucket = ClassifyCommand(result);
-            if (_commandCount.ContainsKey(bucket)) _commandCount[bucket]++;
-            else _commandCount["Other"]++;
-
-            PushActivity(new AgentActivityModel
-            {
-                AgentId = result.AgentId,
-                FilterKey = "Command",
-                EventType = "Command",
-                BadgeTextColor = result.Success ? "var(--status-online)" : "var(--btn-stop-bg)",
-                BadgeBgColor = result.Success ? "var(--status-badge-online-bg)" : "rgba(239, 68, 68, 0.12)",
-                Summary = $"Command completed (Success={result.Success})",
-                Details = $"CommandId: {result.CommandId}\nSuccess: {result.Success}\nMessage: {result.Message}",
-                TimestampUtc = DateTime.UtcNow
-            });
-
-            QueueChartsUpdate();
-            SyncTick();
-        });
-
+        // Subscribe to state changes from the service for auto UI updates
+        DashboardState.OnStateChanged += HandleStateChanged;
+        
+        // Initialize the shared service (only connects if not already connected)
         try
         {
-            await _hubConnection.StartAsync();
-
-            try
-            {
-                var agents = await _hubConnection.InvokeAsync<List<AgentInfo>>(HubEvents.GetAllAgents);
-
-                _knownAgentIds.Clear();
-                _onlineAgentIds.Clear();
-
-                foreach (var a in agents)
-                {
-                    if (string.IsNullOrWhiteSpace(a.AgentId)) continue;
-
-                    _knownAgentIds.Add(a.AgentId);
-
-                    if (a.Status == AgentStatus.Online)
-                        _onlineAgentIds.Add(a.AgentId);
-                }
-
-                AddOnlinePoint();
-                QueueChartsUpdate();
-
-                SyncTick();
-                await InvokeAsync(StateHasChanged);
-            }
-            catch (Exception ex)
-            {
-                Console.WriteLine($"[Home] Cannot load agents list: {ex.Message}");
-            }
+            await DashboardState.InitializeAsync(NavigationManager.ToAbsoluteUri("/remotehub").ToString());
+            SyncTick();
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"[Home] Cannot start hub connection: {ex.Message}");
+            Console.WriteLine($"[Home] DashboardState init error: {ex.Message}");
         }
 
+        // Uptime timer - component-specific
         _uptimeTimer = new System.Threading.Timer(_ =>
         {
             UpdateUptimeText();
             InvokeAsync(StateHasChanged);
         }, null, TimeSpan.Zero, TimeSpan.FromSeconds(1));
 
+        // Chart refresh timer
         _chartTimer = new System.Threading.Timer(_ =>
         {
-            AddOnlinePoint();
+            DashboardState.AddOnlinePoint();
             QueueChartsUpdate();
             InvokeAsync(StateHasChanged);
         }, null, TimeSpan.FromSeconds(10), TimeSpan.FromSeconds(60));
     }
 
+    private void HandleStateChanged()
+    {
+        QueueChartsUpdate();
+        SyncTick();
+    }
+
     private void SyncTick()
     {
-        _lastSyncText = DateTime.Now.ToString("HH:mm:ss");
+        _lastSyncText = DashboardState.LastSyncUtc.ToLocalTime().ToString("HH:mm:ss");
         InvokeAsync(StateHasChanged);
-    }
-
-    private void TrackAgentOnline(AgentInfo agent)
-    {
-        if (string.IsNullOrWhiteSpace(agent.AgentId)) return;
-        _knownAgentIds.Add(agent.AgentId);
-        _onlineAgentIds.Add(agent.AgentId);
-    }
-
-    private void TrackAgentOffline(string agentId)
-    {
-        if (string.IsNullOrWhiteSpace(agentId)) return;
-        _knownAgentIds.Add(agentId);
-        _onlineAgentIds.Remove(agentId);
-    }
-
-    private void PushActivity(AgentActivityModel a)
-    {
-        a.TimeText = DateTime.Now.ToString("HH:mm:ss");
-        RecentActivities.Insert(0, a);
-
-        if (RecentActivities.Count > 50)
-            RecentActivities.RemoveRange(50, RecentActivities.Count - 50);
     }
 
     private void UpdateUptimeText()
     {
-        var uptime = DateTime.UtcNow - _appStartUtc;
+        var uptime = DateTime.UtcNow - DashboardState.AppStartUtc;
         if (uptime.TotalDays >= 1) _uptimeCompact = $"{(int)uptime.TotalDays}d {(int)uptime.Hours}h";
         else if (uptime.TotalHours >= 1) _uptimeCompact = $"{(int)uptime.TotalHours}h {(int)uptime.Minutes}m";
         else if (uptime.TotalMinutes >= 1) _uptimeCompact = $"{(int)uptime.TotalMinutes}m {(int)uptime.Seconds}s";
         else _uptimeCompact = $"{(int)uptime.TotalSeconds}s";
-    }
-
-    private void SeedMockRecentActivities()
-    {
-        // Start with empty list - real data comes from SignalR events
-        RecentActivities = new();
-    }
-
-    // ============================
-    // Online series
-    // ============================
-
-    private void AddOnlinePoint()
-    {
-        var now = DateTime.UtcNow;
-        _onlineSeries.Add((now, OnlineAgents));
-
-        var cut = now.AddHours(-24);
-        while (_onlineSeries.Count > 0 && _onlineSeries[0].tUtc < cut)
-            _onlineSeries.RemoveAt(0);
     }
 
     // ============================
@@ -640,6 +482,9 @@
         _chartTimer?.Dispose();
         _chartTimer = null;
 
+        // Unsubscribe from state changes
+        DashboardState.OnStateChanged -= HandleStateChanged;
+
         // destroy charts
         if (_chartsModule is not null)
         {
@@ -651,22 +496,6 @@
             }
             catch { }
         }
-
-        if (_hubConnection is not null)
-            await _hubConnection.DisposeAsync();
-    }
-
-    public class AgentActivityModel
-    {
-        public string AgentId { get; set; } = "";
-        public string FilterKey { get; set; } = "All";
-        public string EventType { get; set; } = "";
-        public string BadgeTextColor { get; set; } = "";
-        public string BadgeBgColor { get; set; } = "";
-        public string Summary { get; set; } = "";
-        public string Details { get; set; } = "";
-        public DateTime TimestampUtc { get; set; } = DateTime.UtcNow;
-        public string TimeText { get; set; } = "—";
     }
 }
 

@@ -24,6 +24,9 @@ builder.Services.AddHostedService<DiscoveryBroadcaster>();
 // Toast notification service
 builder.Services.AddScoped<ToastService>();
 
+// Dashboard state persistence service (shared across pages)
+builder.Services.AddScoped<DashboardStateService>();
+
 var app = builder.Build();
 
 if (!app.Environment.IsDevelopment())
