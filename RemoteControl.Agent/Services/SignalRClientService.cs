@@ -151,13 +151,17 @@ public class SignalRClientService
 
         _hubConnection.On<CommandRequest>(HubEvents.ExecuteCommand, async (request) =>
         {
+#if DEBUG
             Console.WriteLine($"[SignalR] Command received: {request.Type}, CommandId={request.CommandId}");
+#endif
             UpdateStatus($"Received command: {request.Type}");
             
             var result = _commandHandler.HandleCommand(request);
             
+#if DEBUG
             Console.WriteLine($"[SignalR] Command completed: {request.Type}, Success={result.Success}" +
                 (result.Success ? "" : $", ErrorCode={result.ErrorCode}, Message={result.Message}"));
+#endif
             
             await SendResultAsync(result);
         });
@@ -252,13 +256,17 @@ public class SignalRClientService
     {
         if (_webCamService == null) return;
         _webCamService.Start(async (frameBytes) => await SendWebcamFrame(frameBytes));
+#if DEBUG
         Console.WriteLine("[SignalR] Webcam streaming started");
+#endif
     }
 
     public void StopWebcam()
     {
         _webCamService?.Stop();
+#if DEBUG
         Console.WriteLine("[SignalR] Webcam streaming stopped");
+#endif
     }
 
     private async Task SendWebcamFrame(byte[] frameBytes)
@@ -275,7 +283,9 @@ public class SignalRClientService
     private Task OnReconnecting(Exception? arg)
     {
         _isConnected = false;
+#if DEBUG
         Console.WriteLine($"[SignalR] Reconnecting... Error: {arg?.Message ?? "none"}");
+#endif
         UpdateStatus("Reconnecting...");
         OnConnectionStateChanged?.Invoke("Reconnecting");
         return Task.CompletedTask;
@@ -284,7 +294,9 @@ public class SignalRClientService
     private Task OnReconnected(string? arg)
     {
         _isConnected = true;
+#if DEBUG
         Console.WriteLine($"[SignalR] Reconnected successfully. ConnectionId: {arg ?? "unknown"}");
+#endif
         UpdateStatus("Reconnected");
         OnConnectionStateChanged?.Invoke("Connected");
         _ = RegisterAgentAsync();
@@ -296,7 +308,9 @@ public class SignalRClientService
     private Task OnClosed(Exception? arg)
     {
         _isConnected = false;
+#if DEBUG
         Console.WriteLine($"[SignalR] Connection closed. Error: {arg?.Message ?? "graceful shutdown"}");
+#endif
         UpdateStatus($"Connection Closed: {arg?.Message}");
         OnConnectionStateChanged?.Invoke("Disconnected");
         _heartbeatTimer.Stop();
