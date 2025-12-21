@@ -110,7 +110,7 @@ public class ToastService : IDisposable
         OnChange?.Invoke();
         
         // Auto-remove after duration
-        var timer = new Timer(durationMs);
+        var timer = new System.Timers.Timer(durationMs);
         timer.Elapsed += (s, e) =>
         {
             Remove(toast.Id);
