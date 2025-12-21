@@ -1,6 +1,7 @@
 using RemoteControl.Web.Components;
 using RemoteControl.Web.Hubs;
 using RemoteControl.Web.Services;
+using RemoteControl.Web.Middleware;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -30,6 +31,12 @@ if (!app.Environment.IsDevelopment())
     app.UseExceptionHandler("/Error", createScopeForErrors: true);
     app.UseHsts();
 }
+
+// Security headers (X-Content-Type-Options, X-Frame-Options, CSP, etc.)
+app.UseSecurityHeaders();
+
+// Rate limiting (5 auth/min, 100 API/min)
+app.UseRateLimiting();
 
 app.UseStatusCodePagesWithReExecute("/not-found", createScopeForStatusCodePages: true);
 app.UseHttpsRedirection();
