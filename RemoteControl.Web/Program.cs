@@ -20,6 +20,9 @@ builder.Services.AddSignalR(o =>
 // UDP Discovery Broadcaster - cho Agent tự động tìm Server
 builder.Services.AddHostedService<DiscoveryBroadcaster>();
 
+// Toast notification service
+builder.Services.AddScoped<ToastService>();
+
 var app = builder.Build();
 
 if (!app.Environment.IsDevelopment())
