@@ -43,10 +43,10 @@
         }
     }
 
-    private void HandleKeyPress(KeyboardEventArgs e)
+    private async Task HandleKeyPress(KeyboardEventArgs e)
     {
-        if (e.Key == "Enter") Confirm();
-        if (e.Key == "Escape") Cancel();
+        if (e.Key == "Enter") await Confirm();
+        if (e.Key == "Escape") await Cancel();
     }
 
     private async Task Confirm()

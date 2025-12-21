@@ -82,19 +82,19 @@
         await SearchQueryChanged.InvokeAsync(value);
     }
 
-    private void HandlePathKeyPress(KeyboardEventArgs e)
+    private async Task HandlePathKeyPress(KeyboardEventArgs e)
     {
         if (e.Key == "Enter")
         {
-            OnNavigate.InvokeAsync();
+            await OnNavigate.InvokeAsync();
         }
     }
 
-    private void HandleSearchKeyPress(KeyboardEventArgs e)
+    private async Task HandleSearchKeyPress(KeyboardEventArgs e)
     {
         if (e.Key == "Escape")
         {
-            ClearSearch();
+            await ClearSearch();
         }
     }
 
