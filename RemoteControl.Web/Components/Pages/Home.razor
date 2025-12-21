@@ -104,8 +104,8 @@
 <div class="grid grid-cols-1 xl:grid-cols-3 gap-6">
 
     @* Recent Activity *@
-    <div class="xl:col-span-2 rounded-xl overflow-hidden flex flex-col h-full"
-         style="background-color: var(--card-bg); border: 1px solid var(--card-border);">
+    <div class="xl:col-span-2 rounded-xl flex flex-col h-full"
+         style="background-color: var(--card-bg); border: 1px solid var(--card-border); overflow: visible;">
 
         <div class="px-6 py-4 flex items-center justify-between gap-4"
              style="border-bottom: 1px solid var(--card-border);">
@@ -137,135 +137,123 @@
             </button>
         </div>
 
-        <div class="overflow-x-auto grow">
-            <table class="w-full text-left text-sm" style="color: var(--table-text);">
-                <thead class="uppercase text-xs font-semibold"
-                       style="background-color: var(--table-header-bg); color: var(--table-header-text);">
-                    <tr>
-                        <th class="px-6 py-3">Agent</th>
-                        <th class="px-6 py-3">Type</th>
-                        <th class="px-6 py-3">Details</th>
-                        <th class="px-6 py-3">Time</th>
-                    </tr>
-                </thead>
-                <tbody style="border-top: 1px solid var(--table-border);">
-                    @if (FilteredActivities.Count == 0)
+        <div class="grow" style="overflow: visible;">
+            @* Header row *@
+            <div class="grid grid-cols-4 gap-4 px-6 py-3 uppercase text-xs font-semibold"
+                 style="background-color: var(--table-header-bg); color: var(--table-header-text);">
+                <div>Agent</div>
+                <div>Type</div>
+                <div>Details</div>
+                <div>Time</div>
+            </div>
+
+            @* Activity rows *@
+            <div style="border-top: 1px solid var(--table-border);">
+                @if (FilteredActivities.Count == 0)
+                {
+                    <div class="px-6 py-6" style="color: var(--text-secondary); border-bottom: 1px solid var(--table-border);">
+                        No activities for filter:
+                        <span class="font-semibold" style="color: var(--text-primary);">@_activityFilter</span>
+                    </div>
+                }
+                else
+                {
+                    @foreach (var activity in FilteredActivities)
                     {
-                        <tr style="border-bottom: 1px solid var(--table-border);">
-                            <td class="px-6 py-6" colspan="4" style="color: var(--text-secondary);">
-                                No activities for filter:
-                                <span class="font-semibold" style="color: var(--text-primary);">@_activityFilter</span>
-                            </td>
-                        </tr>
-                    }
-                    else
-                    {
-                        @foreach (var activity in FilteredActivities)
-                        {
-                            <tr class="transition-colors cursor-pointer"
-                                style="border-bottom: 1px solid var(--table-border);"
-                                onmouseover="this.style.backgroundColor='var(--table-row-hover)';"
-                                onmouseout="this.style.backgroundColor='transparent';"
-                                @onclick="() => OpenDetail(activity)">
-                                <td class="px-6 py-4 font-medium" style="color: var(--table-text-primary);">@activity.AgentId</td>
-                                <td class="px-6 py-4">
+                        <div class="relative"
+                             @onmouseenter="() => _hoveredActivity = activity"
+                             @onmouseleave="() => _hoveredActivity = null">
+                            
+                            @* Row content *@
+                            <div class="grid grid-cols-4 gap-4 px-6 py-4 text-sm transition-colors cursor-pointer"
+                                 style="border-bottom: 1px solid var(--table-border); color: var(--table-text);"
+                                 onmouseover="this.style.backgroundColor='var(--table-row-hover)';"
+                                 onmouseout="this.style.backgroundColor='transparent';">
+                                <div class="font-medium" style="color: var(--table-text-primary);">@activity.AgentId</div>
+                                <div>
                                     <span class="px-2 py-1 rounded text-xs"
                                           style="background-color: @activity.BadgeBgColor; color: @activity.BadgeTextColor;">
                                         @activity.EventType
                                     </span>
-                                </td>
-                                <td class="px-6 py-4">@activity.Summary</td>
-                                <td class="px-6 py-4">@activity.TimeText</td>
-                            </tr>
-                        }
+                                </div>
+                                <div class="truncate">@activity.Summary</div>
+                                <div>@activity.TimeText</div>
+                            </div>
+                        </div>
                     }
-                </tbody>
-            </table>
+                }
+            </div>
         </div>
     </div>
 
-    @* Right column *@
+    @* Right column - Activity Detail Panel *@
     <div class="xl:col-span-1 h-full space-y-6">
 
-        <div class="rounded-2xl p-6"
-             style="background-color: var(--card-bg); border: 1px solid var(--card-border); box-shadow: 0 8px 18px rgba(0,0,0,0.04);">
-            <div class="flex items-center justify-between mb-4">
-                <h3 class="font-semibold text-lg" style="color: var(--text-primary);">Agent Map (Optional)</h3>
-                <span class="text-xs" style="color: var(--text-quaternary);">Advanced</span>
-            </div>
-
-            <div class="rounded-2xl p-4 h-48 flex items-center justify-center text-center"
-                 style="
-                    background:
-                        radial-gradient(circle at 20% 30%, rgba(37,99,235,0.12) 0%, transparent 45%),
-                        radial-gradient(circle at 70% 60%, rgba(16,185,129,0.10) 0%, transparent 45%),
-                        var(--table-header-bg);
-                    border: 1px dashed rgba(148,163,184,0.55);
-                 ">
-                <div class="text-sm" style="color: var(--text-secondary);">
-                    Chưa có geolocation từ Agent.<br />
-                    <span class="text-xs" style="color: var(--text-quaternary);">
-                        (Giữ chỗ UI – không ảnh hưởng tính năng gốc)
-                    </span>
-                </div>
-            </div>
-
-            <div class="mt-4 text-xs" style="color: var(--text-quaternary);">
-                Hiện tại chỉ scaffold UI. Khi có geolocation mới vẽ map thật.
-            </div>
-        </div>
-    </div>
-</div>
-
-@* Detail Modal - Fixed overlay *@
-@if (_detailOpen && _selectedActivity is not null)
-{
-    <div class="fixed inset-0 flex items-center justify-center"
-         style="z-index: 9999; background: rgba(0,0,0,0.6); backdrop-filter: blur(2px);"
-         @onclick="CloseDetail">
-        <div class="w-full max-w-md mx-4 rounded-2xl overflow-hidden shadow-2xl"
-             style="background-color: var(--card-bg); border: 1px solid var(--card-border); box-shadow: 0 25px 50px -12px rgba(0,0,0,0.5);"
-             @onclick:stopPropagation="true">
-            <div class="px-5 py-4 flex items-center justify-between"
-                 style="border-bottom: 1px solid var(--card-border);">
-                <div>
-                    <div class="text-base font-semibold" style="color: var(--text-primary);">Activity Detail</div>
-                    <div class="text-xs mt-0.5" style="color: var(--text-quaternary);">@_selectedActivity.TimeText</div>
-                </div>
-                <button class="p-1.5 rounded-lg hover:bg-white/10 transition-colors"
-                        style="color: var(--text-secondary);"
-                        @onclick="CloseDetail">
-                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
-                    </svg>
-                </button>
-            </div>
-
-            <div class="px-5 py-4 space-y-3 text-sm">
-                <div class="flex items-center gap-2">
-                    <span style="color: var(--text-tertiary); min-width: 50px;">Agent</span>
-                    <span class="font-medium" style="color: var(--text-primary);">@_selectedActivity.AgentId</span>
-                </div>
-
-                <div class="flex items-center gap-2">
-                    <span style="color: var(--text-tertiary); min-width: 50px;">Type</span>
+        @* Activity Detail - Shows when hovering a row *@
+        @if (_hoveredActivity is not null)
+        {
+            <div class="rounded-2xl p-5 hover-card-fade-in"
+                 style="background-color: var(--card-bg); border: 2px solid #14b8a6; box-shadow: 0 8px 18px rgba(0,0,0,0.08);">
+                <div class="flex items-center justify-between mb-4">
+                    <h3 class="font-semibold text-base" style="color: var(--text-primary);">Activity Detail</h3>
                     <span class="px-2 py-0.5 rounded text-xs"
-                          style="background-color: @_selectedActivity.BadgeBgColor; color: @_selectedActivity.BadgeTextColor;">
-                        @_selectedActivity.EventType
+                          style="background-color: @_hoveredActivity.BadgeBgColor; color: @_hoveredActivity.BadgeTextColor;">
+                        @_hoveredActivity.EventType
                     </span>
                 </div>
 
-                <div>
-                    <div class="mb-1.5" style="color: var(--text-tertiary);">Details</div>
-                    <div class="rounded-lg p-3 text-xs whitespace-pre-wrap max-h-40 overflow-auto"
-                         style="background-color: var(--table-header-bg); border: 1px solid var(--card-border); color: var(--text-primary);">
-                        @_selectedActivity.Details
+                <div class="space-y-3">
+                    <div>
+                        <div class="text-xs mb-1" style="color: var(--text-tertiary);">Agent</div>
+                        <div class="text-sm font-medium" style="color: var(--text-primary);">@_hoveredActivity.AgentId</div>
+                    </div>
+                    <div>
+                        <div class="text-xs mb-1" style="color: var(--text-tertiary);">Time</div>
+                        <div class="text-sm" style="color: var(--text-secondary);">@_hoveredActivity.TimeText</div>
+                    </div>
+                    <div>
+                        <div class="text-xs mb-1" style="color: var(--text-tertiary);">Summary</div>
+                        <div class="text-sm" style="color: var(--text-secondary);">@_hoveredActivity.Summary</div>
+                    </div>
+                    <div>
+                        <div class="text-xs mb-1" style="color: var(--text-tertiary);">Full Details</div>
+                        <div class="rounded-lg p-3 text-xs whitespace-pre-wrap"
+                             style="background-color: var(--table-header-bg); border: 1px solid var(--table-border); color: var(--text-primary);">
+                            @_hoveredActivity.Details
+                        </div>
                     </div>
                 </div>
             </div>
-        </div>
+        }
+        else
+        {
+            @* Agent Map placeholder - Shows when not hovering *@
+            <div class="rounded-2xl p-6"
+                 style="background-color: var(--card-bg); border: 1px solid var(--card-border); box-shadow: 0 8px 18px rgba(0,0,0,0.04);">
+                <div class="flex items-center justify-between mb-4">
+                    <h3 class="font-semibold text-lg" style="color: var(--text-primary);">Agent Map (Optional)</h3>
+                    <span class="text-xs" style="color: var(--text-quaternary);">Advanced</span>
+                </div>
+
+                <div class="rounded-2xl p-4 h-48 flex items-center justify-center text-center"
+                     style="
+                        background:
+                            radial-gradient(circle at 20% 30%, rgba(37,99,235,0.12) 0%, transparent 45%),
+                            radial-gradient(circle at 70% 60%, rgba(16,185,129,0.10) 0%, transparent 45%),
+                            var(--table-header-bg);
+                        border: 1px dashed rgba(148,163,184,0.55);
+                     ">
+                    <div class="text-sm" style="color: var(--text-secondary);">
+                        Hover một activity để xem chi tiết<br />
+                        <span class="text-xs" style="color: var(--text-quaternary);">
+                            (Chi tiết sẽ hiện ở đây)
+                        </span>
+                    </div>
+                </div>
+            </div>
+        }
     </div>
-}
+</div>
 
 @code {
     // ============================
@@ -304,22 +292,10 @@
             : RecentActivities.Where(a => a.FilterKey == _activityFilter))
         .Take(10).ToList();
 
-    private bool _detailOpen = false;
-    private AgentActivityModel? _selectedActivity;
+    // Hover state for Activity detail panel (Right column)
+    private AgentActivityModel? _hoveredActivity = null;
 
     private void SetFilter(string f) => _activityFilter = f;
-
-    private void OpenDetail(AgentActivityModel a)
-    {
-        _selectedActivity = a;
-        _detailOpen = true;
-    }
-
-    private void CloseDetail()
-    {
-        _detailOpen = false;
-        _selectedActivity = null;
-    }
 
     // ============================
     // Chart data state
@@ -693,3 +669,21 @@
         public string TimeText { get; set; } = "—";
     }
 }
+
+<style>
+    /* Hover card fade-in animation */
+    @@keyframes hoverCardFadeIn {
+        from {
+            opacity: 0;
+            transform: translateY(-4px);
+        }
+        to {
+            opacity: 1;
+            transform: translateY(0);
+        }
+    }
+
+    .hover-card-fade-in {
+        animation: hoverCardFadeIn 0.15s ease-out;
+    }
+</style>
