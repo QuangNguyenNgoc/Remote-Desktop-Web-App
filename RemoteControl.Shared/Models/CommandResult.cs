@@ -1,6 +1,45 @@
 namespace RemoteControl.Shared.Models;
 
 /// <summary>
+/// Error codes for command execution results
+/// </summary>
+public enum ErrorCode
+{
+    /// <summary>No error - command succeeded</summary>
+    None = 0,
+    
+    /// <summary>Unknown/unspecified error</summary>
+    Unknown = 1,
+    
+    /// <summary>Target agent is offline</summary>
+    AgentOffline = 10,
+    
+    /// <summary>Invalid command type or parameters</summary>
+    InvalidCommand = 20,
+    
+    /// <summary>Permission denied (e.g., killing system process)</summary>
+    PermissionDenied = 30,
+    
+    /// <summary>Operation timed out</summary>
+    Timeout = 40,
+    
+    /// <summary>Process not found (for KillProcess)</summary>
+    ProcessNotFound = 50,
+    
+    /// <summary>Registry key/value not found or access denied</summary>
+    RegistryError = 60,
+    
+    /// <summary>File not found or access error</summary>
+    FileError = 70,
+    
+    /// <summary>SignalR connection error</summary>
+    ConnectionError = 80,
+    
+    /// <summary>Feature not supported on this agent</summary>
+    NotSupported = 90
+}
+
+/// <summary>
 /// Represents the result of a command execution from Agent to Web
 /// </summary>
 public class CommandResult
@@ -19,6 +58,11 @@ public class CommandResult
     /// Whether the command executed successfully
     /// </summary>
     public bool Success { get; set; }
+
+    /// <summary>
+    /// Error code for failed commands (None = success)
+    /// </summary>
+    public ErrorCode ErrorCode { get; set; } = ErrorCode.None;
 
     /// <summary>
     /// Status or error message

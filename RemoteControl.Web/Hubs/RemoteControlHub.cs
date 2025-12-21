@@ -32,22 +32,31 @@ namespace RemoteControl.Web.Hubs
         {
             var connectionId = Context.ConnectionId;
 
-            if (agent == null || string.IsNullOrWhiteSpace(agent.AgentId))
+            try
             {
-                _logger.LogWarning("RegisterAgent: agent không hợp lệ từ {ConnectionId}", connectionId);
-                return;
+                if (agent == null || string.IsNullOrWhiteSpace(agent.AgentId))
+                {
+                    _logger.LogWarning("RegisterAgent: agent không hợp lệ từ {ConnectionId}", connectionId);
+                    return;
+                }
+
+                agent.ConnectionId = connectionId;
+                agent.Status = AgentStatus.Online;
+                agent.LastSeen = DateTime.UtcNow;
+                ConnectedAgents[agent.AgentId] = agent;
+
+                _logger.LogInformation(
+                    "RegisterAgent: Agent {AgentId} ({MachineName}) đăng ký với Connection {ConnectionId}",
+                    agent.AgentId, agent.MachineName, connectionId);
+
+                await Clients.All.SendAsync(HubEvents.AgentConnected, agent);
             }
-
-            agent.ConnectionId = connectionId;
-            agent.Status = AgentStatus.Online;
-            agent.LastSeen = DateTime.UtcNow;
-            ConnectedAgents[agent.AgentId] = agent;
-
-            _logger.LogInformation(
-                "RegisterAgent: Agent {AgentId} ({MachineName}) đăng ký với Connection {ConnectionId}",
-                agent.AgentId, agent.MachineName, connectionId);
-
-            await Clients.All.SendAsync(HubEvents.AgentConnected, agent);
+            catch (Exception ex)
+            {
+                _logger.LogError(ex,
+                    "RegisterAgent failed for Connection {ConnectionId}, AgentId={AgentId}",
+                    connectionId, agent?.AgentId ?? "null");
+            }
         }
 
         public List<AgentInfo> GetAllAgents()
@@ -59,52 +68,77 @@ namespace RemoteControl.Web.Hubs
 
         public async Task SendCommand(CommandRequest request)
         {
-            if (request == null || string.IsNullOrWhiteSpace(request.AgentId))
+            try
             {
-                _logger.LogWarning("SendCommand: request không hợp lệ (thiếu AgentId)");
-                return;
+                if (request == null || string.IsNullOrWhiteSpace(request.AgentId))
+                {
+                    _logger.LogWarning("SendCommand: request không hợp lệ (thiếu AgentId)");
+                    return;
+                }
+
+                var targetAgentId = request.AgentId;
+
+                if (!ConnectedAgents.TryGetValue(targetAgentId, out var agentInfo))
+                {
+                    _logger.LogWarning("SendCommand: Agent {AgentId} không kết nối", targetAgentId);
+
+                    await Clients.Caller.SendAsync(
+                        "CommandFailed",
+                        request,
+                        $"Agent {targetAgentId} đang offline");
+
+                    return;
+                }
+
+                var agentConnectionId = agentInfo.ConnectionId;
+
+                _logger.LogInformation(
+                    "SendCommand: Command {CommandId} ({CommandType}) -> Agent {AgentId}",
+                    request.CommandId,
+                    request.Type,
+                    targetAgentId);
+
+                await Clients.Client(agentConnectionId).SendAsync(HubEvents.ExecuteCommand, request);
             }
-
-            var targetAgentId = request.AgentId;
-
-            if (!ConnectedAgents.TryGetValue(targetAgentId, out var agentInfo))
+            catch (Exception ex)
             {
-                _logger.LogWarning("SendCommand: Agent {AgentId} không kết nối", targetAgentId);
+                _logger.LogError(ex,
+                    "SendCommand failed: CommandId={CommandId}, AgentId={AgentId}",
+                    request?.CommandId ?? "null", request?.AgentId ?? "null");
 
+                // Notify caller of failure
                 await Clients.Caller.SendAsync(
                     "CommandFailed",
                     request,
-                    $"Agent {targetAgentId} đang offline");
-
-                return;
+                    $"Internal error: {ex.Message}");
             }
-
-            var agentConnectionId = agentInfo.ConnectionId;
-
-            _logger.LogInformation(
-                "SendCommand: Command {CommandId} -> Agent {AgentId} (Conn {ConnectionId})",
-                request.CommandId,
-                targetAgentId,
-                agentConnectionId);
-
-            await Clients.Client(agentConnectionId).SendAsync(HubEvents.ExecuteCommand, request);
         }
 
         public async Task SendResult(CommandResult result)
         {
-            if (result == null || string.IsNullOrWhiteSpace(result.AgentId))
+            try
             {
-                _logger.LogWarning("SendResult: result không hợp lệ");
-                return;
+                if (result == null || string.IsNullOrWhiteSpace(result.AgentId))
+                {
+                    _logger.LogWarning("SendResult: result không hợp lệ");
+                    return;
+                }
+
+                _logger.LogInformation(
+                    "SendResult: Command {CommandId} from Agent {AgentId}, Success={Success}, Message={Message}",
+                    result.CommandId,
+                    result.AgentId,
+                    result.Success,
+                    result.Message ?? "(none)");
+
+                await Clients.All.SendAsync(HubEvents.CommandCompleted, result);
             }
-
-            _logger.LogInformation(
-                "SendResult: Command {CommandId} từ Agent {AgentId}, Success = {Success}",
-                result.CommandId,
-                result.AgentId,
-                result.Success);
-
-            await Clients.All.SendAsync(HubEvents.CommandCompleted, result);
+            catch (Exception ex)
+            {
+                _logger.LogError(ex,
+                    "SendResult failed: CommandId={CommandId}, AgentId={AgentId}",
+                    result?.CommandId ?? "null", result?.AgentId ?? "null");
+            }
         }
 
         // =========================
@@ -113,21 +147,28 @@ namespace RemoteControl.Web.Hubs
         // =========================
         public async Task UpdateSystemInfo(string agentId, SystemInfo systemInfo)
         {
-            if (string.IsNullOrWhiteSpace(agentId) || systemInfo == null)
+            try
             {
-                _logger.LogWarning("UpdateSystemInfo: payload không hợp lệ");
-                return;
-            }
+                if (string.IsNullOrWhiteSpace(agentId) || systemInfo == null)
+                {
+                    _logger.LogWarning("UpdateSystemInfo: payload không hợp lệ, AgentId={AgentId}", agentId ?? "null");
+                    return;
+                }
 
-            if (ConnectedAgents.TryGetValue(agentId, out var agent))
+                if (ConnectedAgents.TryGetValue(agentId, out var agent))
+                {
+                    agent.SystemInfo = systemInfo;
+                    agent.LastSeen = DateTime.UtcNow;
+                    agent.Status = AgentStatus.Online;
+                    ConnectedAgents[agentId] = agent;
+                }
+
+                await Clients.All.SendAsync(HubEvents.SystemInfoUpdated, agentId, systemInfo);
+            }
+            catch (Exception ex)
             {
-                agent.SystemInfo = systemInfo;
-                agent.LastSeen = DateTime.UtcNow;
-                agent.Status = AgentStatus.Online;
-                ConnectedAgents[agentId] = agent;
+                _logger.LogError(ex, "UpdateSystemInfo failed for AgentId={AgentId}", agentId ?? "null");
             }
-
-            await Clients.All.SendAsync(HubEvents.SystemInfoUpdated, agentId, systemInfo);
         }
 
         // =========================
