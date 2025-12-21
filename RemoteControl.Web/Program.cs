@@ -35,6 +35,9 @@ if (!app.Environment.IsDevelopment())
 // Security headers (X-Content-Type-Options, X-Frame-Options, CSP, etc.)
 app.UseSecurityHeaders();
 
+// Rate limiting (5 auth/min, 100 API/min)
+app.UseRateLimiting();
+
 app.UseStatusCodePagesWithReExecute("/not-found", createScopeForStatusCodePages: true);
 app.UseHttpsRedirection();
 
