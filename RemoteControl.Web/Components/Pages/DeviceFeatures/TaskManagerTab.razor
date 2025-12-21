@@ -1,8 +1,10 @@
 @using RemoteControl.Shared.Models
 @using RemoteControl.Shared.Constants
 @using Microsoft.AspNetCore.SignalR.Client
+@using RemoteControl.Web.Services
 @implements IAsyncDisposable
 @inject NavigationManager Nav
+@inject ToastService ToastService
 
 @* Task Manager Tab Component *@
 <div class="task-manager-container">
@@ -128,6 +130,9 @@
 
     // Process data
     private List<ProcessInfo> Processes { get; set; } = new();
+    
+    // Track pending kill commands for toast
+    private HashSet<string> _pendingKillCommands = new();
 
     protected override async Task OnInitializedAsync()
     {
@@ -188,6 +193,22 @@
             {
                 Console.WriteLine($"[TaskManager] Parse error: {ex.Message}");
             }
+        }
+        
+        // Handle kill process result
+        if (_pendingKillCommands.Contains(result.CommandId))
+        {
+            _pendingKillCommands.Remove(result.CommandId);
+            
+            if (result.Success)
+            {
+                ToastService.ShowSuccess(result.Message ?? "Process terminated", "Kill Process");
+            }
+            else
+            {
+                ToastService.ShowError(result.Message ?? "Failed to kill process", $"Error ({result.ErrorCode})");
+            }
+            InvokeAsync(StateHasChanged);
         }
     }
 
@@ -251,6 +272,8 @@
         if (_hubConnection == null || !IsConnected) return;
 
         var request = CommandRequest.CreateKillProcess(AgentId, processId);
+        _pendingKillCommands.Add(request.CommandId); // Track for toast
+        
         await _hubConnection.InvokeAsync("SendCommand", request);
         Console.WriteLine($"[TaskManager] Killing process: {processId}");
 
