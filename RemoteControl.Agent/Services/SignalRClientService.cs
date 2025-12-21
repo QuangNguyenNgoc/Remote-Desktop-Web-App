@@ -151,8 +151,14 @@ public class SignalRClientService
 
         _hubConnection.On<CommandRequest>(HubEvents.ExecuteCommand, async (request) =>
         {
+            Console.WriteLine($"[SignalR] Command received: {request.Type}, CommandId={request.CommandId}");
             UpdateStatus($"Received command: {request.Type}");
+            
             var result = _commandHandler.HandleCommand(request);
+            
+            Console.WriteLine($"[SignalR] Command completed: {request.Type}, Success={result.Success}" +
+                (result.Success ? "" : $", ErrorCode={result.ErrorCode}, Message={result.Message}"));
+            
             await SendResultAsync(result);
         });
     }
@@ -269,6 +275,7 @@ public class SignalRClientService
     private Task OnReconnecting(Exception? arg)
     {
         _isConnected = false;
+        Console.WriteLine($"[SignalR] Reconnecting... Error: {arg?.Message ?? "none"}");
         UpdateStatus("Reconnecting...");
         OnConnectionStateChanged?.Invoke("Reconnecting");
         return Task.CompletedTask;
@@ -277,6 +284,7 @@ public class SignalRClientService
     private Task OnReconnected(string? arg)
     {
         _isConnected = true;
+        Console.WriteLine($"[SignalR] Reconnected successfully. ConnectionId: {arg ?? "unknown"}");
         UpdateStatus("Reconnected");
         OnConnectionStateChanged?.Invoke("Connected");
         _ = RegisterAgentAsync();
@@ -288,6 +296,7 @@ public class SignalRClientService
     private Task OnClosed(Exception? arg)
     {
         _isConnected = false;
+        Console.WriteLine($"[SignalR] Connection closed. Error: {arg?.Message ?? "graceful shutdown"}");
         UpdateStatus($"Connection Closed: {arg?.Message}");
         OnConnectionStateChanged?.Invoke("Disconnected");
         _heartbeatTimer.Stop();

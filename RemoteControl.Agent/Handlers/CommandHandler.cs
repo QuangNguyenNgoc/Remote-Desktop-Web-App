@@ -118,7 +118,7 @@ public class CommandHandler
     private CommandResult HandleKillProcess(CommandRequest request)
     {
         if (!request.Parameters.TryGetValue("ProcessId", out var pidStr) || !int.TryParse(pidStr, out var pid))
-            return CreateErrorResult(request, "Missing or invalid ProcessId parameter");
+            return CreateErrorResult(request, "Missing or invalid ProcessId parameter", ErrorCode.InvalidCommand);
 
         var (success, message) = _processService.KillProcess(pid);
         return success ? CreateSuccessResult(request, message) : CreateErrorResult(request, message);
@@ -127,7 +127,7 @@ public class CommandHandler
     private CommandResult HandleStartProcess(CommandRequest request)
     {
         if (!request.Parameters.TryGetValue("ProcessName", out var name) || string.IsNullOrEmpty(name))
-            return CreateErrorResult(request, "Missing ProcessName parameter");
+            return CreateErrorResult(request, "Missing ProcessName parameter", ErrorCode.InvalidCommand);
 
         var (success, message) = _processService.StartProcess(name);
         return success ? CreateSuccessResult(request, message) : CreateErrorResult(request, message);
@@ -309,14 +309,14 @@ public class CommandHandler
         var result = _registryService.GetKeyInfo(keyPath);
         return result.Exists
             ? CreateSuccessResult(request, $"Key exists: {result.SubKeyCount} subkeys, {result.ValueCount} values", result)
-            : CreateErrorResult(request, $"Key does not exist: {keyPath}");
+            : CreateErrorResult(request, $"Key does not exist: {keyPath}", ErrorCode.RegistryError);
     }
 
     // ====== Unknown Command Handler ======
     private CommandResult HandleUnknownCommand(CommandRequest request)
     {
         Console.WriteLine($"[CommandHandler] Unknown command type: {request.Type}");
-        return CreateErrorResult(request, $"Unknown command type: {request.Type}");
+        return CreateErrorResult(request, $"Unknown command type: {request.Type}", ErrorCode.InvalidCommand);
     }
 
     // ====== Helper Methods ======
@@ -333,13 +333,14 @@ public class CommandHandler
         };
     }
 
-    private CommandResult CreateErrorResult(CommandRequest request, string message)
+    private CommandResult CreateErrorResult(CommandRequest request, string message, ErrorCode errorCode = ErrorCode.Unknown)
     {
         return new CommandResult
         {
             CommandId = request.CommandId,
             AgentId = request.AgentId,
             Success = false,
+            ErrorCode = errorCode,
             Message = message,
             Data = null,
             CompletedAt = DateTime.UtcNow
