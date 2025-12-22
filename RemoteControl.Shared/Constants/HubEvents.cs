@@ -91,4 +91,30 @@ public static class HubEvents
     /// Payload: (string agentId, string reason)
     /// </summary>
     public const string KickAgent = "KickAgent";
+
+    // ===== Screen Streaming Events =====
+
+    /// <summary>
+    /// Dashboard requests agent to start screen streaming
+    /// Payload: (string agentId, int fps, int quality)
+    /// </summary>
+    public const string StartScreenStream = "StartScreenStream";
+
+    /// <summary>
+    /// Dashboard requests agent to stop screen streaming
+    /// Payload: string agentId
+    /// </summary>
+    public const string StopScreenStream = "StopScreenStream";
+
+    /// <summary>
+    /// Agent sends a screen frame during streaming
+    /// Payload: ScreenshotResult
+    /// </summary>
+    public const string StreamFrame = "StreamFrame";
+
+    /// <summary>
+    /// Hub broadcasts screen frame to dashboard
+    /// Payload: (string agentId, ScreenshotResult frame)
+    /// </summary>
+    public const string ScreenFrameReceived = "ScreenFrameReceived";
 }

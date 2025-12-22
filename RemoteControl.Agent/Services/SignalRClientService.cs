@@ -24,6 +24,9 @@ public class SignalRClientService
     private string? _manualHubUrl;  // URL set manually via dialog
     private int _sendingSystemInfo;
 
+    // Screen streaming
+    private ScreenStreamService? _screenStreamService;
+
     public event Action<string>? OnStatusChanged;
     public event Action<string>? OnConnectionStateChanged;
 
@@ -165,6 +168,22 @@ public class SignalRClientService
             
             await SendResultAsync(result);
         });
+
+        // Screen streaming handlers
+        _hubConnection.On<int, int>(HubEvents.StartScreenStream, async (fps, quality) =>
+        {
+            Console.WriteLine($"[SignalR] StartScreenStream: {fps} FPS, {quality}% quality");
+            if (_screenStreamService != null)
+            {
+                await _screenStreamService.StartStreamingAsync(fps, quality);
+            }
+        });
+
+        _hubConnection.On(HubEvents.StopScreenStream, () =>
+        {
+            Console.WriteLine("[SignalR] StopScreenStream");
+            _screenStreamService?.StopStreaming();
+        });
     }
 
     private async Task RegisterAgentAsync()
@@ -250,6 +269,16 @@ public class SignalRClientService
     public void SetWebCamService(WebCamService webCamService)
     {
         _webCamService = webCamService;
+    }
+
+    // ====== Screen Streaming ======
+    public void SetScreenStreamService(ScreenStreamService screenStreamService)
+    {
+        _screenStreamService = screenStreamService;
+        if (_hubConnection != null)
+        {
+            _screenStreamService.SetHubConnection(_hubConnection);
+        }
     }
 
     public void StartWebcam()

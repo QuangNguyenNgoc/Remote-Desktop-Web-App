@@ -350,12 +350,12 @@
         _infoRefreshTimer.Start();
     }
 
-    private void SwitchMode(ScreenMode mode)
+    private async void SwitchMode(ScreenMode mode)
     {
         // Stop any active operations when switching modes
         if (IsStreaming)
         {
-            StopStream();
+            await StopStream();
         }
         if (IsRecording)
         {
@@ -366,18 +366,57 @@
         StateHasChanged();
     }
 
-    private void StartStream()
+    private async Task StartStream()
     {
+        if (_hubConnection == null || !IsConnected) return;
+        if (string.IsNullOrEmpty(AgentId)) return;
+
         IsStreaming = true;
+        _frameCount = 0;
+        _fpsStopwatch = System.Diagnostics.Stopwatch.StartNew();
+        
+        // Tell agent to start streaming
+        await _hubConnection.InvokeAsync(HubEvents.StartScreenStream, AgentId, 10, 70);
         Console.WriteLine("[RemoteScreen] Stream started");
         StateHasChanged();
     }
 
-    private void StopStream()
+    private async Task StopStream()
     {
+        if (_hubConnection == null || !IsConnected) return;
+        
         IsStreaming = false;
+        StreamFPS = "0";
+        
+        // Tell agent to stop streaming
+        await _hubConnection.InvokeAsync(HubEvents.StopScreenStream, AgentId);
         Console.WriteLine("[RemoteScreen] Stream stopped");
         StateHasChanged();
+    }
+
+    // Frame counter for FPS calculation
+    private int _frameCount = 0;
+    private System.Diagnostics.Stopwatch? _fpsStopwatch;
+
+    private void OnScreenFrameReceived(string agentId, ScreenshotResult frame)
+    {
+        if (agentId != AgentId) return;
+        if (!IsStreaming) return;
+
+        // Update current screenshot
+        CurrentScreenshot = frame;
+        StreamResolution = $"{frame.Width}×{frame.Height}";
+        
+        // Calculate FPS
+        _frameCount++;
+        if (_fpsStopwatch != null && _fpsStopwatch.ElapsedMilliseconds >= 1000)
+        {
+            StreamFPS = _frameCount.ToString();
+            _frameCount = 0;
+            _fpsStopwatch.Restart();
+        }
+
+        InvokeAsync(StateHasChanged);
     }
 
     private void StartRecording()
@@ -530,6 +569,9 @@
             .Build();
 
         _hubConnection.On<CommandResult>(HubEvents.CommandCompleted, OnCommandCompleted);
+        
+        // Handle streaming frames
+        _hubConnection.On<string, ScreenshotResult>(HubEvents.ScreenFrameReceived, OnScreenFrameReceived);
 
         try
         {

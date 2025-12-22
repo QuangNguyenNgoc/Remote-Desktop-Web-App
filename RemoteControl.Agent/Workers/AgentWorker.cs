@@ -19,6 +19,8 @@ public class AgentWorker : BackgroundService
     private readonly CommandHandler _commandHandler;
     private readonly SystemInfoService _systemInfoService;
     private readonly WebCamService _webCamService;
+    private readonly ScreenshotService _screenshotService;
+    private readonly ScreenStreamService _screenStreamService;
     private SignalRClientService? _signalRService;
 
     // ====== State ======
@@ -31,6 +33,8 @@ public class AgentWorker : BackgroundService
         _commandHandler = new CommandHandler();
         _systemInfoService = new SystemInfoService();
         _webCamService = new WebCamService();
+        _screenshotService = new ScreenshotService();
+        _screenStreamService = new ScreenStreamService(_screenshotService);
 
         Console.WriteLine("[AgentWorker] Initialized");
     }
@@ -43,6 +47,7 @@ public class AgentWorker : BackgroundService
         // Khởi tạo SignalR client
         _signalRService = new SignalRClientService(_commandHandler, _systemInfoService, _configuration);
         _signalRService.SetWebCamService(_webCamService);
+        _signalRService.SetScreenStreamService(_screenStreamService);
 
         // Event handlers
         _signalRService.OnStatusChanged += (msg) => Console.WriteLine($"[AgentWorker] Status: {msg}");
