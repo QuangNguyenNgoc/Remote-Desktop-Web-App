@@ -350,100 +350,42 @@
         _infoRefreshTimer.Start();
     }
 
-    private async void SwitchMode(ScreenMode mode)
+    private void SwitchMode(ScreenMode mode)
     {
         // Stop any active operations when switching modes
         if (IsStreaming)
         {
-            await StopStream();
+            StopStream();
         }
         if (IsRecording)
         {
-            await StopRecording();
+            StopRecording();
         }
 
         CurrentMode = mode;
         StateHasChanged();
     }
 
-    private async Task StartStream()
+    private void StartStream()
     {
-        if (_hubConnection == null || !IsConnected) return;
-        if (string.IsNullOrEmpty(AgentId)) return;
-
         IsStreaming = true;
-        _frameCount = 0;
-        _fpsStopwatch = System.Diagnostics.Stopwatch.StartNew();
-        
-        // Tell agent to start streaming at 20 FPS
-        await _hubConnection.InvokeAsync(HubEvents.StartScreenStream, AgentId, 20, 70);
         Console.WriteLine("[RemoteScreen] Stream started");
         StateHasChanged();
     }
 
-    private async Task StopStream()
+    private void StopStream()
     {
-        if (_hubConnection == null || !IsConnected) return;
-        
         IsStreaming = false;
-        StreamFPS = "0";
-        
-        // Tell agent to stop streaming
-        await _hubConnection.InvokeAsync(HubEvents.StopScreenStream, AgentId);
         Console.WriteLine("[RemoteScreen] Stream stopped");
         StateHasChanged();
     }
 
-    // Frame counter for FPS calculation
-    private int _frameCount = 0;
-    private System.Diagnostics.Stopwatch? _fpsStopwatch;
-
-    private async void OnScreenFrameReceived(string agentId, ScreenshotResult frame)
+    private void StartRecording()
     {
-        if (agentId != AgentId) return;
-        if (!IsStreaming) return;
-
-        // Update current screenshot
-        CurrentScreenshot = frame;
-        StreamResolution = $"{frame.Width}×{frame.Height}";
-        
-        // Draw frame to canvas for recording (MediaRecorder captures from canvas)
-        if (IsRecording && !string.IsNullOrEmpty(frame.ImageBase64))
-        {
-            await JSRuntime.InvokeVoidAsync("screenRecording.drawFrame", frame.ImageBase64, frame.Format);
-        }
-
-        // Calculate FPS
-        _frameCount++;
-        if (_fpsStopwatch != null && _fpsStopwatch.ElapsedMilliseconds >= 1000)
-        {
-            StreamFPS = _frameCount.ToString();
-            _frameCount = 0;
-            _fpsStopwatch.Restart();
-        }
-
-        await InvokeAsync(StateHasChanged);
-    }
-
-    private async Task StartRecording()
-    {
-        if (_hubConnection == null || !IsConnected) return;
-        if (string.IsNullOrEmpty(AgentId)) return;
-
         IsRecording = true;
         HasRecordedVideo = false;
         _recordingElapsed = TimeSpan.Zero;
         RecordingLength = "00:00:00";
-
-        // Initialize canvas and start MediaRecorder
-        await JSRuntime.InvokeVoidAsync("screenRecording.init", 1920, 1080);
-        await JSRuntime.InvokeVoidAsync("screenRecording.startRecording", 20);
-
-        // Start streaming to get frames for recording
-        IsStreaming = true;
-        _frameCount = 0;
-        _fpsStopwatch = System.Diagnostics.Stopwatch.StartNew();
-        await _hubConnection.InvokeAsync(HubEvents.StartScreenStream, AgentId, 20, 70);
 
         // Start recording timer
         _recordingTimer = new System.Timers.Timer(1000);
@@ -464,23 +406,12 @@
         };
         _pulseTimer.Start();
 
-        Console.WriteLine("[RemoteScreen] Recording started with streaming");
+        Console.WriteLine("[RemoteScreen] Recording started");
         StateHasChanged();
     }
 
-    private async Task StopRecording()
+    private void StopRecording()
     {
-        // Stop streaming
-        if (_hubConnection != null && IsConnected)
-        {
-            await _hubConnection.InvokeAsync(HubEvents.StopScreenStream, AgentId);
-        }
-        IsStreaming = false;
-        StreamFPS = "0";
-
-        // Stop MediaRecorder
-        await JSRuntime.InvokeVoidAsync("screenRecording.stopRecording");
-
         IsRecording = false;
         HasRecordedVideo = true;
         
@@ -499,15 +430,11 @@
 
     private async Task SaveVideo()
     {
-        var fileName = $"screen-recording_{DateTime.Now:yyyyMMdd_HHmmss}.webm";
+        var fileName = $"recording_{DateTime.Now:yyyyMMdd_HHmmss}.mp4";
         Console.WriteLine($"[RemoteScreen] Saving video: {fileName}");
         
-        await JSRuntime.InvokeVoidAsync("screenRecording.downloadVideo", fileName);
-        
-        // Clear recording data after save
-        await JSRuntime.InvokeVoidAsync("screenRecording.clear");
-        HasRecordedVideo = false;
-        StateHasChanged();
+        // TODO: Implement actual video save logic
+        await Task.CompletedTask;
     }
 
     // Action methods
@@ -603,9 +530,6 @@
             .Build();
 
         _hubConnection.On<CommandResult>(HubEvents.CommandCompleted, OnCommandCompleted);
-        
-        // Handle streaming frames
-        _hubConnection.On<string, ScreenshotResult>(HubEvents.ScreenFrameReceived, OnScreenFrameReceived);
 
         try
         {
@@ -906,9 +830,9 @@
         display: flex;
         flex-wrap: wrap;
         align-items: center;
-        justify-content: space-between;
+        justify-content: center;
         gap: 1rem;
-        padding: 0.75rem 1.5rem;
+        padding: 0.75rem 1rem;
         background-color: rgba(30, 41, 59, 0.5);
         border-radius: 0.5rem;
         margin-top: 0.5rem;

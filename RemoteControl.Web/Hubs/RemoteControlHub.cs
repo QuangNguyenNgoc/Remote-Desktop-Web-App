@@ -186,6 +186,56 @@ namespace RemoteControl.Web.Hubs
             await Clients.All.SendAsync("WebcamFrame", agentId, base64Jpeg);
         }
 
+        // =========================
+        // (4) Screen Streaming: Dashboard <-> Agent
+        // =========================
+
+        /// <summary>
+        /// Dashboard requests agent to start screen streaming
+        /// </summary>
+        public async Task StartScreenStream(string agentId, int fps = 10, int quality = 70)
+        {
+            if (string.IsNullOrWhiteSpace(agentId))
+            {
+                _logger.LogWarning("StartScreenStream: AgentId is null");
+                return;
+            }
+
+            if (ConnectedAgents.TryGetValue(agentId, out var agent))
+            {
+                _logger.LogInformation("StartScreenStream requested for {AgentId} at {FPS} FPS", agentId, fps);
+                await Clients.Client(agent.ConnectionId).SendAsync(HubEvents.StartScreenStream, fps, quality);
+            }
+        }
+
+        /// <summary>
+        /// Dashboard requests agent to stop screen streaming
+        /// </summary>
+        public async Task StopScreenStream(string agentId)
+        {
+            if (string.IsNullOrWhiteSpace(agentId)) return;
+
+            if (ConnectedAgents.TryGetValue(agentId, out var agent))
+            {
+                _logger.LogInformation("StopScreenStream requested for {AgentId}", agentId);
+                await Clients.Client(agent.ConnectionId).SendAsync(HubEvents.StopScreenStream);
+            }
+        }
+
+        /// <summary>
+        /// Agent sends a screen frame during streaming
+        /// </summary>
+        public async Task StreamFrame(ScreenshotResult frame)
+        {
+            // Get agentId from connection
+            var agentId = ConnectedAgents.Values.FirstOrDefault(a => a.ConnectionId == Context.ConnectionId)?.AgentId;
+            if (string.IsNullOrWhiteSpace(agentId)) return;
+
+            // Broadcast frame to all clients (dashboard will filter by agentId)
+            await Clients.All.SendAsync(HubEvents.ScreenFrameReceived, agentId, frame);
+        }
+
+
         public override Task OnConnectedAsync()
         {
             _logger.LogInformation("Client connected: {ConnectionId}", Context.ConnectionId);
