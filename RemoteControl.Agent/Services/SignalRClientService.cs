@@ -94,6 +94,9 @@ public class SignalRClientService
             UpdateStatus("Connected to Hub");
             OnConnectionStateChanged?.Invoke("Connected");
 
+            // Set hub connection for screen stream service (after hub is connected)
+            _screenStreamService?.SetHubConnection(_hubConnection);
+
             await RegisterAgentAsync();
 
             _heartbeatTimer.Start();
