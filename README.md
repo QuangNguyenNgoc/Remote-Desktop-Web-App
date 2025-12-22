@@ -163,4 +163,4 @@ This project is licensed under the [MIT License](./LICENSE).
 
 ---
 
-**Made with ❤️ by [QuangNguyenNgoc](https://github.com/QuangNguyenNgoc)**
+**Made with ❤️ by [Nguyễn Ngọc Quang](https://github.com/QuangNguyenNgoc), [Đặng Quang Tiến](https://github.com/F0n9), [Nguyễn Hưng](https://github.com/orzADDICT169)**
