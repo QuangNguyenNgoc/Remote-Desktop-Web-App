@@ -14,17 +14,9 @@ using RemoteControl.Agent.Helpers;
 using RemoteControl.Agent.UI;
 using RemoteControl.Agent.Workers;
 
-// ====== Parse Command-Line Arguments ======
-var mode = GetRunMode(args);
+// ====== Build Configuration First ======
 var serverArg = GetServerArg(args);
 
-Console.WriteLine($"[Agent] Starting in {mode} mode...");
-if (!string.IsNullOrEmpty(serverArg))
-{
-    Console.WriteLine($"[Agent] Server: {serverArg}");
-}
-
-// Build Configuration
 var configBuilder = new ConfigurationBuilder()
     .SetBasePath(AppContext.BaseDirectory) // Use exe directory, not current directory
     .AddJsonFile("appsettings.json", optional: true, reloadOnChange: true)
@@ -44,6 +36,15 @@ if (!string.IsNullOrEmpty(serverArg))
 
 IConfiguration configuration = configBuilder.Build();
 
+// ====== Parse Run Mode (args first, then config) ======
+var mode = GetRunMode(args, configuration);
+
+Console.WriteLine($"[Agent] Starting in {mode} mode...");
+if (!string.IsNullOrEmpty(serverArg))
+{
+    Console.WriteLine($"[Agent] Server: {serverArg}");
+}
+
 // ====== Run theo mode ======
 switch (mode)
 {
@@ -61,9 +62,10 @@ switch (mode)
         break;
 }
 
-// ====== Helper: Parse run mode từ args ======
-static RunMode GetRunMode(string[] args)
+// ====== Helper: Parse run mode từ args hoặc config ======
+static RunMode GetRunMode(string[] args, IConfiguration? configuration = null)
 {
+    // Priority 1: Command line args
     foreach (var arg in args)
     {
         if (arg.Equals("--mode=service", StringComparison.OrdinalIgnoreCase))
@@ -78,6 +80,21 @@ static RunMode GetRunMode(string[] args)
         if (arg.Equals("--service", StringComparison.OrdinalIgnoreCase))
             return RunMode.Service;
     }
+    
+    // Priority 2: appsettings.json -> Agent:DefaultMode
+    if (configuration != null)
+    {
+        var defaultMode = configuration["Agent:DefaultMode"];
+        if (!string.IsNullOrEmpty(defaultMode))
+        {
+            if (Enum.TryParse<RunMode>(defaultMode, ignoreCase: true, out var configMode))
+            {
+                Console.WriteLine($"[Agent] Using DefaultMode from config: {configMode}");
+                return configMode;
+            }
+        }
+    }
+    
     return RunMode.Debug;
 }
 
