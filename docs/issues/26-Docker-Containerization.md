@@ -7,26 +7,27 @@ Containerize ứng dụng với Docker để dễ deploy
 ### ✅ Checklist
 
 **RemoteControl.Web Dockerfile:**
-- [ ] Tạo `RemoteControl.Web/Dockerfile`
-- [ ] Multi-stage build: restore → build → publish
-- [ ] Base image: `mcr.microsoft.com/dotnet/aspnet:10.0`
-- [ ] Expose port 5048
-- [ ] Set ASPNETCORE_URLS environment variable
+- [x] Tạo `RemoteControl.Web/Dockerfile`
+- [x] Multi-stage build: restore → build → publish
+- [x] Base image: `mcr.microsoft.com/dotnet/aspnet:9.0`
+- [x] Expose port 5048
+- [x] Set ASPNETCORE_URLS environment variable
+- [x] Health check endpoint `/health`
 
 **RemoteControl.Agent Dockerfile:**
 - [ ] Tạo `RemoteControl.Agent/Dockerfile`
-- [ ] Windows container (vì dùng System.Drawing, PerformanceCounter)
-- [ ] Hoặc Linux container với workaround
+- [x] ~~Windows container (vì dùng System.Drawing, PerformanceCounter)~~ **Không cần - Agent phải chạy native**
 
 **Docker Compose:**
-- [ ] Tạo `docker-compose.yml` ở root
-- [ ] Service: `web` (RemoteControl.Web)
+- [x] Tạo `docker-compose.yml` ở root
+- [x] Service: `web` (RemoteControl.Web)
 - [ ] Volume mount cho config files
 - [ ] Network configuration
-- [ ] Health checks
+- [x] Health checks
 
 **Documentation:**
-- [ ] Update README với Docker instructions
+- [x] Update README với Docker instructions
+- [x] Update BUILD-AND-PUBLISH-GUIDE.md
 - [ ] Add docker-compose.override.yml for dev
 
 ### 🔗 Dependencies
