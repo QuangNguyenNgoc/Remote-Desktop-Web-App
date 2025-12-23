@@ -124,25 +124,29 @@ Remote-Desktop-Web-App/
 > Agent là Windows-specific, chỉ Web server hỗ trợ Docker.
 
 ```bash
-# Build
-docker build -t remotecontrol-web -f RemoteControl.Web/Dockerfile .
+# Option 1: Docker Compose (recommended)
+docker-compose up -d
 
-# Run
+# Option 2: Manual build & run
+docker build -t remotecontrol-web -f RemoteControl.Web/Dockerfile .
 docker run -d -p 5048:5048 remotecontrol-web
 ```
 
-Xem [Docker Guide](./docs/issues/26-Docker-Containerization.md) để biết thêm.
+Access: `http://localhost:5048`
+
+Xem [Build & Publish Guide](./docs/BUILD-AND-PUBLISH-GUIDE.md) để biết thêm.
 
 ---
 
 ## 🌐 Remote Access via Ngrok
 
 ```bash
-# Expose localhost to internet
-ngrok http 5049
+# Expose Web server to internet (port 5048!)
+ngrok http 5048
 
-# Agent connects to ngrok URL
-Agent.exe --mode=hidden --server=abc123.ngrok.io:443
+# Agent config (appsettings.json)
+# HubUrl: "https://abc123.ngrok-free.dev/remotehub"
+# Note: Ngrok URL không có port!
 ```
 
 ---

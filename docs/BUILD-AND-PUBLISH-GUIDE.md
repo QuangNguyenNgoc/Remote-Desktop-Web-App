@@ -205,15 +205,52 @@ dotnet publish -c Release -r win-x64 --self-contained
 
 ### 4.2 Web Server (Docker)
 
-> 📝 Xem [Issue #26 - Docker Containerization](./issues/26-Docker-Containerization.md)
+> ⚠️ Agent là Windows-specific, chỉ Web server hỗ trợ Docker.
+
+**Option 1: Docker Compose (Recommended)**
 
 ```powershell
-# Build image (từ thư mục gốc)
+# Từ thư mục gốc project
+docker-compose up -d
+
+# Xem logs
+docker-compose logs -f
+
+# Dừng
+docker-compose down
+```
+
+**Option 2: Manual Build & Run**
+
+```powershell
+# Build image
 docker build -t remotecontrol-web -f RemoteControl.Web/Dockerfile .
 
 # Run container
-docker run -d -p 5048:5048 remotecontrol-web
+docker run -d -p 5048:5048 --name remotecontrol-web remotecontrol-web
+
+# Xem logs
+docker logs -f remotecontrol-web
+
+# Dừng và xóa
+docker stop remotecontrol-web && docker rm remotecontrol-web
 ```
+
+**Health Check:**
+
+```powershell
+# Kiểm tra container health
+curl http://localhost:5048/health
+# Response: {"status":"healthy","timestamp":"..."}
+```
+
+**Files Docker:**
+
+| File | Mô tả |
+|------|-------|
+| `RemoteControl.Web/Dockerfile` | Multi-stage build image |
+| `docker-compose.yml` | Compose configuration |
+| `.dockerignore` | Exclude files from build context |
 
 ### 4.3 Agent Distribution
 

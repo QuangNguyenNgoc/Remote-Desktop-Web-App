@@ -1,0 +1,49 @@
+# Docker ignore file - exclude unnecessary files from build context
+
+# Build outputs
+**/bin/
+**/obj/
+**/out/
+**/publish/
+
+# IDE files
+.vs/
+.vscode/
+.idea/
+*.suo
+*.user
+*.userosscache
+*.sln.docstates
+
+# Git
+.git/
+.gitignore
+.gitattributes
+
+# Documentation
+docs/
+*.md
+!README.md
+
+# Test files
+**/TestResults/
+**/*.Tests/
+
+# Node modules (if any)
+**/node_modules/
+
+# Logs
+*.log
+logs/
+
+# OS files
+Thumbs.db
+.DS_Store
+
+# Docker files (avoid recursive copy)
+**/Dockerfile*
+**/.dockerignore
+docker-compose*.yml
+
+# Agent (not needed for Web container)
+RemoteControl.Agent/
