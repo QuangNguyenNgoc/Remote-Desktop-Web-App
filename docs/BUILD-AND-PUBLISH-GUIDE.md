@@ -224,7 +224,10 @@ docker run -d -p 5048:5048 remotecontrol-web
    cd RemoteControl.Agent
    dotnet publish -c Release -r win-x64 --self-contained -p:PublishSingleFile=true -p:DebugType=None
    ```
-
+1. **Build with config file (have dll):**
+  ```powershell
+  dotnet publish -c Release -r win-x64 --self-contained
+  ```
 2. **Sửa `appsettings.json`** trong folder publish:
    ```json
    {
