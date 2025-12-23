@@ -38,7 +38,7 @@ cd RemoteControl.Web
 dotnet watch
 ```
 
-Web sẽ chạy tại `https://localhost:5049`
+Web sẽ chạy tại `https://localhost:5048`
 
 ### Chạy Agent (Debug Mode)
 
@@ -122,7 +122,7 @@ cd RemoteControl.Web
 dotnet watch
 
 # Terminal 2: Expose via Ngrok
-ngrok http 5049
+ngrok http 5048
 ```
 
 Ngrok sẽ cung cấp URL như: `https://abc123.ngrok.io`
@@ -197,4 +197,4 @@ docker run -d -p 5048:5048 remotecontrol-web
 | Run Agent (debug) | `cd RemoteControl.Agent && dotnet run` |
 | Run Agent (hidden) | `Agent.exe --mode=hidden --server=IP:PORT` |
 | Build Agent portable | `dotnet publish -c Release -r win-x64 --self-contained` |
-| Expose via Ngrok | `ngrok http 5049` |
+| Expose via Ngrok | `ngrok http 5048` |
