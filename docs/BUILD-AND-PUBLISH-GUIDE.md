@@ -38,7 +38,7 @@ cd RemoteControl.Web
 dotnet watch
 ```
 
-Web sẽ chạy tại `https://localhost:5049`
+Web sẽ chạy tại `https://localhost:5048`
 
 ### Chạy Agent (Debug Mode)
 
