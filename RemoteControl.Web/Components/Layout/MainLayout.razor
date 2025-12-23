@@ -1,6 +1,8 @@
 ﻿@inherits LayoutComponentBase
+@using RemoteControl.Web.Services
 @inject IJSRuntime JS
 @inject NavigationManager Nav
+@inject TranslationService Lang
 
 @if (_isChecking)
 {
@@ -19,7 +21,7 @@ else
         <main class="flex-1 flex flex-col min-w-0 overflow-hidden">
             <TopBar PageTitle="@PageTitle" />
 
-            <div class="flex-1 overflow-auto p-6" style="background-color: var(--body-bg);">
+            <div class="flex-1 overflow-auto p-6 relative" style="@GetWallpaperStyle()">
                 @Body
             </div>
         </main>
@@ -40,6 +42,27 @@ else
     
     private bool _isChecking = true;
     private bool _initialized = false;
+    private string _selectedWallpaper = "default";
+
+    // Wallpaper gradients matching Settings.razor - increased opacity for visibility
+    private static readonly Dictionary<string, string> WallpaperGradients = new()
+    {
+        { "default", "" },
+        { "sunset", "linear-gradient(135deg, rgba(249, 115, 22, 0.25) 0%, rgba(236, 72, 153, 0.25) 100%)" },
+        { "ocean", "linear-gradient(135deg, rgba(6, 182, 212, 0.25) 0%, rgba(59, 130, 246, 0.25) 100%)" },
+        { "forest", "linear-gradient(135deg, rgba(34, 197, 94, 0.25) 0%, rgba(16, 185, 129, 0.25) 100%)" },
+        { "purple", "linear-gradient(135deg, rgba(168, 85, 247, 0.25) 0%, rgba(139, 92, 246, 0.25) 100%)" },
+        { "midnight", "linear-gradient(135deg, rgba(30, 41, 59, 0.5) 0%, rgba(15, 23, 42, 0.5) 100%)" }
+    };
+
+    private string GetWallpaperStyle()
+    {
+        if (_selectedWallpaper == "default" || !WallpaperGradients.TryGetValue(_selectedWallpaper, out var gradient) || string.IsNullOrEmpty(gradient))
+        {
+            return "background-color: var(--body-bg);";
+        }
+        return $"background: {gradient}, var(--body-bg);";
+    }
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
@@ -56,6 +79,11 @@ else
                 return;
             }
 
+            // Apply stored theme and wallpaper from settings
+            await ApplyStoredTheme();
+            await LoadWallpaper();
+            await LoadStoredLanguage();
+
             _isChecking = false;
             StateHasChanged();
         }
@@ -63,6 +91,58 @@ else
         {
             // If JS fails, redirect to login
             Nav.NavigateTo("/login", forceLoad: true);
+        }
+    }
+
+    private async Task LoadWallpaper()
+    {
+        try
+        {
+            var wallpaper = await JS.InvokeAsync<string?>("localStorage.getItem", "settings_wallpaper");
+            if (!string.IsNullOrEmpty(wallpaper) && WallpaperGradients.ContainsKey(wallpaper))
+            {
+                _selectedWallpaper = wallpaper;
+            }
+        }
+        catch
+        {
+            // Ignore errors
+        }
+    }
+
+    private async Task LoadStoredLanguage()
+    {
+        try
+        {
+            var language = await JS.InvokeAsync<string?>("localStorage.getItem", "settings_language");
+            if (!string.IsNullOrEmpty(language))
+            {
+                Lang.SetLanguage(language);
+            }
+        }
+        catch
+        {
+            // Ignore errors
+        }
+    }
+
+    private async Task ApplyStoredTheme()
+    {
+        try
+        {
+            var isDarkMode = await JS.InvokeAsync<string?>("localStorage.getItem", "settings_darkMode") == "true";
+            if (isDarkMode)
+            {
+                await JS.InvokeVoidAsync("eval", "document.documentElement.classList.add('dark'); document.documentElement.classList.remove('light');");
+            }
+            else
+            {
+                await JS.InvokeVoidAsync("eval", "document.documentElement.classList.remove('dark'); document.documentElement.classList.add('light');");
+            }
+        }
+        catch
+        {
+            // Ignore theme errors
         }
     }
 

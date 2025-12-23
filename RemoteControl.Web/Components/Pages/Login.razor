@@ -5,127 +5,136 @@
 @inject IJSRuntime JS
 
 <div class="login-page">
-    <div class="login-box">
-        <div class="login-header">
-            <div class="login-icon">
-                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                    <rect width="18" height="11" x="3" y="11" rx="2" ry="2"/>
-                    <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
-                </svg>
-            </div>
-            <h1>Passkey Login</h1>
-        </div>
+    @* Animated Background *@
+    <div class="background-layer">
+        <div class="gradient-overlay"></div>
+        <div class="floating-orb orb-1"></div>
+        <div class="floating-orb orb-2"></div>
+        <div class="floating-orb orb-3"></div>
+    </div>
 
-        <div class="login-form">
-            <div class="form-group">
-                <label for="passkey-input">Enter passkey</label>
-                <div class="input-wrapper">
-                    <input 
-                        id="passkey-input" 
-                        type="@(_showPassword ? "text" : "password")" 
-                        @bind="_passkey" 
-                        @bind:event="oninput"
-                        @onkeypress="HandleKeyPress"
-                        placeholder="enter here"
-                        class="passkey-input" />
-                    <button type="button" class="toggle-password-btn" @onclick="TogglePassword" title="@(_showPassword ? "Hide" : "Show") password">
-                        @if (_showPassword)
-                        {
-                            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                                <path d="M9.88 9.88a3 3 0 1 0 4.24 4.24"/>
-                                <path d="M10.73 5.08A10.43 10.43 0 0 1 12 5c7 0 10 7 10 7a13.16 13.16 0 0 1-1.67 2.68"/>
-                                <path d="M6.61 6.61A13.526 13.526 0 0 0 2 12s3 7 10 7a9.74 9.74 0 0 0 5.39-1.61"/>
-                                <line x1="2" x2="22" y1="2" y2="22"/>
-                            </svg>
-                        }
-                        else
-                        {
-                            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                                <path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"/>
-                                <circle cx="12" cy="12" r="3"/>
-                            </svg>
-                        }
-                    </button>
-                </div>
-            </div>
-
-            <!-- Remember Me checkbox -->
-            <div class="remember-row">
-                <label class="remember-label">
-                    <input type="checkbox" @bind="_rememberMe" disabled="@_isLoading" />
-                    <span>Remember me</span>
-                    <span class="remember-hint">(1 hour)</span>
-                </label>
-            </div>
-
-            @if (!string.IsNullOrWhiteSpace(_error))
-            {
-                <div class="error-message">@_error</div>
-            }
-
-            <button class="login-btn" @onclick="LoginAsync" disabled="@(_isLoading || _isLocked)">
-                @if (_isLocked)
-                {
-                    <span>🔒 Locked (@_lockoutSecondsRemaining s)</span>
-                }
-                else if (_isLoading)
-                {
-                    <span class="loading-spinner"></span>
-                    <span>Logging in...</span>
-                }
-                else
-                {
-                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                        <rect width="18" height="11" x="3" y="11" rx="2" ry="2"/>
-                        <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+    @* Login Card *@
+    <div class="login-container">
+        <div class="login-card">
+            @* Logo Section *@
+            <div class="logo-section">
+                <div class="logo-icon">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"/>
+                        <circle cx="12" cy="12" r="3"/>
                     </svg>
-                    <span>Login</span>
-                }
-            </button>
+                </div>
+                <h1 class="logo-title">NETSPY</h1>
+                <p class="logo-subtitle">Admin authentication required</p>
+            </div>
 
-            <div class="login-footer">
-                <p>Secure authentication required</p>
+            @* Login Form *@
+            <div class="form-section">
+                <div class="form-group">
+                    <label for="password-input">Password</label>
+                    <div class="input-wrapper">
+                        <svg class="input-icon" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <rect width="18" height="11" x="3" y="11" rx="2" ry="2"/>
+                            <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+                        </svg>
+                        <input 
+                            id="password-input" 
+                            type="@(_showPassword ? "text" : "password")" 
+                            @bind="_passkey" 
+                            @bind:event="oninput"
+                            @onkeypress="HandleKeyPress"
+                            placeholder="Enter admin password"
+                            class="password-input @(_hasError ? "input-error shake" : "")"
+                            disabled="@(_isLoading || _isLocked)" />
+                        <button type="button" class="toggle-btn" @onclick="TogglePassword" disabled="@_isLoading">
+                            @if (_showPassword)
+                            {
+                                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                    <path d="M9.88 9.88a3 3 0 1 0 4.24 4.24"/>
+                                    <path d="M10.73 5.08A10.43 10.43 0 0 1 12 5c7 0 10 7 10 7a13.16 13.16 0 0 1-1.67 2.68"/>
+                                    <path d="M6.61 6.61A13.526 13.526 0 0 0 2 12s3 7 10 7a9.74 9.74 0 0 0 5.39-1.61"/>
+                                    <line x1="2" x2="22" y1="2" y2="22"/>
+                                </svg>
+                            }
+                            else
+                            {
+                                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                    <path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"/>
+                                    <circle cx="12" cy="12" r="3"/>
+                                </svg>
+                            }
+                        </button>
+                    </div>
+                    @if (_hasError)
+                    {
+                        <p class="error-text">@_errorMessage</p>
+                    }
+                </div>
+
+                @* Remember Me *@
+                <label class="remember-checkbox">
+                    <input type="checkbox" @bind="_rememberMe" disabled="@(_isLoading || _isLocked)" />
+                    <span class="checkmark"></span>
+                    <span class="remember-text">Remember me <span class="remember-hint">(1 hour)</span></span>
+                </label>
+
+                @* IP Check Status *@
+                <div class="ip-check-status">
+                    <div class="status-dot @(_ipCheckStatus ? "status-online" : "status-offline")"></div>
+                    <span class="status-text">Server: http://localhost:5048</span>
+                </div>
+
+                @* Submit Button *@
+                <button class="submit-btn" @onclick="LoginAsync" disabled="@(_isLoading || _isLocked || string.IsNullOrWhiteSpace(_passkey))">
+                    @if (_isLocked)
+                    {
+                        <span>🔒 Locked (@_lockoutSecondsRemaining s)</span>
+                    }
+                    else if (_isLoading)
+                    {
+                        <div class="btn-loading">
+                            <div class="spinner"></div>
+                            <span>Logging in...</span>
+                        </div>
+                    }
+                    else
+                    {
+                        <span>Login</span>
+                    }
+                </button>
             </div>
         </div>
     </div>
 
-    @if (_toastVisible)
-    {
-        <div class="toast" role="status" aria-live="polite">
-            @_toastMessage
-        </div>
-    }
+    @* Footer *@
+    <footer class="login-footer">
+        <p>© 2024 NETSPY Remote Control • Secure Connection</p>
+    </footer>
 </div>
 
 @code {
-    // Response class for API
-    private sealed class VerifyResponse
-    {
-        public bool Success { get; set; }
-    }
-
     // State variables
     private string _passkey = "";
-    private string _error = "";
+    private string _errorMessage = "";
+    private bool _hasError = false;
     private bool _isLoading = false;
     private bool _showPassword = false;
     private bool _rememberMe = false;
+    private bool _ipCheckStatus = false;
     
     // Rate limit lockout state
     private bool _isLocked = false;
     private int _lockoutSecondsRemaining = 0;
     private System.Timers.Timer? _lockoutTimer;
-    
-    // Toast state
-    private bool _toastVisible = false;
-    private string _toastMessage = "";
 
     private void TogglePassword() => _showPassword = !_showPassword;
 
-    // Auto-login check on page load
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
         if (!firstRender) return;
+
+        // Check IP status
+        await CheckIpStatus();
 
         // If already logged in, redirect to home
         if (await IsRememberedAndValidAsync())
@@ -134,60 +143,69 @@
         }
     }
 
+    private async Task CheckIpStatus()
+    {
+        try
+        {
+            using var http = new HttpClient { Timeout = TimeSpan.FromSeconds(3) };
+            var response = await http.GetAsync("http://localhost:5048/");
+            _ipCheckStatus = response.IsSuccessStatusCode;
+        }
+        catch
+        {
+            _ipCheckStatus = false;
+        }
+        await InvokeAsync(StateHasChanged);
+    }
+
     private async Task LoginAsync()
     {
-        if (_isLoading) return;
+        if (_isLoading || _isLocked) return;
 
         if (string.IsNullOrWhiteSpace(_passkey))
         {
-            _error = "Please enter passkey.";
-            await ShowToastAsync("Please enter passkey.");
+            ShowError("Please enter password.");
             return;
         }
 
-        _error = "";
+        _hasError = false;
+        _errorMessage = "";
         _isLoading = true;
 
         try
         {
-            // Native C# HttpClient API call
             using var http = new HttpClient { BaseAddress = new Uri(Nav.BaseUri) };
             var resp = await http.PostAsJsonAsync("/auth/verify", new { Passkey = _passkey });
 
             if (resp.StatusCode == System.Net.HttpStatusCode.TooManyRequests)
             {
-                // Rate limited - start lockout countdown
                 StartLockout(60);
-                _error = $"Too many attempts. Please wait {_lockoutSecondsRemaining} seconds.";
-                await ShowToastAsync("Too many login attempts!");
+                ShowError($"Too many attempts. Please wait {_lockoutSecondsRemaining}s.");
                 return;
             }
             
             if (!resp.IsSuccessStatusCode)
             {
-                _error = "Login failed. Please try again.";
-                await ShowToastAsync("Login failed.");
+                ShowError("Login failed. Please try again.");
                 return;
             }
 
             var data = await resp.Content.ReadFromJsonAsync<VerifyResponse>();
-            var ok = data?.Success == true;
-
-            if (!ok)
+            
+            if (data?.Success != true)
             {
-                _error = "Invalid passkey.";
-                await ShowToastAsync("Invalid passkey.");
+                ShowError("Wrong password. Please try again.");
+                _passkey = "";
                 return;
             }
 
-            // Persist login with Remember Me
+            // Persist login with Remember Me (1 hour)
             await PersistLoginAsync(_rememberMe);
             Nav.NavigateTo("/", forceLoad: true);
         }
         catch
         {
-            _error = "Login failed. Please try again.";
-            await ShowToastAsync("Login failed.");
+            ShowError("Connection error. Please try again.");
         }
         finally
         {
@@ -195,31 +213,37 @@
         }
     }
 
+    private void ShowError(string message)
+    {
+        _errorMessage = message;
+        _hasError = true;
+    }
+
     private void HandleKeyPress(KeyboardEventArgs e)
     {
-        if (e.Key == "Enter")
+        if (e.Key == "Enter" && !_isLoading && !_isLocked)
         {
             _ = LoginAsync();
         }
     }
 
-    // Start lockout countdown timer
     private void StartLockout(int seconds)
     {
         _isLocked = true;
         _lockoutSecondsRemaining = seconds;
         
         _lockoutTimer?.Stop();
-        _lockoutTimer = new System.Timers.Timer(1000); // 1 second interval
+        _lockoutTimer = new System.Timers.Timer(1000);
         _lockoutTimer.Elapsed += (s, e) =>
         {
             _lockoutSecondsRemaining--;
-            _error = $"Too many attempts. Please wait {_lockoutSecondsRemaining} seconds.";
+            _errorMessage = $"Too many attempts. Please wait {_lockoutSecondsRemaining}s.";
             
             if (_lockoutSecondsRemaining <= 0)
             {
                 _isLocked = false;
-                _error = "";
+                _hasError = false;
+                _errorMessage = "";
                 _lockoutTimer?.Stop();
             }
             
@@ -228,7 +252,7 @@
         _lockoutTimer.Start();
     }
 
-    // Persist login to storage
+    // Persist login to storage (1 hour)
     private async Task PersistLoginAsync(bool remember)
     {
         if (remember)
@@ -246,7 +270,6 @@
         }
     }
 
-    // Check if user is remembered and still valid
     private async Task<bool> IsRememberedAndValidAsync()
     {
         var session = await JS.InvokeAsync<string>("sessionStorage.getItem", "rc_auth_session");
@@ -261,74 +284,156 @@
         return now <= until;
     }
 
-    // Toast notification
-    private async Task ShowToastAsync(string message)
+    private sealed class VerifyResponse
     {
-        _toastMessage = message;
-        _toastVisible = true;
-        StateHasChanged();
-
-        await Task.Delay(2500);
-
-        _toastVisible = false;
-        StateHasChanged();
+        public bool Success { get; set; }
     }
 }
 
 <style>
-    /* Centered container layout */
     .login-page {
         min-height: 100vh;
         display: flex;
+        flex-direction: column;
         align-items: center;
         justify-content: center;
-        padding: 1rem;
-        background: var(--body-bg);
+        position: relative;
+        overflow: hidden;
+        font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
     }
 
-    /* Card with shadow and rounded corners */
-    .login-box {
+    /* Background Layer */
+    .background-layer {
+        position: fixed;
+        inset: 0;
+        background: linear-gradient(135deg, #0f172a 0%, #1e293b 50%, #0f172a 100%);
+        z-index: 0;
+    }
+
+    .gradient-overlay {
+        position: absolute;
+        inset: 0;
+        background: 
+            radial-gradient(ellipse at 20% 20%, rgba(249, 115, 22, 0.15) 0%, transparent 50%),
+            radial-gradient(ellipse at 80% 80%, rgba(236, 72, 153, 0.15) 0%, transparent 50%),
+            radial-gradient(ellipse at 50% 50%, rgba(168, 85, 247, 0.08) 0%, transparent 60%);
+    }
+
+    .floating-orb {
+        position: absolute;
+        border-radius: 50%;
+        filter: blur(80px);
+        animation: float 8s ease-in-out infinite;
+    }
+
+    .orb-1 {
+        top: 15%;
+        left: 20%;
+        width: 400px;
+        height: 400px;
+        background: rgba(249, 115, 22, 0.12);
+        animation-delay: 0s;
+    }
+
+    .orb-2 {
+        bottom: 20%;
+        right: 15%;
+        width: 350px;
+        height: 350px;
+        background: rgba(236, 72, 153, 0.12);
+        animation-delay: -2s;
+    }
+
+    .orb-3 {
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        width: 300px;
+        height: 300px;
+        background: rgba(168, 85, 247, 0.08);
+        animation-delay: -4s;
+    }
+
+    @@keyframes float {
+        0%, 100% { transform: translateY(0) scale(1); }
+        50% { transform: translateY(-30px) scale(1.05); }
+    }
+
+    /* Login Container */
+    .login-container {
+        position: relative;
+        z-index: 10;
         width: 100%;
-        max-width: 26rem;
-        padding: 2rem;
-        border-radius: 1rem;
-        background: var(--card-bg);
-        box-shadow: 0 4px 24px rgba(0, 0, 0, 0.12), 0 2px 8px rgba(0, 0, 0, 0.06);
-        border: 1px solid var(--card-border);
+        max-width: 420px;
+        padding: 1.5rem;
+        animation: slideUp 0.6s ease-out;
     }
 
-    /* Centered header with icon and bold title */
-    .login-header {
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        gap: 0.75rem;
+    @@keyframes slideUp {
+        from {
+            opacity: 0;
+            transform: translateY(30px);
+        }
+        to {
+            opacity: 1;
+            transform: translateY(0);
+        }
+    }
+
+    /* Glass Card */
+    .login-card {
+        background: rgba(30, 41, 59, 0.7);
+        backdrop-filter: blur(20px);
+        -webkit-backdrop-filter: blur(20px);
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        border-radius: 1.5rem;
+        padding: 2.5rem;
+        box-shadow: 
+            0 25px 50px -12px rgba(0, 0, 0, 0.5),
+            0 0 0 1px rgba(255, 255, 255, 0.05) inset;
+    }
+
+    /* Logo Section */
+    .logo-section {
+        text-align: center;
         margin-bottom: 2rem;
     }
 
-    .login-icon {
-        padding: 0.625rem;
-        border-radius: 0.625rem;
-        background: rgba(59, 130, 246, 0.15);
+    .logo-icon {
+        width: 80px;
+        height: 80px;
+        margin: 0 auto 1rem;
         display: flex;
         align-items: center;
         justify-content: center;
+        background: linear-gradient(135deg, #f97316 0%, #ec4899 100%);
+        border-radius: 1.25rem;
+        color: white;
+        box-shadow: 
+            0 10px 40px -10px rgba(249, 115, 22, 0.5),
+            0 0 20px rgba(236, 72, 153, 0.3);
+        animation: float 4s ease-in-out infinite;
     }
 
-    .login-icon svg {
-        width: 1.5rem;
-        height: 1.5rem;
-        color: #3b82f6;
+    .logo-title {
+        font-size: 2rem;
+        font-weight: 800;
+        background: linear-gradient(135deg, #f97316 0%, #ec4899 50%, #a855f7 100%);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        background-clip: text;
+        margin: 0 0 0.5rem 0;
+        letter-spacing: -0.02em;
     }
 
-    .login-header h1 {
-        font-size: 1.5rem;
-        font-weight: 700;
-        color: var(--text-primary);
+    .logo-subtitle {
+        color: rgba(148, 163, 184, 0.8);
+        font-size: 0.875rem;
         margin: 0;
     }
 
-    .login-form {
+    /* Form Section */
+    .form-section {
         display: flex;
         flex-direction: column;
         gap: 1.25rem;
@@ -337,178 +442,277 @@
     .form-group {
         display: flex;
         flex-direction: column;
+        gap: 0.5rem;
     }
 
-    /* Medium font weight for label */
     .form-group label {
-        display: block;
         font-size: 0.875rem;
         font-weight: 500;
-        margin-bottom: 0.5rem;
-        color: var(--text-primary);
+        color: #e2e8f0;
     }
 
     .input-wrapper {
         position: relative;
+        display: flex;
+        align-items: center;
     }
 
-    /* Updated border radius */
-    .passkey-input {
+    .input-icon {
+        position: absolute;
+        left: 1rem;
+        color: rgba(148, 163, 184, 0.6);
+        pointer-events: none;
+    }
+
+    .password-input {
         width: 100%;
-        padding: 0.75rem 2.75rem 0.75rem 1rem;
-        border-radius: 0.625rem;
+        padding: 0.875rem 3rem 0.875rem 2.75rem;
+        background: rgba(15, 23, 42, 0.6);
+        border: 2px solid rgba(71, 85, 105, 0.4);
+        border-radius: 0.75rem;
         font-size: 1rem;
-        background: var(--card-bg);
-        border: 2px solid var(--card-border);
-        color: var(--text-primary);
-        transition: all 0.2s;
+        color: #f1f5f9;
         outline: none;
-        box-sizing: border-box;
+        transition: all 0.2s ease;
     }
 
-    .passkey-input:focus {
-        border-color: #3b82f6;
-        box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+    .password-input::placeholder {
+        color: rgba(148, 163, 184, 0.5);
     }
 
-    .passkey-input::placeholder {
-        color: var(--text-quaternary);
+    .password-input:focus {
+        border-color: #f97316;
+        box-shadow: 0 0 0 3px rgba(249, 115, 22, 0.15);
+    }
+
+    .password-input.input-error {
+        border-color: #ef4444;
+        box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.15);
+    }
+
+    .password-input:disabled {
         opacity: 0.6;
+        cursor: not-allowed;
     }
 
-    /* Toggle password button */
-    .toggle-password-btn {
+    .toggle-btn {
         position: absolute;
         right: 0.75rem;
-        top: 50%;
-        transform: translateY(-50%);
-        padding: 0.25rem;
-        background: transparent;
+        background: none;
         border: none;
+        padding: 0.5rem;
         cursor: pointer;
-        color: var(--text-quaternary);
-        border-radius: 0.25rem;
+        color: rgba(148, 163, 184, 0.6);
+        border-radius: 0.5rem;
         transition: all 0.2s;
         display: flex;
         align-items: center;
         justify-content: center;
     }
 
-    .toggle-password-btn:hover {
-        background: rgba(0, 0, 0, 0.05);
-        color: var(--text-secondary);
+    .toggle-btn:hover:not(:disabled) {
+        color: #f1f5f9;
+        background: rgba(255, 255, 255, 0.1);
     }
 
-    .error-message {
-        padding: 0.75rem;
-        border-radius: 0.625rem;
-        background: rgba(239, 68, 68, 0.1);
-        border: 1px solid rgba(239, 68, 68, 0.3);
-        color: #ef4444;
-        font-size: 0.875rem;
+    .error-text {
+        color: #f87171;
+        font-size: 0.8rem;
+        margin: 0;
+        animation: fadeIn 0.3s ease;
     }
 
-    /* Updated button with semibold font and scale effect */
-    .login-btn {
-        width: 100%;
-        padding: 0.75rem 1.5rem;
-        border-radius: 0.625rem;
-        font-weight: 600;
-        font-size: 0.875rem;
+    @@keyframes fadeIn {
+        from { opacity: 0; transform: translateY(-5px); }
+        to { opacity: 1; transform: translateY(0); }
+    }
+
+    /* Shake Animation */
+    .shake {
+        animation: shake 0.4s ease;
+    }
+
+    @@keyframes shake {
+        0%, 100% { transform: translateX(0); }
+        20% { transform: translateX(-8px); }
+        40% { transform: translateX(8px); }
+        60% { transform: translateX(-6px); }
+        80% { transform: translateX(6px); }
+    }
+
+    /* Remember Me Checkbox */
+    .remember-checkbox {
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+        cursor: pointer;
+        user-select: none;
+    }
+
+    .remember-checkbox input {
+        display: none;
+    }
+
+    .checkmark {
+        width: 20px;
+        height: 20px;
+        border: 2px solid rgba(71, 85, 105, 0.6);
+        border-radius: 0.375rem;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        transition: all 0.2s;
+        flex-shrink: 0;
+    }
+
+    .remember-checkbox input:checked + .checkmark {
+        background: linear-gradient(135deg, #f97316, #ec4899);
+        border-color: transparent;
+    }
+
+    .remember-checkbox input:checked + .checkmark::after {
+        content: '✓';
         color: white;
-        background: #3b82f6;
+        font-size: 12px;
+        font-weight: bold;
+    }
+
+    .remember-text {
+        color: rgba(148, 163, 184, 0.9);
+        font-size: 0.875rem;
+    }
+
+    .remember-hint {
+        color: rgba(148, 163, 184, 0.5);
+        font-size: 0.75rem;
+    }
+
+    /* IP Check Status */
+    .ip-check-status {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        padding: 0.75rem 1rem;
+        background: rgba(15, 23, 42, 0.5);
+        border-radius: 0.625rem;
+        border: 1px solid rgba(71, 85, 105, 0.3);
+    }
+
+    .status-dot {
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        flex-shrink: 0;
+    }
+
+    .status-online {
+        background: #10b981;
+        box-shadow: 0 0 8px rgba(16, 185, 129, 0.6);
+        animation: pulse 2s infinite;
+    }
+
+    .status-offline {
+        background: #ef4444;
+        box-shadow: 0 0 8px rgba(239, 68, 68, 0.4);
+    }
+
+    @@keyframes pulse {
+        0%, 100% { opacity: 1; }
+        50% { opacity: 0.5; }
+    }
+
+    .status-text {
+        color: rgba(148, 163, 184, 0.7);
+        font-size: 0.8rem;
+        font-family: 'JetBrains Mono', 'Fira Code', monospace;
+    }
+
+    /* Submit Button */
+    .submit-btn {
+        width: 100%;
+        padding: 0.875rem 1.5rem;
+        background: linear-gradient(135deg, #f97316 0%, #ec4899 100%);
         border: none;
+        border-radius: 0.75rem;
+        font-size: 1rem;
+        font-weight: 600;
+        color: white;
         cursor: pointer;
         transition: all 0.2s;
         display: flex;
         align-items: center;
         justify-content: center;
         gap: 0.5rem;
+        box-shadow: 0 10px 30px -10px rgba(249, 115, 22, 0.4);
     }
 
-    .login-btn:hover:not(:disabled) {
-        background: #2563eb;
+    .submit-btn:hover:not(:disabled) {
+        transform: translateY(-2px);
+        box-shadow: 0 15px 40px -10px rgba(249, 115, 22, 0.5);
     }
 
-    .login-btn:active:not(:disabled) {
-        transform: scale(0.98);
+    .submit-btn:active:not(:disabled) {
+        transform: translateY(0);
     }
 
-    .login-btn:disabled {
+    .submit-btn:disabled {
         opacity: 0.5;
         cursor: not-allowed;
+        transform: none;
     }
 
-    .loading-spinner {
-        width: 1rem;
-        height: 1rem;
-        border: 2px solid white;
-        border-top-color: transparent;
+    .btn-loading {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+    }
+
+    .spinner {
+        width: 18px;
+        height: 18px;
+        border: 2px solid rgba(255, 255, 255, 0.3);
+        border-top-color: white;
         border-radius: 50%;
-        animation: spin 0.6s linear infinite;
+        animation: spin 0.8s linear infinite;
     }
 
     @@keyframes spin {
         to { transform: rotate(360deg); }
     }
 
-    /* Updated footer text */
+    /* Footer */
     .login-footer {
+        position: relative;
+        z-index: 10;
+        margin-top: auto;
+        padding: 1.5rem;
         text-align: center;
-        padding-top: 0.75rem;
     }
 
     .login-footer p {
+        color: rgba(148, 163, 184, 0.4);
         font-size: 0.75rem;
-        font-weight: 500;
-        color: var(--text-quaternary);
         margin: 0;
     }
 
-    /* Remember Me */
-    .remember-row {
-        margin-top: -0.25rem;
-    }
+    /* Responsive */
+    @@media (max-width: 480px) {
+        .login-card {
+            padding: 1.75rem;
+        }
 
-    .remember-label {
-        display: flex;
-        align-items: center;
-        gap: 0.5rem;
-        font-size: 0.875rem;
-        color: var(--text-secondary);
-        cursor: pointer;
-    }
+        .logo-icon {
+            width: 64px;
+            height: 64px;
+        }
 
-    .remember-label input[type="checkbox"] {
-        width: 1rem;
-        height: 1rem;
-        accent-color: #3b82f6;
-        cursor: pointer;
-    }
+        .logo-icon svg {
+            width: 32px;
+            height: 32px;
+        }
 
-    .remember-hint {
-        color: var(--text-quaternary);
-        font-size: 0.75rem;
-    }
-
-    /* Toast notification */
-    .toast {
-        position: fixed;
-        bottom: 24px;
-        left: 50%;
-        transform: translateX(-50%);
-        background: #ef4444;
-        color: #fff;
-        padding: 12px 24px;
-        border-radius: 8px;
-        font-size: 14px;
-        box-shadow: 0 4px 12px rgba(0,0,0,0.3);
-        z-index: 9999;
-        animation: slideUp 0.3s ease;
-    }
-
-    @@keyframes slideUp {
-        from { opacity: 0; transform: translateX(-50%) translateY(20px); }
-        to { opacity: 1; transform: translateX(-50%) translateY(0); }
+        .logo-title {
+            font-size: 1.5rem;
+        }
     }
 </style>

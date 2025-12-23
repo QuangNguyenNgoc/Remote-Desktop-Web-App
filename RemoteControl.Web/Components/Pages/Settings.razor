@@ -1,0 +1,421 @@
+@page "/settings"
+@using RemoteControl.Web.Services
+@using RemoteControl.Web.Components.Layout
+@inject IJSRuntime JS
+@inject ToastService ToastService
+@inject TranslationService Lang
+@implements IDisposable
+
+<div class="max-w-4xl mx-auto space-y-6">
+    <div class="flex items-center gap-3 mb-8">
+        <div class="p-3 rounded-xl" style="background-color: var(--nav-active-bg);">
+            <svg class="w-6 h-6" style="color: var(--nav-active-text);" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                      d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path>
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
+            </svg>
+        </div>
+        <h1 class="text-2xl font-bold" style="color: var(--text-primary);">@Lang.T("settings_title")</h1>
+    </div>
+
+    @* Language Section *@
+    <div class="rounded-2xl p-6" style="background-color: var(--card-bg); border: 1px solid var(--card-border); box-shadow: 0 4px 12px rgba(0,0,0,0.05);">
+        <div class="flex items-center gap-3 mb-4">
+            <svg class="w-5 h-5" style="color: var(--btn-primary-bg);" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                      d="M3.055 11H5a2 2 0 012 2v1a2 2 0 002 2 2 2 0 012 2v2.945M8 3.935V5.5A2.5 2.5 0 0010.5 8h.5a2 2 0 012 2 2 2 0 104 0 2 2 0 012-2h1.064M15 20.488V18a2 2 0 012-2h3.064M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+            </svg>
+            <h3 class="font-semibold text-lg" style="color: var(--text-primary);">@Lang.T("settings_language")</h3>
+        </div>
+        
+        <div class="flex items-center justify-between">
+            <span class="text-sm" style="color: var(--text-tertiary);">@Lang.T("settings_language_desc")</span>
+            <div class="relative inline-block w-48">
+                <select @bind="_selectedLanguage" @bind:after="OnLanguageChanged"
+                        class="w-full px-4 py-2.5 rounded-xl appearance-none cursor-pointer transition-all"
+                        style="background-color: var(--input-bg); border: 1px solid var(--input-border); color: var(--input-text);"
+                        onfocus="this.style.borderColor='var(--input-focus-border)'; this.style.boxShadow='0 0 0 3px rgba(37, 99, 235, 0.1)';"
+                        onblur="this.style.borderColor='var(--input-border)'; this.style.boxShadow='none';">
+                    <option value="EN">🇬🇧 English</option>
+                    <option value="VN">🇻🇳 Tiếng Việt</option>
+                    <option value="JP">🇯🇵 日本語</option>
+                    <option value="CN">🇨🇳 中文</option>
+                </select>
+                <svg class="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 pointer-events-none" 
+                     style="color: var(--text-quaternary);" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+                </svg>
+            </div>
+        </div>
+    </div>
+
+    @* Appearance Section *@
+    <div class="rounded-2xl p-6" style="background-color: var(--card-bg); border: 1px solid var(--card-border); box-shadow: 0 4px 12px rgba(0,0,0,0.05);">
+        <div class="flex items-center gap-3 mb-4">
+            <svg class="w-5 h-5" style="color: #ec4899;" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                      d="M7 21a4 4 0 01-4-4V5a2 2 0 012-2h4a2 2 0 012 2v12a4 4 0 01-4 4zm0 0h12a2 2 0 002-2v-4a2 2 0 00-2-2h-2.343M11 7.343l1.657-1.657a2 2 0 012.828 0l2.829 2.829a2 2 0 010 2.828l-8.486 8.485M7 17h.01"></path>
+            </svg>
+            <h3 class="font-semibold text-lg" style="color: var(--text-primary);">@Lang.T("settings_appearance")</h3>
+        </div>
+        
+        <div class="space-y-4">
+            @* Theme Toggle *@
+            <div class="flex items-center justify-between p-3 rounded-xl transition-colors"
+                 style="background-color: var(--table-header-bg);">
+                <div class="flex items-center gap-3">
+                    @if (_isDarkMode)
+                    {
+                        <svg class="w-5 h-5" style="color: #8b5cf6;" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" 
+                                  d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z"></path>
+                        </svg>
+                    }
+                    else
+                    {
+                        <svg class="w-5 h-5" style="color: #f97316;" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" 
+                                  d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z"></path>
+                        </svg>
+                    }
+                    <span class="text-sm font-medium" style="color: var(--text-primary);">
+                        @(_isDarkMode ? Lang.T("settings_dark_mode") : Lang.T("settings_light_mode"))
+                    </span>
+                </div>
+                <label class="relative inline-flex items-center cursor-pointer">
+                    <input type="checkbox" checked="@_isDarkMode" @onchange="ToggleTheme" class="sr-only peer">
+                    <div class="w-11 h-6 rounded-full peer transition-colors duration-200
+                                peer-checked:after:translate-x-full peer-checked:after:border-white 
+                                after:content-[''] after:absolute after:top-[2px] after:left-[2px] 
+                                after:bg-white after:border after:rounded-full after:h-5 after:w-5 
+                                after:transition-all after:shadow-md"
+                         style="background-color: @(_isDarkMode ? "var(--btn-primary-bg)" : "var(--input-border)");"></div>
+                </label>
+            </div>
+
+            @* Wallpaper Selector *@
+            <div class="pt-2">
+                <span class="text-sm font-medium block mb-3" style="color: var(--text-secondary);">@Lang.T("settings_wallpaper")</span>
+                <div class="grid grid-cols-6 gap-3">
+                    @foreach (var wp in _wallpapers)
+                    {
+                        <button @onclick="() => SelectWallpaper(wp.Id)"
+                                class="aspect-video rounded-xl overflow-hidden transition-all duration-300 relative group @(wp.Id == _selectedWallpaper ? "ring-2 ring-offset-2 scale-105" : "opacity-70 hover:opacity-100 hover:scale-105")"
+                                style="@(wp.Id == _selectedWallpaper ? "ring-color: var(--btn-primary-bg); ring-offset-color: var(--card-bg);" : "")"
+                                title="@wp.Name">
+                            <div class="absolute inset-0" style="background: @wp.Gradient;"></div>
+                            <div class="absolute inset-0 bg-black/20"></div>
+                            @if (wp.Id == _selectedWallpaper)
+                            {
+                                <div class="absolute inset-0 flex items-center justify-center">
+                                    <div class="w-2 h-2 rounded-full animate-pulse" style="background-color: var(--btn-primary-bg);"></div>
+                                </div>
+                            }
+                            <span class="absolute bottom-1 left-0 right-0 text-[10px] text-white/80 text-center truncate px-1">@wp.Name</span>
+                        </button>
+                    }
+                </div>
+            </div>
+        </div>
+    </div>
+
+    @* Notifications Section *@
+    <div class="rounded-2xl p-6" style="background-color: var(--card-bg); border: 1px solid var(--card-border); box-shadow: 0 4px 12px rgba(0,0,0,0.05);">
+        <div class="flex items-center gap-3 mb-4">
+            <svg class="w-5 h-5" style="color: #f59e0b;" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                      d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"></path>
+            </svg>
+            <h3 class="font-semibold text-lg" style="color: var(--text-primary);">@Lang.T("settings_notifications")</h3>
+        </div>
+        
+        <div class="space-y-4">
+            @* Push Notifications *@
+            <div class="flex items-center justify-between p-3 rounded-xl transition-colors hover:bg-opacity-50"
+                 style="background-color: var(--table-header-bg);">
+                <div class="flex items-center gap-3">
+                    <svg class="w-4 h-4" style="color: var(--text-tertiary);" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                              d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"></path>
+                    </svg>
+                    <span class="text-sm" style="color: var(--text-secondary);">@Lang.T("settings_push_notifications")</span>
+                </div>
+                <label class="relative inline-flex items-center cursor-pointer">
+                    <input type="checkbox" @bind="_pushNotifications" @bind:after="SaveSettings" class="sr-only peer">
+                    <div class="w-11 h-6 rounded-full peer transition-colors duration-200
+                                peer-checked:after:translate-x-full peer-checked:after:border-white 
+                                after:content-[''] after:absolute after:top-[2px] after:left-[2px] 
+                                after:bg-white after:border after:rounded-full after:h-5 after:w-5 
+                                after:transition-all after:shadow-md"
+                         style="background-color: @(_pushNotifications ? "var(--btn-primary-bg)" : "var(--input-border)");"></div>
+                </label>
+            </div>
+
+            @* Sound Alerts *@
+            <div class="flex items-center justify-between p-3 rounded-xl transition-colors hover:bg-opacity-50"
+                 style="background-color: var(--table-header-bg);">
+                <div class="flex items-center gap-3">
+                    <svg class="w-4 h-4" style="color: var(--text-tertiary);" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                              d="M15.536 8.464a5 5 0 010 7.072m2.828-9.9a9 9 0 010 12.728M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z"></path>
+                    </svg>
+                    <span class="text-sm" style="color: var(--text-secondary);">@Lang.T("settings_sound_alerts")</span>
+                </div>
+                <label class="relative inline-flex items-center cursor-pointer">
+                    <input type="checkbox" @bind="_soundAlerts" @bind:after="SaveSettings" class="sr-only peer">
+                    <div class="w-11 h-6 rounded-full peer transition-colors duration-200
+                                peer-checked:after:translate-x-full peer-checked:after:border-white 
+                                after:content-[''] after:absolute after:top-[2px] after:left-[2px] 
+                                after:bg-white after:border after:rounded-full after:h-5 after:w-5 
+                                after:transition-all after:shadow-md"
+                         style="background-color: @(_soundAlerts ? "var(--btn-primary-bg)" : "var(--input-border)");"></div>
+                </label>
+            </div>
+        </div>
+    </div>
+
+    @* Connection Section *@
+    <div class="rounded-2xl p-6" style="background-color: var(--card-bg); border: 1px solid var(--card-border); box-shadow: 0 4px 12px rgba(0,0,0,0.05);">
+        <div class="flex items-center gap-3 mb-4">
+            <svg class="w-5 h-5" style="color: #10b981;" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                      d="M8.111 16.404a5.5 5.5 0 017.778 0M12 20h.01m-7.08-7.071c3.904-3.905 10.236-3.905 14.141 0M1.394 9.393c5.857-5.857 15.355-5.857 21.213 0"></path>
+            </svg>
+            <h3 class="font-semibold text-lg" style="color: var(--text-primary);">@Lang.T("settings_connection")</h3>
+        </div>
+        
+        <div class="space-y-4">
+            @* Auto Reconnect *@
+            <div class="flex items-center justify-between p-3 rounded-xl transition-colors hover:bg-opacity-50"
+                 style="background-color: var(--table-header-bg);">
+                <div class="flex items-center gap-3">
+                    <svg class="w-4 h-4" style="color: var(--text-tertiary);" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                              d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
+                    </svg>
+                    <span class="text-sm" style="color: var(--text-secondary);">@Lang.T("settings_auto_reconnect")</span>
+                </div>
+                <label class="relative inline-flex items-center cursor-pointer">
+                    <input type="checkbox" @bind="_autoReconnect" @bind:after="SaveSettings" class="sr-only peer">
+                    <div class="w-11 h-6 rounded-full peer transition-colors duration-200
+                                peer-checked:after:translate-x-full peer-checked:after:border-white 
+                                after:content-[''] after:absolute after:top-[2px] after:left-[2px] 
+                                after:bg-white after:border after:rounded-full after:h-5 after:w-5 
+                                after:transition-all after:shadow-md"
+                         style="background-color: @(_autoReconnect ? "var(--btn-primary-bg)" : "var(--input-border)");"></div>
+                </label>
+            </div>
+
+            @* Low Bandwidth Mode *@
+            <div class="flex items-center justify-between p-3 rounded-xl transition-colors hover:bg-opacity-50"
+                 style="background-color: var(--table-header-bg);">
+                <div class="flex items-center gap-3">
+                    <svg class="w-4 h-4" style="color: var(--text-tertiary);" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                              d="M13 10V3L4 14h7v7l9-11h-7z"></path>
+                    </svg>
+                    <span class="text-sm" style="color: var(--text-secondary);">@Lang.T("settings_low_bandwidth")</span>
+                </div>
+                <label class="relative inline-flex items-center cursor-pointer">
+                    <input type="checkbox" @bind="_lowBandwidth" @bind:after="SaveSettings" class="sr-only peer">
+                    <div class="w-11 h-6 rounded-full peer transition-colors duration-200
+                                peer-checked:after:translate-x-full peer-checked:after:border-white 
+                                after:content-[''] after:absolute after:top-[2px] after:left-[2px] 
+                                after:bg-white after:border after:rounded-full after:h-5 after:w-5 
+                                after:transition-all after:shadow-md"
+                         style="background-color: @(_lowBandwidth ? "var(--btn-primary-bg)" : "var(--input-border)");"></div>
+                </label>
+            </div>
+        </div>
+    </div>
+
+    @* Refresh Interval Section *@
+    <div class="rounded-2xl p-6" style="background-color: var(--card-bg); border: 1px solid var(--card-border); box-shadow: 0 4px 12px rgba(0,0,0,0.05);">
+        <div class="flex items-center gap-3 mb-4">
+            <svg class="w-5 h-5" style="color: #6366f1;" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                      d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+            </svg>
+            <h3 class="font-semibold text-lg" style="color: var(--text-primary);">@Lang.T("settings_refresh_interval")</h3>
+        </div>
+        
+        <div class="space-y-4">
+            <div class="flex items-center justify-between">
+                <div class="flex items-center gap-2">
+                    <svg class="w-4 h-4" style="color: var(--text-tertiary);" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                              d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
+                    </svg>
+                    <span class="text-sm" style="color: var(--text-secondary);">Update Frequency</span>
+                </div>
+                <span class="text-sm font-mono font-semibold px-3 py-1 rounded-lg" 
+                      style="background-color: var(--table-header-bg); color: var(--text-primary);">
+                    @_refreshInterval s
+                </span>
+            </div>
+
+            <div class="py-2">
+                <input type="range" min="5" max="120" step="5" @bind="_refreshInterval" @bind:after="SaveSettings"
+                       class="w-full h-2 rounded-full appearance-none cursor-pointer accent-blue-600"
+                       style="background: linear-gradient(to right, var(--btn-primary-bg) 0%, var(--btn-primary-bg) @((_refreshInterval - 5) * 100 / 115)%, var(--progress-bg) @((_refreshInterval - 5) * 100 / 115)%, var(--progress-bg) 100%);">
+            </div>
+            
+            <div class="flex justify-between text-xs" style="color: var(--text-quaternary);">
+                <span>5s</span>
+                <span>30s</span>
+                <span>60s</span>
+                <span>90s</span>
+                <span>120s</span>
+            </div>
+        </div>
+    </div>
+
+    @* About Section *@
+    <div class="rounded-2xl p-6" style="background-color: var(--card-bg); border: 1px solid var(--card-border); box-shadow: 0 4px 12px rgba(0,0,0,0.05);">
+        <div class="flex items-center gap-3 mb-4">
+            <svg class="w-5 h-5" style="color: var(--text-tertiary);" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                      d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+            </svg>
+            <h3 class="font-semibold text-lg" style="color: var(--text-primary);">@Lang.T("settings_about")</h3>
+        </div>
+        
+        <div class="space-y-3 text-sm" style="color: var(--text-tertiary);">
+            <div class="flex justify-between">
+                <span>@Lang.T("settings_version")</span>
+                <span style="color: var(--text-primary);">1.0.0</span>
+            </div>
+            <div class="flex justify-between">
+                <span>@Lang.T("settings_app_name")</span>
+                <span style="color: var(--text-primary);">NETSPY Remote Control</span>
+            </div>
+            <div class="flex justify-between">
+                <span>@Lang.T("settings_framework")</span>
+                <span style="color: var(--text-primary);">Blazor + SignalR</span>
+            </div>
+        </div>
+    </div>
+</div>
+
+@code {
+    // ============================
+    // Settings State
+    // ============================
+    
+    private string _selectedLanguage = "EN";
+    private bool _isDarkMode = false;
+    private string _selectedWallpaper = "default";
+    private bool _pushNotifications = true;
+    private bool _soundAlerts = true;
+    private bool _autoReconnect = true;
+    private bool _lowBandwidth = false;
+    private int _refreshInterval = 30;
+
+    // Wallpaper options
+    private readonly List<WallpaperOption> _wallpapers = new()
+    {
+        new("default", "Default", "linear-gradient(135deg, rgba(249,115,22,0.1), transparent, rgba(236,72,153,0.1))"),
+        new("sunset", "Sunset", "linear-gradient(135deg, rgba(249,115,22,0.2), rgba(236,72,153,0.1), rgba(168,85,247,0.2))"),
+        new("ocean", "Ocean", "linear-gradient(135deg, rgba(6,182,212,0.2), rgba(59,130,246,0.1), rgba(99,102,241,0.2))"),
+        new("forest", "Forest", "linear-gradient(135deg, rgba(16,185,129,0.2), rgba(34,197,94,0.1), rgba(20,184,166,0.2))"),
+        new("aurora", "Aurora", "linear-gradient(135deg, rgba(139,92,246,0.2), rgba(168,85,247,0.1), rgba(217,70,239,0.2))"),
+        new("midnight", "Midnight", "linear-gradient(135deg, rgba(15,23,42,0.5), rgba(31,41,55,0.3), rgba(39,39,42,0.5))")
+    };
+
+    protected override async Task OnInitializedAsync()
+    {
+        Lang.OnLanguageChanged += HandleLanguageChanged;
+        await LoadSettings();
+        Lang.SetLanguage(_selectedLanguage);
+        MainLayout.PageTitle = Lang.T("settings_title");
+    }
+
+    private async Task LoadSettings()
+    {
+        try
+        {
+            _selectedLanguage = await JS.InvokeAsync<string?>("localStorage.getItem", "settings_language") ?? "EN";
+            _isDarkMode = await JS.InvokeAsync<string?>("localStorage.getItem", "settings_darkMode") == "true";
+            _selectedWallpaper = await JS.InvokeAsync<string?>("localStorage.getItem", "settings_wallpaper") ?? "default";
+            _pushNotifications = await JS.InvokeAsync<string?>("localStorage.getItem", "settings_pushNotifications") != "false";
+            _soundAlerts = await JS.InvokeAsync<string?>("localStorage.getItem", "settings_soundAlerts") != "false";
+            _autoReconnect = await JS.InvokeAsync<string?>("localStorage.getItem", "settings_autoReconnect") != "false";
+            _lowBandwidth = await JS.InvokeAsync<string?>("localStorage.getItem", "settings_lowBandwidth") == "true";
+            
+            var refreshStr = await JS.InvokeAsync<string?>("localStorage.getItem", "settings_refreshInterval");
+            if (int.TryParse(refreshStr, out var refresh) && refresh >= 5 && refresh <= 120)
+            {
+                _refreshInterval = refresh;
+            }
+        }
+        catch
+        {
+            // Use defaults if localStorage fails
+        }
+    }
+
+    private async Task SaveSettings()
+    {
+        try
+        {
+            await JS.InvokeVoidAsync("localStorage.setItem", "settings_language", _selectedLanguage);
+            await JS.InvokeVoidAsync("localStorage.setItem", "settings_darkMode", _isDarkMode.ToString().ToLower());
+            await JS.InvokeVoidAsync("localStorage.setItem", "settings_wallpaper", _selectedWallpaper);
+            await JS.InvokeVoidAsync("localStorage.setItem", "settings_pushNotifications", _pushNotifications.ToString().ToLower());
+            await JS.InvokeVoidAsync("localStorage.setItem", "settings_soundAlerts", _soundAlerts.ToString().ToLower());
+            await JS.InvokeVoidAsync("localStorage.setItem", "settings_autoReconnect", _autoReconnect.ToString().ToLower());
+            await JS.InvokeVoidAsync("localStorage.setItem", "settings_lowBandwidth", _lowBandwidth.ToString().ToLower());
+            await JS.InvokeVoidAsync("localStorage.setItem", "settings_refreshInterval", _refreshInterval.ToString());
+        }
+        catch
+        {
+            // Handle localStorage errors silently
+        }
+    }
+
+    private async Task ToggleTheme()
+    {
+        _isDarkMode = !_isDarkMode;
+        await SaveSettings();
+        await ApplyTheme();
+    }
+
+    private async Task ApplyTheme()
+    {
+        if (_isDarkMode)
+        {
+            await JS.InvokeVoidAsync("eval", "document.documentElement.classList.add('dark'); document.documentElement.classList.remove('light');");
+        }
+        else
+        {
+            await JS.InvokeVoidAsync("eval", "document.documentElement.classList.remove('dark'); document.documentElement.classList.add('light');");
+        }
+    }
+
+    private async Task SelectWallpaper(string id)
+    {
+        _selectedWallpaper = id;
+        await SaveSettings();
+        // Reload to apply wallpaper change
+        await JS.InvokeVoidAsync("eval", "location.reload();");
+    }
+
+    private async Task OnLanguageChanged()
+    {
+        Lang.SetLanguage(_selectedLanguage);
+        await SaveSettings();
+        StateHasChanged();
+    }
+
+    private void HandleLanguageChanged()
+    {
+        InvokeAsync(StateHasChanged);
+    }
+
+    public void Dispose()
+    {
+        Lang.OnLanguageChanged -= HandleLanguageChanged;
+    }
+
+    private record WallpaperOption(string Id, string Name, string Gradient);
+}
