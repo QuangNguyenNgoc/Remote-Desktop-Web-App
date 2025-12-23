@@ -186,7 +186,7 @@ docker run -d -p 5048:5048 remotecontrol-web
 3. **Zip folder publish** và gửi cho user
    ```powershell
    # Zip folder publish: in Agent folder
-Compress-Archive -Path "bin\Release\net10.0-windows\win-x64\publish\*" -DestinationPath "RemoteControlAgent.zip"
+   Compress-Archive -Path "bin\Release\net10.0-windows\win-x64\publish\*" -DestinationPath "RemoteControlAgent.zip"
    ```
 
 4. **User chỉ cần double-click** `RemoteControl.Agent.exe`
