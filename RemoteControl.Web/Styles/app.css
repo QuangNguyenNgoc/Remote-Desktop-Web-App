@@ -89,8 +89,9 @@
   --progress-fill: #10b981;
 }
 
+/* Dark mode - supports both system preference AND manual toggle via .dark class on html */
 @media (prefers-color-scheme: dark) {
-  :root {
+  html:not(.light) {
     /* Body & Base */
     --body-bg: #111827;
     --body-text: #f3f4f6;
@@ -173,6 +174,91 @@
     --progress-bg: #374151;
     --progress-fill: #10b981;
   }
+}
+
+/* Manual dark mode toggle - .dark class on html forces dark mode */
+html.dark {
+  /* Body & Base */
+  --body-bg: #111827;
+  --body-text: #f3f4f6;
+  --scrollbar-track: #111827;
+  --scrollbar-thumb: #374151;
+
+  /* Sidebar & Header */
+  --sidebar-bg: #111827;
+  --sidebar-border: #1f2937;
+  --header-bg: #111827;
+  --header-border: #1f2937;
+  --header-text: #f3f4f6;
+
+  /* Cards */
+  --card-bg: #1f2937;
+  --card-border: #374151;
+  --card-hover-border: #4b5563;
+
+  /* Text Colors */
+  --text-primary: #f3f4f6;
+  --text-secondary: #e5e7eb;
+  --text-tertiary: #d1d5db;
+  --text-quaternary: #9ca3af;
+  --text-white: #ffffff;
+
+  /* Buttons */
+  --btn-primary-bg: #2563eb;
+  --btn-primary-hover: #1d4ed8;
+  --btn-primary-text: #ffffff;
+  --btn-secondary-bg: #374151;
+  --btn-secondary-hover: #4b5563;
+  --btn-secondary-text: #e5e7eb;
+  --btn-disabled-bg: rgba(55, 65, 81, 0.5);
+  --btn-disabled-text: #6b7280;
+
+  /* Tables */
+  --table-bg: #1f2937;
+  --table-header-bg: rgba(17, 24, 39, 0.5);
+  --table-header-text: #9ca3af;
+  --table-row-hover: rgba(31, 41, 55, 0.8);
+  --table-border: #374151;
+  --table-text: #9ca3af;
+  --table-text-primary: #ffffff;
+
+  /* Terminal/Console */
+  --terminal-bg: #000000;
+  --terminal-border: #1f2937;
+  --terminal-text: #d1d5db;
+  --terminal-text-secondary: #6b7280;
+
+  /* Status Colors */
+  --status-online: #10b981;
+  --status-offline: #6b7280;
+  --status-badge-online-bg: rgba(16, 185, 129, 0.1);
+  --status-badge-online-text: #34d399;
+  --status-badge-offline-bg: #374151;
+  --status-badge-offline-text: #9ca3af;
+
+  /* Input Fields */
+  --input-bg: #1f2937;
+  --input-border: #374151;
+  --input-text: #e5e7eb;
+  --input-placeholder: #9ca3af;
+  --input-focus-bg: #374151;
+  --input-focus-border: #2563eb;
+
+  /* Icons & Accents */
+  --icon-bg: #374151;
+  --icon-text: #d1d5db;
+  --nav-active-bg: #2563eb;
+  --nav-active-text: #ffffff;
+  --nav-hover-bg: #1f2937;
+  --nav-hover-text: #ffffff;
+  --nav-text: #9ca3af;
+
+  /* Dividers */
+  --divider: #374151;
+
+  /* Progress Bars */
+  --progress-bg: #374151;
+  --progress-fill: #10b981;
 }
 
 /* Custom Scrollbar cho giao diện dark mode */

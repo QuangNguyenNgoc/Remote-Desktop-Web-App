@@ -27,6 +27,9 @@ builder.Services.AddScoped<ToastService>();
 // Dashboard state persistence service (shared across pages)
 builder.Services.AddScoped<DashboardStateService>();
 
+// Translation service for multi-language support
+builder.Services.AddScoped<TranslationService>();
+
 var app = builder.Build();
 
 if (!app.Environment.IsDevelopment())
